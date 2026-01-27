@@ -1,0 +1,196 @@
+{
+  "emissions": {
+    "pwede": {
+      "nde": 1,
+      "hinde": 0,
+      "pwede": 0
+    },
+    "hinde, hindi": {
+      "nd": 1,
+      "hinde": 0
+    },
+    "hinde": {
+      "hnd": 1,
+      "hinde": 0,
+      "hind": 0,
+      "nd": 0,
+      "nde": 0,
+      "hindi": 0,
+      "pwede": 0
+    },
+    "hindi": {
+      "hnd": 0,
+      "hinde": 0,
+      "hind": 0,
+      "nd": 0,
+      "nde": 0,
+      "hindi": 0,
+      "pwede": 0
+    },
+    "sa": {
+      "s": 2
+    },
+    "siya": {
+      "sy": 1
+    },
+    "sayo": {
+      "sy": 0
+    },
+    "happy birthday": {
+      "hb": 1
+    },
+    "saan": {
+      "sa": 2,
+      "saa": 0,
+      "wlan": 0,
+      "wlang": 0,
+      "walang": 0,
+      "lang": 0,
+      "han": 0,
+      "hang": 0,
+      "hangg": 0,
+      "hangga": 0,
+      "hanggan": 0,
+      "kan": 0,
+      "kant": 0,
+      "kanto": 0
+    },
+    "ikaw": {
+      "u": 2
+    },
+    "oo": {
+      "u": 0
+    },
+    "lang": {
+      "ln": 1,
+      "nng": 0,
+      "ng": 0,
+      "wlang": 0,
+      "walang": 0,
+      "lang": 0,
+      "hang": 0,
+      "hangg": 0,
+      "hangga": 0,
+      "hanggan": 0
+    },
+    "sana": {
+      "na": 0,
+      "nak": 0,
+      "naka": 0,
+      "nakat": 0,
+      "nakata": 0,
+      "nakatam": 0,
+      "nakatamb": 0,
+      "nakatamba": 0,
+      "nakatambay": 0
+    },
+    "kung": {
+      "nng": 0,
+      "ng": 0,
+      "wlang": 0,
+      "walang": 0,
+      "lang": 0,
+      "hang": 0,
+      "hangg": 0,
+      "hangga": 0,
+      "hanggan": 0,
+      "kn": 2
+    },
+    "diyan": {
+      "wlan": 0,
+      "wlang": 0,
+      "walang": 0,
+      "lang": 0,
+      "han": 0,
+      "hang": 0,
+      "hangg": 0,
+      "hangga": 0,
+      "hanggan": 0,
+      "kan": 0,
+      "kant": 0,
+      "kanto": 0
+    },
+    "dito": {
+      "d2": 1
+    }
+  },
+  "transitions": {
+    "<START>": {
+      "pwede": 1,
+      "hinde, hindi": 1,
+      "hinde": 1,
+      "hindi": 0,
+      "lang": 1,
+      "kung": 0,
+      "dito": 1
+    },
+    "ako": {
+      "sa": 0,
+      "siya": 1,
+      "sayo": 0
+    },
+    "siya": {
+      "sa": 1
+    },
+    "sa": {
+      "happy birthday": 1,
+      "diyan": 0,
+      "saan": 0
+    },
+    "birthday": {
+      "sa": 0,
+      "saan": 1
+    },
+    "saan": {
+      "ikaw": 2,
+      "oo": 0
+    },
+    "lang": {
+      "sa": 0,
+      "saan": 0
+    },
+    "dulo": {
+      "sana": 0,
+      "kung": 0,
+      "lang": 0
+    },
+    "ng": {
+      "diyan": 0,
+      "saan": 0,
+      "kung": 0,
+      "lang": 0
+    },
+    "wa": {
+      "kung": 0,
+      "diyan": 0,
+      "saan": 0,
+      "lang": 0
+    },
+    "walang": {
+      "diyan": 0,
+      "saan": 0,
+      "kung": 0,
+      "lang": 0
+    },
+    "hanggan": {
+      "kung": 1
+    },
+    "dito": {
+      "sa": 1
+    },
+    "kanto": {
+      "kung": 0,
+      "lang": 0
+    },
+    "meralco": {
+      "kung": 1
+    },
+    "kung": {
+      "sa": 0,
+      "saan": 1
+    },
+    "ikaw": {
+      "sana": 0
+    }
+  }
+}
