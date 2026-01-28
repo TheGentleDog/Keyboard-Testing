@@ -12,7 +12,7 @@ SHORTCUT_DICT = {
     "aq": ["ako"], "xa": ["siya"], "sya": ["siya"], "u": ["ikaw", "oo"],
     "lng": ["lang"], "nmn": ["naman"], "sna": ["sana"], "s": ["sa"],
     "sry": ["sorry"], "syo": ["sayo"], "hbd": ["happy birthday"],
-    "nde": ["hinde", "hindi"],
+    "nde": ["hinde", "hindi"],"tyo": ["tayo"], "n": ["ng","nang"], "nng": ["nang"],
 }
 
 MAX_SUGGESTIONS = 5
