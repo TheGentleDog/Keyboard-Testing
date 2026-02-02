@@ -28,7 +28,7 @@
       "pwede": 0
     },
     "sa": {
-      "s": 2
+      "s": 3
     },
     "siya": {
       "sy": 1
@@ -53,7 +53,10 @@
       "hanggan": 0,
       "kan": 0,
       "kant": 0,
-      "kanto": 0
+      "kanto": 0,
+      "an": 0,
+      "ank": 0,
+      "tan": 0
     },
     "ikaw": {
       "u": 2
@@ -62,16 +65,17 @@
       "u": 0
     },
     "lang": {
-      "ln": 1,
+      "ln": 2,
       "nng": 0,
-      "ng": 0,
+      "ng": 1,
       "wlang": 0,
       "walang": 0,
       "lang": 0,
       "hang": 0,
       "hangg": 0,
       "hangga": 0,
-      "hanggan": 0
+      "hanggan": 0,
+      "nga": 0
     },
     "sana": {
       "na": 0,
@@ -94,7 +98,8 @@
       "hangg": 0,
       "hangga": 0,
       "hanggan": 0,
-      "kn": 2
+      "kn": 2,
+      "nga": 0
     },
     "diyan": {
       "wlan": 0,
@@ -108,10 +113,79 @@
       "hanggan": 0,
       "kan": 0,
       "kant": 0,
-      "kanto": 0
+      "kanto": 0,
+      "an": 0,
+      "ank": 0,
+      "tan": 0,
+      "johjan": 0
     },
     "dito": {
       "d2": 1
+    },
+    "meron": {
+      "mr": 2,
+      "meron": 0,
+      "rn": 1
+    },
+    "juan": {
+      "jua": 1
+    },
+    "department": {
+      "d": 1
+    },
+    "mv": {
+      "m": 1
+    },
+    "magkakahiwalay": {
+      "": 1
+    },
+    "militanteng": {
+      "": 1
+    },
+    "mosyon": {
+      "": 1
+    },
+    "marcos": {
+      "": 1
+    },
+    "marikina": {
+      "": 1
+    },
+    "anak": {
+      "an": 1
+    },
+    "anakpawis": {
+      "": 1
+    },
+    "armed": {
+      "a": 1
+    },
+    "asawa": {
+      "": 1
+    },
+    "aktor": {
+      "": 6
+    },
+    "appropriations": {
+      "": 2,
+      "a": 1
+    },
+    "aminado": {
+      "": 1
+    },
+    "did": {
+      "d": 1
+    },
+    "block": {
+      "blo": 1,
+      "block": 1,
+      "": 8
+    },
+    "araw": {
+      "araw": 1
+    },
+    "trabaho": {
+      "t": 1
     }
   },
   "transitions": {
@@ -120,9 +194,10 @@
       "hinde, hindi": 1,
       "hinde": 1,
       "hindi": 0,
-      "lang": 1,
+      "lang": 2,
       "kung": 0,
-      "dito": 1
+      "dito": 1,
+      "meron": 1
     },
     "ako": {
       "sa": 0,
@@ -135,7 +210,14 @@
     "sa": {
       "happy birthday": 1,
       "diyan": 0,
-      "saan": 0
+      "saan": 0,
+      "mv": 1,
+      "magkakahiwalay": 1,
+      "ni": 1,
+      "ng": 5,
+      "ang": 2,
+      "ay": 2,
+      "na": 3
     },
     "birthday": {
       "sa": 0,
@@ -147,7 +229,9 @@
     },
     "lang": {
       "sa": 0,
-      "saan": 0
+      "saan": 0,
+      "diyan": 0,
+      "anak": 1
     },
     "dulo": {
       "sana": 0,
@@ -158,7 +242,11 @@
       "diyan": 0,
       "saan": 0,
       "kung": 0,
-      "lang": 0
+      "lang": 0,
+      "ng": 1,
+      "na": 3,
+      "sa": 7,
+      "ay": 2
     },
     "wa": {
       "kung": 0,
@@ -191,6 +279,133 @@
     },
     "ikaw": {
       "sana": 0
+    },
+    "kuya": {
+      "meron": 1
+    },
+    "news": {
+      "juan": 1
+    },
+    "": {
+      "meron": 0,
+      "lang": 0,
+      "sa": 0
+    },
+    "meron": {
+      "department": 1
+    },
+    "mv": {
+      "militanteng": 1
+    },
+    "magkakahiwalay": {
+      "mosyon": 1
+    },
+    "militanteng": {
+      "marcos": 1
+    },
+    "mosyon": {
+      "marikina": 1
+    },
+    "anakpawis": {
+      "armed": 1,
+      "asawa": 1
+    },
+    "armed": {
+      "aktor": 1
+    },
+    "asawa": {
+      "aktor": 1
+    },
+    "aktor": {
+      "aktor": 4,
+      "appropriations": 2
+    },
+    "appropriations": {
+      "aminado": 1,
+      "committee": 1
+    },
+    "ang": {
+      "did": 1,
+      "mga": 2,
+      "araw": 1,
+      "ng": 1,
+      "sa": 4,
+      "na": 2,
+      "ay": 1
+    },
+    "did": {
+      "appropriations": 1,
+      "not": 1
+    },
+    "not": {
+      "at": 1
+    },
+    "s": {
+      "saan": 0,
+      "sa": 0
+    },
+    "ni": {
+      "villar": 1,
+      "ni": 3,
+      "mga": 2
+    },
+    "ga": {
+      "villar": 1,
+      "sa": 1
+    },
+    "villar": {
+      "sa": 1
+    },
+    "na": {
+      "na": 1,
+      "ang": 5,
+      "mga": 1,
+      "ng": 1,
+      "sa": 1
+    },
+    "mga": {
+      "mga": 12,
+      "ni": 2,
+      "ng": 3,
+      "diyan": 0,
+      "saan": 0,
+      "trabaho": 1,
+      "ang": 1
+    },
+    "block": {
+      "block": 7
+    },
+    "puki": {
+      "na": 1
+    },
+    "kulay": {
+      "ang": 1
+    },
+    "araw": {
+      "buwan": 1
+    },
+    "buwan": {
+      "bituin": 1
+    },
+    "bituin": {
+      "langit": 1
+    },
+    "langit": {
+      "lupa": 1
+    },
+    "lupa": {
+      "mga": 1
+    },
+    "rey": {
+      "diyan": 0,
+      "ang": 1
+    },
+    "johjan": {
+      "mga": 1
+    },
+    "ay": {
+      "ng": 3,
+      "ang": 1
     }
   }
 }
