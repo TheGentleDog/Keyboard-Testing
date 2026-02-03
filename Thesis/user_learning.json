@@ -1,11 +1,64 @@
 {
-  "user_shortcuts": {},
-  "user_shortcut_usage": {},
-  "manual_shortcuts": {
-    "tyo": "tayo",
-    "kyo": "kayo",
-    "kya": "kuya"
+  "user_shortcuts": {
+    "sy": "siya",
+    "tayo": "tayong",
+    "ry": "ryan"
+  },
+  "user_shortcut_usage": {
+    "sy": 1,
+    "tayo": 1,
+    "ry": 1
   },
   "new_words": [],
-  "word_usage_history": []
+  "word_usage_history": [
+    [
+      "sa",
+      [
+        "tayo"
+      ]
+    ],
+    [
+      "siya",
+      [
+        "tayo",
+        "sa"
+      ]
+    ],
+    [
+      "ang",
+      [
+        "sa",
+        "siya"
+      ]
+    ],
+    [
+      "bata",
+      [
+        "siya",
+        "ang"
+      ]
+    ],
+    [
+      "tayong",
+      [
+        "ang",
+        "bata"
+      ]
+    ],
+    [
+      "magagawa",
+      [
+        "bata",
+        "tayong"
+      ]
+    ],
+    [
+      "dyan",
+      []
+    ],
+    [
+      "ang",
+      []
+    ]
+  ]
 }
