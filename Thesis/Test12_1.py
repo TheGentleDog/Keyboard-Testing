@@ -7,7 +7,7 @@ from datasets import load_dataset
 import pickle
 
 # Configuration
-MAX_SUGGESTIONS = 8
+MAX_SUGGESTIONS = 5
 NGRAM_CACHE_FILE = "ngram_model.pkl"
 VOCAB_CACHE_FILE = "vocabulary.pkl"
 USER_LEARNING_FILE = "user_learning.json"  # NEW: Store user-specific learning
@@ -118,7 +118,11 @@ class NgramModel:
         self.total_words = len(fallback) * 10
     
     def _build_char_ngrams(self, word):
-   
+        """
+        Build character-level bigrams and trigrams within a word.
+        Example: "tayo" → bigrams: "ta"→"y", "ay"→"o", "yo"→END
+                        trigrams: ("t","a")→"y", ("a","y")→"o"
+        """
         if len(word) < 2:
             return
         
@@ -147,13 +151,24 @@ class NgramModel:
         → Look up what commonly follows "ta" in Filipino words
         → Returns: ["tayo", "talaga", "tahimik", ...]
         """
-        if len(prefix) < 2:
+        if len(prefix) < 1:
             return []
         
         completions = []
         
-        # Find words that start with this prefix
-        candidates = [word for word in self.vocabulary if word.startswith(prefix)]
+        # Minimum word length based on prefix
+        if len(prefix) == 1:
+            min_length = 2  # Allow 2-letter words for single char prefix
+        else:
+            min_length = max(len(prefix) + 1, 3)
+        
+        # Find words that start with this prefix, meet min length, and are alphabetic
+        candidates = [
+            word for word in self.vocabulary 
+            if word.startswith(prefix) 
+            and len(word) >= min_length
+            and word.isalpha()  # No punctuation
+        ]
         
         # Score based on character continuation probability
         scored = []
@@ -662,7 +677,20 @@ class NgramModel:
         candidates = []
         
         # Strategy 1: Exact prefix matches (best candidates)
-        exact_matches = [word for word in self.vocabulary if word.startswith(prefix)]
+        # Filter logic:
+        # - If prefix is 1 char: allow words >= 2 chars
+        # - Otherwise: allow words >= 3 chars or prefix+1
+        if len(prefix) == 1:
+            min_word_length = 2  # Allow 2-letter words for single letter input
+        else:
+            min_word_length = max(len(prefix) + 1, 3)
+        
+        exact_matches = [
+            word for word in self.vocabulary 
+            if word.startswith(prefix) 
+            and len(word) >= min_word_length
+            and word.isalpha()  # Exclude words with punctuation like "tao,-"
+        ]
         
         # Strategy 1.5: CHARACTER-LEVEL N-GRAM boost (NEW!)
         # Get character-based completions and boost their scores
@@ -678,7 +706,7 @@ class NgramModel:
         
         # Add character completions that might not be in exact matches
         for word in char_completions:
-            if word not in exact_matches:
+            if word not in exact_matches and len(word) >= min_word_length and word.isalpha():
                 candidates.append((word, True, False, 1.3))  # Still boost, but less
         
         # Strategy 2: Typo tolerance - find words with small edit distance
@@ -686,8 +714,16 @@ class NgramModel:
         if len(exact_matches) < max_results:
             for word in self.vocabulary:
                 if word not in exact_matches:
-                    # Only consider words of similar length (within 2 chars)
-                    if abs(len(word) - len(prefix)) <= 2:
+                    # Skip very short words
+                    if len(word) < min_word_length:
+                        continue
+                    
+                    # Skip words with punctuation
+                    if not word.isalpha():
+                        continue
+                    
+                    # Only consider words of similar length (within 3 chars for better flexibility)
+                    if abs(len(word) - len(prefix)) <= 3:
                         distance = damerau_levenshtein_distance(prefix, word[:len(prefix)])
                         # Only include if distance is small (1-2 edits)
                         if distance <= 2:

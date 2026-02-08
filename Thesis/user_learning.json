@@ -2,12 +2,14 @@
   "user_shortcuts": {
     "sy": "siya",
     "tayo": "tayong",
-    "ry": "ryan"
+    "ry": "ryan",
+    "d2": "dito"
   },
   "user_shortcut_usage": {
-    "sy": 1,
+    "sy": 2,
     "tayo": 1,
-    "ry": 1
+    "ry": 1,
+    "d2": 1
   },
   "new_words": [],
   "word_usage_history": [
@@ -58,6 +60,149 @@
     ],
     [
       "ang",
+      []
+    ],
+    [
+      "ang",
+      []
+    ],
+    [
+      "mga",
+      [
+        "Ang"
+      ]
+    ],
+    [
+      "sa",
+      [
+        "Ang",
+        "Mga"
+      ]
+    ],
+    [
+      "mga",
+      [
+        "Mga",
+        "Sa"
+      ]
+    ],
+    [
+      "mga",
+      [
+        "Sa",
+        "Mga"
+      ]
+    ],
+    [
+      "sa",
+      [
+        "Mga",
+        "Mga"
+      ]
+    ],
+    [
+      "ang",
+      [
+        "Mga",
+        "Sa"
+      ]
+    ],
+    [
+      "na",
+      [
+        "Sa",
+        "Ang"
+      ]
+    ],
+    [
+      "ay",
+      [
+        "Ang",
+        "Na"
+      ]
+    ],
+    [
+      "at",
+      [
+        "Na",
+        "Ay"
+      ]
+    ],
+    [
+      "si",
+      [
+        "Ay",
+        "At"
+      ]
+    ],
+    [
+      "sa",
+      [
+        "At",
+        "Si"
+      ]
+    ],
+    [
+      "mga",
+      [
+        "Si",
+        "Sa"
+      ]
+    ],
+    [
+      "tayo",
+      []
+    ],
+    [
+      "sa",
+      [
+        "Tayo"
+      ]
+    ],
+    [
+      "sa",
+      [
+        "Tayo",
+        "Sa"
+      ]
+    ],
+    [
+      "ang",
+      [
+        "Sa",
+        "Sa"
+      ]
+    ],
+    [
+      "sa",
+      [
+        "Sa",
+        "Ang"
+      ]
+    ],
+    [
+      "ay",
+      [
+        "Ang",
+        "Sa"
+      ]
+    ],
+    [
+      "na",
+      [
+        "Sa",
+        "Ay"
+      ]
+    ],
+    [
+      "si",
+      [
+        "Ay",
+        "Na"
+      ]
+    ],
+    [
+      "siya",
       []
     ]
   ]

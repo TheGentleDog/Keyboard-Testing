@@ -7,10 +7,17 @@ from datasets import load_dataset
 import pickle
 
 # Configuration
-MAX_SUGGESTIONS = 8
+MAX_SUGGESTIONS = 5
 NGRAM_CACHE_FILE = "ngram_model.pkl"
 VOCAB_CACHE_FILE = "vocabulary.pkl"
 USER_LEARNING_FILE = "user_learning.json"  # NEW: Store user-specific learning
+
+# GitHub shortcut library URLs
+SHORTCUT_LIBRARY_URLS = [
+    "https://raw.githubusercontent.com/ljyflores/efficient-spelling-normalization-filipino/main/data/train_words.csv",
+    "https://raw.githubusercontent.com/ljyflores/efficient-spelling-normalization-filipino/main/data/test_words.csv"
+]
+SHORTCUT_LIBRARY_CACHE = "shortcut_library.json"
 
 # ---------------------------------------------------------------------
 # N-GRAM LANGUAGE MODEL
@@ -25,12 +32,19 @@ class NgramModel:
         self.learned_shortcuts = {}  # Maps shortcuts to full words
         self.shortcut_frequencies = Counter()  # Track how often shortcuts appear
         
+        # NEW: Character/syllable-level n-grams for within-word completion
+        self.char_bigrams = defaultdict(Counter)   # "ta" → {"yo": 50, "ga": 30}
+        self.char_trigrams = defaultdict(Counter)  # ("t", "a") → {"y": 50, "l": 30}
+        
         # NEW: User learning tracking
         self.user_shortcuts = {}  # User-typed shortcuts → full words
         self.user_shortcut_usage = Counter()  # How often user uses each shortcut
         self.manual_shortcuts = {}  # Manually added shortcuts
         self.new_words = set()  # Words user added that aren't in dataset
         self.word_usage_history = []  # Track user's typing patterns
+        
+        # NEW: CSV shortcut library (from GitHub)
+        self.csv_shortcuts = {}  # Loaded from CSV files (informal→formal)
         
     def train_from_dataset(self):
         """Load and train n-gram model from TLUnified NER dataset"""
@@ -56,6 +70,9 @@ class NgramModel:
                     # Unigram
                     self.unigrams[token] += 1
                     self.total_words += 1
+                    
+                    # Build character-level n-grams within each word
+                    self._build_char_ngrams(token)
                     
                     # Bigram
                     if i > 0:
@@ -99,6 +116,81 @@ class NgramModel:
         for word in fallback:
             self.unigrams[word] = 10
         self.total_words = len(fallback) * 10
+    
+    def _build_char_ngrams(self, word):
+        """
+        Build character-level bigrams and trigrams within a word.
+        Example: "tayo" → bigrams: "ta"→"y", "ay"→"o", "yo"→END
+                        trigrams: ("t","a")→"y", ("a","y")→"o"
+        """
+        if len(word) < 2:
+            return
+        
+        # Character bigrams (2-char sequences)
+        for i in range(len(word) - 1):
+            bigram = word[i:i+2]  # "ta", "ay", "yo"
+            if i < len(word) - 2:
+                next_char = word[i+2]
+                self.char_bigrams[bigram][next_char] += 1
+            else:
+                # Mark end of word
+                self.char_bigrams[bigram]["<END>"] += 1
+        
+        # Character trigrams (3-char sequences predicting 4th)
+        for i in range(len(word) - 2):
+            trigram = (word[i], word[i+1])
+            if i < len(word) - 3:
+                next_char = word[i+3]
+                self.char_trigrams[trigram][next_char] += 1
+    
+    def get_char_level_completions(self, prefix, max_results=5):
+        """
+        Get word completions based on character-level n-grams.
+        
+        Example: prefix="ta" 
+        → Look up what commonly follows "ta" in Filipino words
+        → Returns: ["tayo", "talaga", "tahimik", ...]
+        """
+        if len(prefix) < 2:
+            return []
+        
+        completions = []
+        
+        # Minimum word length to avoid single letters
+        min_length = max(len(prefix) + 1, 3)  # At least 3 chars or prefix+1
+        
+        # Find words that start with this prefix and meet minimum length
+        candidates = [
+            word for word in self.vocabulary 
+            if word.startswith(prefix) and len(word) >= min_length
+        ]
+        
+        # Score based on character continuation probability
+        scored = []
+        for word in candidates:
+            score = 0
+            
+            # Check character bigram patterns
+            for i in range(len(prefix), len(word) - 1):
+                if i >= 2:
+                    bigram = word[i-2:i]
+                    if bigram in self.char_bigrams:
+                        next_char = word[i]
+                        count = self.char_bigrams[bigram].get(next_char, 0)
+                        total = sum(self.char_bigrams[bigram].values())
+                        if total > 0:
+                            score += count / total
+            
+            # Boost score based on word frequency
+            freq_score = self.unigrams.get(word, 0) / max(self.total_words, 1)
+            final_score = score + (freq_score * 10)  # Weight word frequency higher
+            
+            scored.append((word, final_score))
+        
+        # Sort by score
+        scored.sort(key=lambda x: x[1], reverse=True)
+        
+        return [word for word, score in scored[:max_results]]
     
     def _learn_shortcuts_from_vocabulary(self):
         """
@@ -210,20 +302,81 @@ class NgramModel:
                 freq = self.shortcut_frequencies[shortcut]
                 print(f"   '{shortcut}' → '{full_word}' (freq: {freq})")
     
+    def load_shortcut_library(self):
+        """
+        Load additional shortcuts from GitHub CSV files.
+        These contain informal→formal Filipino word mappings.
+        
+        CSV format: informal,formal
+        Example: "lng,lang"
+        """
+        # Try to load from cache first
+        if os.path.exists(SHORTCUT_LIBRARY_CACHE):
+            try:
+                with open(SHORTCUT_LIBRARY_CACHE, 'r', encoding='utf-8') as f:
+                    self.csv_shortcuts = json.load(f)
+                print(f"✓ Loaded {len(self.csv_shortcuts)} shortcuts from cache")
+                return
+            except Exception as e:
+                print(f"⚠ Error loading cached shortcuts: {e}")
+        
+        # Download and parse CSV files
+        print("\n📚 Loading shortcut library from GitHub...")
+        
+        import urllib.request
+        import csv
+        import io
+        
+        for url in SHORTCUT_LIBRARY_URLS:
+            try:
+                print(f"  Downloading: {url.split('/')[-1]}...")
+                
+                # Download CSV
+                response = urllib.request.urlopen(url, timeout=10)
+                csv_data = response.read().decode('utf-8')
+                
+                # Parse CSV
+                csv_reader = csv.reader(io.StringIO(csv_data))
+                next(csv_reader, None)  # Skip header if exists
+                
+                count = 0
+                for row in csv_reader:
+                    if len(row) >= 2:
+                        informal = row[0].strip().lower()
+                        formal = row[1].strip().lower()
+                        
+                        # Only add if informal is shorter (it's a shortcut)
+                        if informal and formal and len(informal) < len(formal):
+                            self.csv_shortcuts[informal] = formal
+                            count += 1
+                
+                print(f"  ✓ Loaded {count} shortcuts from {url.split('/')[-1]}")
+                
+            except Exception as e:
+                print(f"  ⚠ Error loading {url.split('/')[-1]}: {e}")
+        
+        # Save to cache
+        try:
+            with open(SHORTCUT_LIBRARY_CACHE, 'w', encoding='utf-8') as f:
+                json.dump(self.csv_shortcuts, f, indent=2, ensure_ascii=False)
+            print(f"✓ Cached {len(self.csv_shortcuts)} shortcuts")
+        except Exception as e:
+            print(f"⚠ Error caching shortcuts: {e}")
+    
     def resolve_shortcut(self, word):
         """
         Resolve a word to its full form if it's a shortcut.
-        Checks multiple sources in priority order.
+        Priority: User > CSV Library > Dataset
         """
         word_lower = word.lower()
         
-        # Priority 1: User shortcuts (highest priority - user's personal style)
+        # Priority 1: User shortcuts (highest - user's personal patterns)
         if word_lower in self.user_shortcuts:
             return self.user_shortcuts[word_lower]
         
-        # Priority 2: Manual shortcuts (admin-added)
-        if word_lower in self.manual_shortcuts:
-            return self.manual_shortcuts[word_lower]
+        # Priority 2: CSV shortcut library (curated informal→formal)
+        if word_lower in self.csv_shortcuts:
+            return self.csv_shortcuts[word_lower]
         
         # Priority 3: Dataset-learned shortcuts
         if word_lower in self.learned_shortcuts:
@@ -244,10 +397,10 @@ class NgramModel:
         if shortcut_lower in self.user_shortcuts:
             expansions.append((self.user_shortcuts[shortcut_lower], 'user'))
         
-        if shortcut_lower in self.manual_shortcuts:
-            word = self.manual_shortcuts[shortcut_lower]
+        if shortcut_lower in self.csv_shortcuts:
+            word = self.csv_shortcuts[shortcut_lower]
             if word not in [w for w, _ in expansions]:
-                expansions.append((word, 'manual'))
+                expansions.append((word, 'csv'))
         
         if shortcut_lower in self.learned_shortcuts:
             word = self.learned_shortcuts[shortcut_lower]
@@ -255,14 +408,6 @@ class NgramModel:
                 expansions.append((word, 'learned'))
         
         return expansions
-    
-    def add_manual_shortcut(self, shortcut, full_word):
-        """
-        Add a manual shortcut mapping.
-        """
-        self.manual_shortcuts[shortcut.lower()] = full_word.lower()
-        print(f"✓ Added manual shortcut: '{shortcut}' → '{full_word}'")
-        self.save_user_learning()
     
     def learn_from_user_typing(self, typed_shortcut, selected_word):
         """
@@ -337,7 +482,6 @@ class NgramModel:
         user_data = {
             'user_shortcuts': self.user_shortcuts,
             'user_shortcut_usage': dict(self.user_shortcut_usage),
-            'manual_shortcuts': self.manual_shortcuts,
             'new_words': list(self.new_words),
             'word_usage_history': self.word_usage_history[-100:]  # Keep last 100
         }
@@ -362,7 +506,6 @@ class NgramModel:
             
             self.user_shortcuts = user_data.get('user_shortcuts', {})
             self.user_shortcut_usage = Counter(user_data.get('user_shortcut_usage', {}))
-            self.manual_shortcuts = user_data.get('manual_shortcuts', {})
             self.new_words = set(user_data.get('new_words', []))
             self.word_usage_history = user_data.get('word_usage_history', [])
             
@@ -371,7 +514,6 @@ class NgramModel:
             
             print(f"✓ Loaded user learning:")
             print(f"  User shortcuts: {len(self.user_shortcuts)}")
-            print(f"  Manual shortcuts: {len(self.manual_shortcuts)}")
             print(f"  New words: {len(self.new_words)}")
             
         except Exception as e:
@@ -383,6 +525,8 @@ class NgramModel:
             'unigrams': dict(self.unigrams),
             'bigrams': {k: dict(v) for k, v in self.bigrams.items()},
             'trigrams': {k: dict(v) for k, v in self.trigrams.items()},
+            'char_bigrams': {k: dict(v) for k, v in self.char_bigrams.items()},
+            'char_trigrams': {k: dict(v) for k, v in self.char_trigrams.items()},
             'vocabulary': list(self.vocabulary),
             'total_words': self.total_words,
             'learned_shortcuts': self.learned_shortcuts,
@@ -392,6 +536,7 @@ class NgramModel:
             pickle.dump(data, f)
         print(f"✓ Saved n-gram model to {NGRAM_CACHE_FILE}")
         print(f"✓ Saved {len(self.learned_shortcuts)} learned shortcuts")
+        print(f"✓ Saved {len(self.char_bigrams)} character bigrams")
     
     def load_cache(self):
         """Load trained model from disk"""
@@ -411,6 +556,17 @@ class NgramModel:
             for k, v in data['trigrams'].items():
                 self.trigrams[k] = Counter(v)
             
+            # Load character-level n-grams if available
+            self.char_bigrams = defaultdict(Counter)
+            if 'char_bigrams' in data:
+                for k, v in data['char_bigrams'].items():
+                    self.char_bigrams[k] = Counter(v)
+            
+            self.char_trigrams = defaultdict(Counter)
+            if 'char_trigrams' in data:
+                for k, v in data['char_trigrams'].items():
+                    self.char_trigrams[k] = Counter(v)
+            
             self.vocabulary = set(data['vocabulary'])
             self.total_words = data['total_words']
             
@@ -422,6 +578,7 @@ class NgramModel:
             print(f"  Vocabulary: {len(self.vocabulary)} words")
             print(f"  Total words: {self.total_words}")
             print(f"  Learned shortcuts: {len(self.learned_shortcuts)}")
+            print(f"  Character bigrams: {len(self.char_bigrams)}")
             return True
         except Exception as e:
             print(f"⚠ Error loading cache: {e}")
@@ -501,24 +658,60 @@ class NgramModel:
         if all_expansions:
             # Add all possible expansions with priority based on source
             for full_word, source in all_expansions:
-                # Higher priority for user shortcuts
-                priority_multiplier = 3.0 if source == 'user' else 2.0 if source == 'manual' else 1.5
+                # Priority: User (3x) > CSV Library (2x) > Dataset (1.5x)
+                if source == 'user':
+                    priority_multiplier = 3.0
+                elif source == 'csv':
+                    priority_multiplier = 2.0
+                else:  # learned
+                    priority_multiplier = 1.5
+                
                 shortcut_candidates.append((full_word, True, True, priority_multiplier))  # word, exact, shortcut, priority
         
         # Find all words that start with prefix OR are close via edit distance
         candidates = []
         
         # Strategy 1: Exact prefix matches (best candidates)
-        exact_matches = [word for word in self.vocabulary if word.startswith(prefix)]
-        candidates.extend([(word, True, False, 1.0) for word in exact_matches])  # Not shortcuts, default priority
+        # Filter out very short words unless prefix is also very short
+        min_word_length = max(len(prefix) + 1, 3)  # At least 3 chars, or prefix+1
+        
+        exact_matches = [
+            word for word in self.vocabulary 
+            if word.startswith(prefix) and len(word) >= min_word_length
+        ]
+        
+        # Strategy 1.5: CHARACTER-LEVEL N-GRAM boost (NEW!)
+        # Get character-based completions and boost their scores
+        char_completions = self.get_char_level_completions(prefix, max_results=10)
+        
+        for word in exact_matches:
+            # Skip single character or very short words unless prefix is also very short
+            if len(word) < 2 and len(prefix) < 2:
+                continue
+            
+            # Check if word is in character-level completions (has good char patterns)
+            if word in char_completions:
+                # Higher priority - good character continuation patterns
+                candidates.append((word, True, False, 1.5))  # 1.5x boost for char patterns
+            else:
+                candidates.append((word, True, False, 1.0))  # Normal priority
+        
+        # Add character completions that might not be in exact matches
+        for word in char_completions:
+            if word not in exact_matches and len(word) >= min_word_length:
+                candidates.append((word, True, False, 1.3))  # Still boost, but less
         
         # Strategy 2: Typo tolerance - find words with small edit distance
         # Only if we have few exact matches
         if len(exact_matches) < max_results:
             for word in self.vocabulary:
                 if word not in exact_matches:
-                    # Only consider words of similar length (within 2 chars)
-                    if abs(len(word) - len(prefix)) <= 2:
+                    # Skip very short words
+                    if len(word) < min_word_length:
+                        continue
+                    
+                    # Only consider words of similar length (within 3 chars for better flexibility)
+                    if abs(len(word) - len(prefix)) <= 3:
                         distance = damerau_levenshtein_distance(prefix, word[:len(prefix)])
                         # Only include if distance is small (1-2 edits)
                         if distance <= 2:
@@ -678,6 +871,10 @@ if not ngram_model.load_cache():
 # Load user-specific learning (shortcuts, new words, etc.)
 print("\nLoading user learning...")
 ngram_model.load_user_learning()
+
+# Load additional shortcut library from GitHub CSV files
+print("\nLoading shortcut library...")
+ngram_model.load_shortcut_library()
 
 # ---------------------------------------------------------------------
 # DAMERAU-LEVENSHTEIN DISTANCE
@@ -1071,12 +1268,6 @@ class FilipinoIME(tk.Tk):
                                             self.update_suggestions()])
         clear_btn.pack(side="left", padx=2, ipadx=5, expand=True, fill="x")
         
-        # NEW: Shortcut Manager button
-        shortcut_btn = ttk.Button(func_row, text="⚙ Shortcuts", 
-                             style="Keyboard.TButton",
-                             command=self.open_shortcut_manager)
-        shortcut_btn.pack(side="left", padx=2, ipadx=5, expand=True, fill="x")
-        
         # Number row
         row_num = ttk.Frame(parent)
         row_num.grid(row=1, column=0, sticky="ew", pady=2)
@@ -1128,117 +1319,6 @@ class FilipinoIME(tk.Tk):
                               command=self.space)
         space_btn.pack(ipadx=50, ipady=10, expand=True, fill="x")
     
-    def open_shortcut_manager(self):
-        """Open a dialog to manage shortcuts"""
-        # Create popup window
-        dialog = tk.Toplevel(self)
-        dialog.title("Shortcut Manager")
-        dialog.geometry("600x500")
-        dialog.transient(self)
-        dialog.grab_set()
-        
-        # Main container
-        container = ttk.Frame(dialog, padding="10")
-        container.pack(fill="both", expand=True)
-        
-        # Title
-        title = ttk.Label(container, text="Manage Shortcuts", font=("Segoe UI", 14, "bold"))
-        title.pack(pady=(0, 10))
-        
-        # Add new shortcut section
-        add_frame = ttk.LabelFrame(container, text="Add New Shortcut", padding="10")
-        add_frame.pack(fill="x", pady=(0, 10))
-        
-        ttk.Label(add_frame, text="Shortcut:").grid(row=0, column=0, sticky="w", padx=5)
-        shortcut_entry = ttk.Entry(add_frame, width=15)
-        shortcut_entry.grid(row=0, column=1, padx=5)
-        
-        ttk.Label(add_frame, text="→").grid(row=0, column=2, padx=5)
-        
-        ttk.Label(add_frame, text="Full Word:").grid(row=0, column=3, sticky="w", padx=5)
-        word_entry = ttk.Entry(add_frame, width=15)
-        word_entry.grid(row=0, column=4, padx=5)
-        
-        def add_shortcut():
-            shortcut = shortcut_entry.get().strip()
-            word = word_entry.get().strip()
-            if shortcut and word:
-                ngram_model.add_manual_shortcut(shortcut, word)
-                shortcut_entry.delete(0, 'end')
-                word_entry.delete(0, 'end')
-                refresh_list()
-                self.status_bar.config(text=f"Added shortcut: '{shortcut}' → '{word}'")
-        
-        add_btn = ttk.Button(add_frame, text="Add", command=add_shortcut)
-        add_btn.grid(row=0, column=5, padx=5)
-        
-        # Shortcuts list
-        list_frame = ttk.LabelFrame(container, text="Current Shortcuts", padding="10")
-        list_frame.pack(fill="both", expand=True)
-        
-        # Create Treeview for shortcuts
-        columns = ('Shortcut', 'Full Word', 'Source', 'Usage')
-        tree = ttk.Treeview(list_frame, columns=columns, show='headings', height=15)
-        
-        tree.heading('Shortcut', text='Shortcut')
-        tree.heading('Full Word', text='Full Word')
-        tree.heading('Source', text='Source')
-        tree.heading('Usage', text='Usage Count')
-        
-        tree.column('Shortcut', width=100)
-        tree.column('Full Word', width=150)
-        tree.column('Source', width=100)
-        tree.column('Usage', width=100)
-        
-        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=tree.yview)
-        tree.configure(yscrollcommand=scrollbar.set)
-        
-        tree.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-        
-        def refresh_list():
-            # Clear tree
-            for item in tree.get_children():
-                tree.delete(item)
-            
-            # Collect all shortcuts
-            all_shortcuts = []
-            
-            # User shortcuts
-            for sc, word in ngram_model.user_shortcuts.items():
-                usage = ngram_model.user_shortcut_usage.get(sc, 0)
-                all_shortcuts.append((sc, word, 'User', usage))
-            
-            # Manual shortcuts
-            for sc, word in ngram_model.manual_shortcuts.items():
-                if sc not in ngram_model.user_shortcuts:
-                    all_shortcuts.append((sc, word, 'Manual', 0))
-            
-            # Dataset shortcuts
-            for sc, word in ngram_model.learned_shortcuts.items():
-                if sc not in ngram_model.user_shortcuts and sc not in ngram_model.manual_shortcuts:
-                    freq = ngram_model.shortcut_frequencies.get(sc, 0)
-                    all_shortcuts.append((sc, word, 'Dataset', freq))
-            
-            # Sort by usage/frequency
-            all_shortcuts.sort(key=lambda x: x[3], reverse=True)
-            
-            # Add to tree
-            for sc, word, source, usage in all_shortcuts:
-                tree.insert('', 'end', values=(sc, word, source, usage))
-        
-        refresh_list()
-        
-        # Bottom buttons
-        btn_frame = ttk.Frame(container)
-        btn_frame.pack(fill="x", pady=(10, 0))
-        
-        close_btn = ttk.Button(btn_frame, text="Close", command=dialog.destroy)
-        close_btn.pack(side="right")
-        
-        # Bind Enter key to add shortcut
-        shortcut_entry.bind('<Return>', lambda e: add_shortcut())
-        word_entry.bind('<Return>', lambda e: add_shortcut())
 
 # ---------------------------------------------------------------------
 # RUN APPLICATION

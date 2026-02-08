@@ -10,6 +10,14 @@ import pickle
 MAX_SUGGESTIONS = 8
 NGRAM_CACHE_FILE = "ngram_model.pkl"
 VOCAB_CACHE_FILE = "vocabulary.pkl"
+USER_LEARNING_FILE = "user_learning.json"  # NEW: Store user-specific learning
+
+# GitHub shortcut library URLs
+SHORTCUT_LIBRARY_URLS = [
+    "https://raw.githubusercontent.com/ljyflores/efficient-spelling-normalization-filipino/main/data/train_words.csv",
+    "https://raw.githubusercontent.com/ljyflores/efficient-spelling-normalization-filipino/main/data/test_words.csv"
+]
+SHORTCUT_LIBRARY_CACHE = "shortcut_library.json"
 
 # ---------------------------------------------------------------------
 # N-GRAM LANGUAGE MODEL
@@ -24,56 +32,173 @@ class NgramModel:
         self.learned_shortcuts = {}  # Maps shortcuts to full words
         self.shortcut_frequencies = Counter()  # Track how often shortcuts appear
         
-    def train_from_dataset(self):
-        """Load and train n-gram model from TLUnified NER dataset"""
-        print("Loading TLUnified NER dataset...")
+        # NEW: Character/syllable-level n-grams for within-word completion
+        self.char_bigrams = defaultdict(Counter)   # "ta" → {"yo": 50, "ga": 30}
+        self.char_trigrams = defaultdict(Counter)  # ("t", "a") → {"y": 50, "l": 30}
         
+        # NEW: User learning tracking
+        self.user_shortcuts = {}  # User-typed shortcuts → full words
+        self.user_shortcut_usage = Counter()  # How often user uses each shortcut
+        self.manual_shortcuts = {}  # Manually added shortcuts
+        self.new_words = set()  # Words user added that aren't in dataset
+        self.word_usage_history = []  # Track user's typing patterns
+        
+        # NEW: CSV shortcut library (from GitHub)
+        self.csv_shortcuts = {}  # Loaded from CSV files (informal→formal)
+        
+    def train_from_dataset(self):
+        """Load and train n-gram model from multiple sources"""
+        print("Loading Filipino vocabulary sources...")
+        
+        all_tokens = []
+        
+        # Source 1: Manual common Filipino words (everyday vocabulary)
+        print("\n1. Loading common Filipino words...")
+        common_words = self._load_common_words()
+        if common_words:
+            all_tokens.extend(common_words * 10)  # Multiply to increase frequency
+            print(f"   ✓ Loaded {len(common_words)} common words")
+        
+        # Source 2: TLUnified NER - Train split (news articles - formal)
         try:
-            # Load the validation split
-            dataset = load_dataset("ljvmiranda921/tlunified-ner", split="validation")
-            print(f"✓ Loaded {len(dataset)} examples")
+            print("\n2. Loading TLUnified NER training set...")
+            dataset = load_dataset("ljvmiranda921/tlunified-ner", split="train[:20000]")  # First 20k
+            print(f"   ✓ Loaded {len(dataset)} examples")
             
-            # Extract tokens and build n-grams
             for example in dataset:
                 tokens = example['tokens']
-                
-                # Clean tokens (lowercase for model consistency)
                 clean_tokens = [token.lower() for token in tokens if token.strip()]
-                
-                # Update vocabulary
-                self.vocabulary.update(clean_tokens)
-                
-                # Build n-grams
-                for i, token in enumerate(clean_tokens):
-                    # Unigram
-                    self.unigrams[token] += 1
-                    self.total_words += 1
-                    
-                    # Bigram
-                    if i > 0:
-                        prev = clean_tokens[i-1]
-                        self.bigrams[prev][token] += 1
-                    
-                    # Trigram
-                    if i > 1:
-                        prev2 = clean_tokens[i-2]
-                        prev1 = clean_tokens[i-1]
-                        context = (prev2, prev1)
-                        self.trigrams[context][token] += 1
+                all_tokens.extend(clean_tokens)
             
-            print(f"✓ Built vocabulary: {len(self.vocabulary)} unique words")
-            print(f"✓ Total words processed: {self.total_words}")
-            print(f"✓ Bigram contexts: {len(self.bigrams)}")
-            print(f"✓ Trigram contexts: {len(self.trigrams)}")
-            
-            # Learn shortcuts from the dataset
-            print("\n🔍 Learning shortcuts from dataset...")
-            self._learn_shortcuts_from_vocabulary()
-            
+            print(f"   ✓ Total tokens: {len(all_tokens)}")
         except Exception as e:
-            print(f"⚠ Error loading dataset: {e}")
-            print("Using fallback vocabulary...")
+            print(f"   ⚠ Error: {e}")
+        
+        # Source 3: TLUnified NER - Validation split
+        try:
+            print("\n3. Loading TLUnified NER validation set...")
+            dataset = load_dataset("ljvmiranda921/tlunified-ner", split="validation")
+            print(f"   ✓ Loaded {len(dataset)} examples")
+            
+            for example in dataset:
+                tokens = example['tokens']
+                clean_tokens = [token.lower() for token in tokens if token.strip()]
+                all_tokens.extend(clean_tokens)
+            
+            print(f"   ✓ Total tokens: {len(all_tokens)}")
+        except Exception as e:
+            print(f"   ⚠ Error: {e}")
+        
+        # Fallback if everything failed
+        if len(all_tokens) == 0:
+            print("\n⚠ All sources failed. Using fallback...")
             self._load_fallback()
+            return
+        
+        # Clean and process tokens
+        print(f"\n📊 Processing {len(all_tokens)} total tokens...")
+        clean_tokens = [
+            token for token in all_tokens 
+            if token.strip() 
+            and len(token) <= 30
+            and any(c.isalpha() for c in token)
+            and token.isalpha()  # Only alphabetic
+        ]
+        
+        print(f"   ✓ Cleaned: {len(clean_tokens)} valid tokens")
+        
+        # Update vocabulary
+        self.vocabulary.update(clean_tokens)
+        
+        # Build n-grams
+        print("\n🔨 Building n-grams...")
+        for i, token in enumerate(clean_tokens):
+            self.unigrams[token] += 1
+            self.total_words += 1
+            self._build_char_ngrams(token)
+            
+            if i > 0:
+                prev = clean_tokens[i-1]
+                self.bigrams[prev][token] += 1
+            
+            if i > 1:
+                prev2 = clean_tokens[i-2]
+                prev1 = clean_tokens[i-1]
+                self.trigrams[(prev2, prev1)][token] += 1
+            
+            if (i + 1) % 50000 == 0:
+                print(f"   Progress: {i + 1}/{len(clean_tokens)}...")
+        
+        print(f"\n✓ Vocabulary: {len(self.vocabulary)} unique words")
+        print(f"✓ Total words: {self.total_words}")
+        print(f"✓ Bigrams: {len(self.bigrams)}")
+        print(f"✓ Trigrams: {len(self.trigrams)}")
+        
+        print("\n🔍 Learning shortcuts...")
+        self._learn_shortcuts_from_vocabulary()
+    
+    def _load_common_words(self):
+        """
+        Load common everyday Filipino words from a file.
+        This fills gaps in formal news corpus with conversational vocabulary.
+        """
+        # Try to load from file first
+        try:
+            if os.path.exists('filipino_common_words.txt'):
+                with open('filipino_common_words.txt', 'r', encoding='utf-8') as f:
+                    words = [line.strip().lower() for line in f if line.strip()]
+                    return words
+        except Exception as e:
+            print(f"   ⚠ Could not load filipino_common_words.txt: {e}")
+        
+        # Built-in common Filipino words (everyday conversation)
+        common = [
+            # Pronouns
+            "ako", "ikaw", "siya", "kami", "tayo", "kayo", "sila",
+            "ko", "mo", "niya", "namin", "natin", "ninyo", "nila",
+            
+            # Common verbs
+            "kumain", "uminom", "matulog", "gumising", "pumunta", "umuwi",
+            "mag-aral", "maglaro", "manood", "makinig", "magsalita",
+            "tumakbo", "lumakad", "umupo", "tumayo", "humiga",
+            "magbasa", "magsulat", "bumili", "magluto", "maligo",
+            
+            # Common adjectives
+            "maganda", "pangit", "mabuti", "masama", "malaki", "maliit",
+            "mataba", "payat", "mabilis", "mabagal", "mainit", "malamig",
+            "masaya", "malungkot", "galit", "takot", "gutom", "busog",
+            
+            # Common nouns
+            "bahay", "paaralan", "kwarto", "kusina", "banyo", "sala",
+            "tao", "bata", "lalaki", "babae", "ina", "ama", "kapatid",
+            "kaibigan", "guro", "estudyante", "trabaho", "pera", "damit",
+            "pagkain", "tubig", "kape", "kanin", "ulam", "prutas", "gulay",
+            
+            # Particles & conjunctions
+            "ang", "ng", "sa", "na", "ay", "at", "o", "pero", "kasi",
+            "kung", "kapag", "para", "dahil", "kaya", "saka", "din", "rin",
+            
+            # Question words
+            "ano", "sino", "saan", "kailan", "bakit", "paano", "ilan", "alin",
+            
+            # Common expressions
+            "oo", "hindi", "ewan", "siguro", "sige", "ayoko", "gusto",
+            "pwede", "kailangan", "dapat", "maaari", "puwede",
+            
+            # Time
+            "ngayon", "bukas", "kahapon", "mamaya", "mamayang", "kanina",
+            "umaga", "tanghali", "hapon", "gabi", "madaling-araw",
+            
+            # Adverbs
+            "dito", "diyan", "doon", "mula", "hanggang", "lahat", "wala",
+            "may", "marami", "konti", "sobra", "kulang", "tama", "mali",
+            
+            # Common phrases parts
+            "naman", "lang", "talaga", "pala", "ba", "pa", "na", "nga",
+            "muna", "sana", "daw", "raw", "kaya", "yata", "yaya",
+        ]
+        
+        return common
     
     def _load_fallback(self):
         """Minimal fallback if dataset fails"""
@@ -92,6 +217,86 @@ class NgramModel:
             self.unigrams[word] = 10
         self.total_words = len(fallback) * 10
     
+    def _build_char_ngrams(self, word):
+        """
+        Build character-level bigrams and trigrams within a word.
+        Example: "tayo" → bigrams: "ta"→"y", "ay"→"o", "yo"→END
+                        trigrams: ("t","a")→"y", ("a","y")→"o"
+        """
+        if len(word) < 2:
+            return
+        
+        # Character bigrams (2-char sequences)
+        for i in range(len(word) - 1):
+            bigram = word[i:i+2]  # "ta", "ay", "yo"
+            if i < len(word) - 2:
+                next_char = word[i+2]
+                self.char_bigrams[bigram][next_char] += 1
+            else:
+                # Mark end of word
+                self.char_bigrams[bigram]["<END>"] += 1
+        
+        # Character trigrams (3-char sequences predicting 4th)
+        for i in range(len(word) - 2):
+            trigram = (word[i], word[i+1])
+            if i < len(word) - 3:
+                next_char = word[i+3]
+                self.char_trigrams[trigram][next_char] += 1
+    
+    def get_char_level_completions(self, prefix, max_results=5):
+        """
+        Get word completions based on character-level n-grams.
+        
+        Example: prefix="ta" 
+        → Look up what commonly follows "ta" in Filipino words
+        → Returns: ["tayo", "talaga", "tahimik", ...]
+        """
+        if len(prefix) < 1:
+            return []
+        
+        completions = []
+        
+        # Minimum word length based on prefix
+        if len(prefix) == 1:
+            min_length = 2  # Allow 2-letter words for single char prefix
+        else:
+            min_length = max(len(prefix) + 1, 3)
+        
+        # Find words that start with this prefix, meet min length, and are alphabetic
+        candidates = [
+            word for word in self.vocabulary 
+            if word.startswith(prefix) 
+            and len(word) >= min_length
+            and word.isalpha()  # No punctuation
+        ]
+        
+        # Score based on character continuation probability
+        scored = []
+        for word in candidates:
+            score = 0
+            
+            # Check character bigram patterns
+            for i in range(len(prefix), len(word) - 1):
+                if i >= 2:
+                    bigram = word[i-2:i]
+                    if bigram in self.char_bigrams:
+                        next_char = word[i]
+                        count = self.char_bigrams[bigram].get(next_char, 0)
+                        total = sum(self.char_bigrams[bigram].values())
+                        if total > 0:
+                            score += count / total
+            
+            # Boost score based on word frequency
+            freq_score = self.unigrams.get(word, 0) / max(self.total_words, 1)
+            final_score = score + (freq_score * 10)  # Weight word frequency higher
+            
+            scored.append((word, final_score))
+        
+        # Sort by score
+        scored.sort(key=lambda x: x[1], reverse=True)
+        
+        return [word for word, score in scored[:max_results]]
+    
     def _learn_shortcuts_from_vocabulary(self):
         """
         Learn common shortcut patterns from the vocabulary.
@@ -104,7 +309,7 @@ class NgramModel:
             return consonants if len(consonants) >= 2 else None
         
         def create_number_shortcut(word):
-            
+            """Replace common syllables with numbers"""
             replacements = {'to': '2', 'too': '2', 'for': '4', 'ate': '8'}
             for pattern, num in replacements.items():
                 if pattern in word:
@@ -202,17 +407,222 @@ class NgramModel:
                 freq = self.shortcut_frequencies[shortcut]
                 print(f"   '{shortcut}' → '{full_word}' (freq: {freq})")
     
+    def load_shortcut_library(self):
+        """
+        Load additional shortcuts from GitHub CSV files.
+        These contain informal→formal Filipino word mappings.
+        
+        CSV format: informal,formal
+        Example: "lng,lang"
+        """
+        # Try to load from cache first
+        if os.path.exists(SHORTCUT_LIBRARY_CACHE):
+            try:
+                with open(SHORTCUT_LIBRARY_CACHE, 'r', encoding='utf-8') as f:
+                    self.csv_shortcuts = json.load(f)
+                print(f"✓ Loaded {len(self.csv_shortcuts)} shortcuts from cache")
+                return
+            except Exception as e:
+                print(f"⚠ Error loading cached shortcuts: {e}")
+        
+        # Download and parse CSV files
+        print("\n📚 Loading shortcut library from GitHub...")
+        
+        import urllib.request
+        import csv
+        import io
+        
+        for url in SHORTCUT_LIBRARY_URLS:
+            try:
+                print(f"  Downloading: {url.split('/')[-1]}...")
+                
+                # Download CSV
+                response = urllib.request.urlopen(url, timeout=10)
+                csv_data = response.read().decode('utf-8')
+                
+                # Parse CSV
+                csv_reader = csv.reader(io.StringIO(csv_data))
+                next(csv_reader, None)  # Skip header if exists
+                
+                count = 0
+                for row in csv_reader:
+                    if len(row) >= 2:
+                        informal = row[0].strip().lower()
+                        formal = row[1].strip().lower()
+                        
+                        # Only add if informal is shorter (it's a shortcut)
+                        if informal and formal and len(informal) < len(formal):
+                            self.csv_shortcuts[informal] = formal
+                            count += 1
+                
+                print(f"  ✓ Loaded {count} shortcuts from {url.split('/')[-1]}")
+                
+            except Exception as e:
+                print(f"  ⚠ Error loading {url.split('/')[-1]}: {e}")
+        
+        # Save to cache
+        try:
+            with open(SHORTCUT_LIBRARY_CACHE, 'w', encoding='utf-8') as f:
+                json.dump(self.csv_shortcuts, f, indent=2, ensure_ascii=False)
+            print(f"✓ Cached {len(self.csv_shortcuts)} shortcuts")
+        except Exception as e:
+            print(f"⚠ Error caching shortcuts: {e}")
+    
     def resolve_shortcut(self, word):
         """
         Resolve a word to its full form if it's a shortcut.
-        Used for bigram/trigram context lookup.
-        
-        Example: resolve_shortcut('lng') → 'lang'
+        Priority: User > CSV Library > Dataset
         """
         word_lower = word.lower()
+        
+        # Priority 1: User shortcuts (highest - user's personal patterns)
+        if word_lower in self.user_shortcuts:
+            return self.user_shortcuts[word_lower]
+        
+        # Priority 2: CSV shortcut library (curated informal→formal)
+        if word_lower in self.csv_shortcuts:
+            return self.csv_shortcuts[word_lower]
+        
+        # Priority 3: Dataset-learned shortcuts
         if word_lower in self.learned_shortcuts:
             return self.learned_shortcuts[word_lower]
+        
         return word
+    
+    def get_all_shortcut_expansions(self, shortcut):
+        """
+        Get ALL possible expansions of a shortcut.
+        Returns list of (word, source) tuples.
+        Used for multiple expansion suggestions.
+        """
+        shortcut_lower = shortcut.lower()
+        expansions = []
+        
+        # Collect from all sources
+        if shortcut_lower in self.user_shortcuts:
+            expansions.append((self.user_shortcuts[shortcut_lower], 'user'))
+        
+        if shortcut_lower in self.csv_shortcuts:
+            word = self.csv_shortcuts[shortcut_lower]
+            if word not in [w for w, _ in expansions]:
+                expansions.append((word, 'csv'))
+        
+        if shortcut_lower in self.learned_shortcuts:
+            word = self.learned_shortcuts[shortcut_lower]
+            if word not in [w for w, _ in expansions]:
+                expansions.append((word, 'learned'))
+        
+        return expansions
+    
+    def learn_from_user_typing(self, typed_shortcut, selected_word):
+        """
+        Learn a shortcut pattern from user behavior.
+        Called when user types a shortcut then selects a word.
+        
+        Example: User types "lng" → selects "lang" → Learn "lng" → "lang"
+        """
+        typed_shortcut = typed_shortcut.lower()
+        selected_word = selected_word.lower()
+        
+        # Only learn if shortcut is significantly shorter
+        if len(typed_shortcut) < len(selected_word) - 1:
+            # Track this pattern
+            if typed_shortcut not in self.user_shortcuts:
+                self.user_shortcuts[typed_shortcut] = selected_word
+                print(f"🎓 Learned from typing: '{typed_shortcut}' → '{selected_word}'")
+            
+            # Track usage frequency
+            self.user_shortcut_usage[typed_shortcut] += 1
+            
+            # Save to disk
+            self.save_user_learning()
+    
+    def add_new_word(self, word):
+        """
+        Add a new word to vocabulary that wasn't in the dataset.
+        """
+        word_lower = word.lower()
+        if word_lower not in self.vocabulary:
+            self.vocabulary.add(word_lower)
+            self.new_words.add(word_lower)
+            self.unigrams[word_lower] = 1  # Initialize with count of 1
+            print(f"📝 Added new word to vocabulary: '{word}'")
+            self.save_user_learning()
+    
+    def track_word_usage(self, word, context=None):
+        """
+        Track user's word usage to improve predictions over time.
+        Updates n-gram counts based on actual usage.
+        """
+        word_lower = word.lower()
+        
+        # Update unigram count
+        self.unigrams[word_lower] += 1
+        self.total_words += 1
+        
+        # Update bigram if context available
+        if context and len(context) >= 1:
+            prev = context[-1].lower()
+            prev = self.resolve_shortcut(prev)
+            self.bigrams[prev][word_lower] += 1
+        
+        # Update trigram if context available
+        if context and len(context) >= 2:
+            prev2 = context[-2].lower()
+            prev1 = context[-1].lower()
+            prev2 = self.resolve_shortcut(prev2)
+            prev1 = self.resolve_shortcut(prev1)
+            self.trigrams[(prev2, prev1)][word_lower] += 1
+        
+        # Add to history (keep last 1000 words)
+        self.word_usage_history.append((word_lower, context))
+        if len(self.word_usage_history) > 1000:
+            self.word_usage_history.pop(0)
+    
+    def save_user_learning(self):
+        """
+        Save user-specific learning data to JSON file.
+        Separate from main model cache for easier updates.
+        """
+        user_data = {
+            'user_shortcuts': self.user_shortcuts,
+            'user_shortcut_usage': dict(self.user_shortcut_usage),
+            'new_words': list(self.new_words),
+            'word_usage_history': self.word_usage_history[-100:]  # Keep last 100
+        }
+        
+        try:
+            with open(USER_LEARNING_FILE, 'w', encoding='utf-8') as f:
+                json.dump(user_data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"⚠ Error saving user learning: {e}")
+    
+    def load_user_learning(self):
+        """
+        Load user-specific learning data from JSON file.
+        """
+        if not os.path.exists(USER_LEARNING_FILE):
+            print("ℹ No user learning file found (will be created on first use)")
+            return
+        
+        try:
+            with open(USER_LEARNING_FILE, 'r', encoding='utf-8') as f:
+                user_data = json.load(f)
+            
+            self.user_shortcuts = user_data.get('user_shortcuts', {})
+            self.user_shortcut_usage = Counter(user_data.get('user_shortcut_usage', {}))
+            self.new_words = set(user_data.get('new_words', []))
+            self.word_usage_history = user_data.get('word_usage_history', [])
+            
+            # Add new words back to vocabulary
+            self.vocabulary.update(self.new_words)
+            
+            print(f"✓ Loaded user learning:")
+            print(f"  User shortcuts: {len(self.user_shortcuts)}")
+            print(f"  New words: {len(self.new_words)}")
+            
+        except Exception as e:
+            print(f"⚠ Error loading user learning: {e}")
     
     def save_cache(self):
         """Save trained model to disk"""
@@ -220,6 +630,8 @@ class NgramModel:
             'unigrams': dict(self.unigrams),
             'bigrams': {k: dict(v) for k, v in self.bigrams.items()},
             'trigrams': {k: dict(v) for k, v in self.trigrams.items()},
+            'char_bigrams': {k: dict(v) for k, v in self.char_bigrams.items()},
+            'char_trigrams': {k: dict(v) for k, v in self.char_trigrams.items()},
             'vocabulary': list(self.vocabulary),
             'total_words': self.total_words,
             'learned_shortcuts': self.learned_shortcuts,
@@ -229,6 +641,7 @@ class NgramModel:
             pickle.dump(data, f)
         print(f"✓ Saved n-gram model to {NGRAM_CACHE_FILE}")
         print(f"✓ Saved {len(self.learned_shortcuts)} learned shortcuts")
+        print(f"✓ Saved {len(self.char_bigrams)} character bigrams")
     
     def load_cache(self):
         """Load trained model from disk"""
@@ -248,6 +661,17 @@ class NgramModel:
             for k, v in data['trigrams'].items():
                 self.trigrams[k] = Counter(v)
             
+            # Load character-level n-grams if available
+            self.char_bigrams = defaultdict(Counter)
+            if 'char_bigrams' in data:
+                for k, v in data['char_bigrams'].items():
+                    self.char_bigrams[k] = Counter(v)
+            
+            self.char_trigrams = defaultdict(Counter)
+            if 'char_trigrams' in data:
+                for k, v in data['char_trigrams'].items():
+                    self.char_trigrams[k] = Counter(v)
+            
             self.vocabulary = set(data['vocabulary'])
             self.total_words = data['total_words']
             
@@ -259,6 +683,7 @@ class NgramModel:
             print(f"  Vocabulary: {len(self.vocabulary)} words")
             print(f"  Total words: {self.total_words}")
             print(f"  Learned shortcuts: {len(self.learned_shortcuts)}")
+            print(f"  Character bigrams: {len(self.char_bigrams)}")
             return True
         except Exception as e:
             print(f"⚠ Error loading cache: {e}")
@@ -331,38 +756,85 @@ class NgramModel:
         """
         prefix = prefix.lower()
         
-        # PRIORITY 0: Check learned shortcuts FIRST
+        # PRIORITY 0: Check ALL shortcut sources for multiple expansions
         shortcut_candidates = []
-        if prefix in self.learned_shortcuts:
-            # Direct shortcut match - this gets highest priority
-            full_word = self.learned_shortcuts[prefix]
-            shortcut_candidates.append((full_word, True, True))  # word, exact_match, is_shortcut
+        all_expansions = self.get_all_shortcut_expansions(prefix)
+        
+        if all_expansions:
+            # Add all possible expansions with priority based on source
+            for full_word, source in all_expansions:
+                # Priority: User (3x) > CSV Library (2x) > Dataset (1.5x)
+                if source == 'user':
+                    priority_multiplier = 3.0
+                elif source == 'csv':
+                    priority_multiplier = 2.0
+                else:  # learned
+                    priority_multiplier = 1.5
+                
+                shortcut_candidates.append((full_word, True, True, priority_multiplier))  # word, exact, shortcut, priority
         
         # Find all words that start with prefix OR are close via edit distance
         candidates = []
         
         # Strategy 1: Exact prefix matches (best candidates)
-        exact_matches = [word for word in self.vocabulary if word.startswith(prefix)]
-        candidates.extend([(word, True, False) for word in exact_matches])  # Not shortcuts
+        # Filter logic:
+        # - If prefix is 1 char: allow words >= 2 chars
+        # - Otherwise: allow words >= 3 chars or prefix+1
+        if len(prefix) == 1:
+            min_word_length = 2  # Allow 2-letter words for single letter input
+        else:
+            min_word_length = max(len(prefix) + 1, 3)
+        
+        exact_matches = [
+            word for word in self.vocabulary 
+            if word.startswith(prefix) 
+            and len(word) >= min_word_length
+            and word.isalpha()  # Exclude words with punctuation like "tao,-"
+        ]
+        
+        # Strategy 1.5: CHARACTER-LEVEL N-GRAM boost (NEW!)
+        # Get character-based completions and boost their scores
+        char_completions = self.get_char_level_completions(prefix, max_results=10)
+        
+        for word in exact_matches:
+            # Check if word is in character-level completions (has good char patterns)
+            if word in char_completions:
+                # Higher priority - good character continuation patterns
+                candidates.append((word, True, False, 1.5))  # 1.5x boost for char patterns
+            else:
+                candidates.append((word, True, False, 1.0))  # Normal priority
+        
+        # Add character completions that might not be in exact matches
+        for word in char_completions:
+            if word not in exact_matches and len(word) >= min_word_length and word.isalpha():
+                candidates.append((word, True, False, 1.3))  # Still boost, but less
         
         # Strategy 2: Typo tolerance - find words with small edit distance
         # Only if we have few exact matches
         if len(exact_matches) < max_results:
             for word in self.vocabulary:
                 if word not in exact_matches:
-                    # Only consider words of similar length (within 2 chars)
-                    if abs(len(word) - len(prefix)) <= 2:
+                    # Skip very short words
+                    if len(word) < min_word_length:
+                        continue
+                    
+                    # Skip words with punctuation
+                    if not word.isalpha():
+                        continue
+                    
+                    # Only consider words of similar length (within 3 chars for better flexibility)
+                    if abs(len(word) - len(prefix)) <= 3:
                         distance = damerau_levenshtein_distance(prefix, word[:len(prefix)])
                         # Only include if distance is small (1-2 edits)
                         if distance <= 2:
-                            candidates.append((word, False, False))  # Not exact, not shortcut
+                            candidates.append((word, False, False, 1.0))  # Not exact, not shortcut, default priority
         
         # Combine shortcut candidates with regular candidates
         all_candidates = shortcut_candidates + candidates
         
         # Score each candidate
         scored = []
-        for word, is_exact_match, is_shortcut in all_candidates:
+        for word, is_exact_match, is_shortcut, priority_mult in all_candidates:
             # 1. N-gram probability
             prob = self.get_word_probability(word, context)
             
@@ -377,8 +849,16 @@ class NgramModel:
             # 4. Exact match bonus
             exact_bonus = 2.0 if is_exact_match else 1.0
             
-            # 5. SHORTCUT BONUS - Highest priority!
-            shortcut_bonus = 5.0 if is_shortcut else 1.0
+            # 5. SHORTCUT BONUS with priority multiplier!
+            # User shortcuts get 3x, manual get 2x, learned get 1.5x
+            shortcut_bonus = 5.0 * priority_mult if is_shortcut else 1.0
+            
+            # 6. Track usage frequency bonus (from user_shortcut_usage)
+            usage_bonus = 1.0
+            if is_shortcut and prefix in self.user_shortcut_usage:
+                # More used shortcuts get higher priority
+                usage_count = self.user_shortcut_usage[prefix]
+                usage_bonus = 1.0 + min(usage_count / 10.0, 2.0)  # Cap at 3x
             
             # Combined score with weighted factors
             # PRIMARY: N-gram probability (70%) - language model comes first
@@ -388,7 +868,7 @@ class NgramModel:
                 prob * 0.7 +           # 70% n-gram probability (PRIMARY)
                 dl_score * 0.2 +       # 20% edit distance similarity (SECONDARY)
                 prefix_ratio * 0.1     # 10% prefix coverage (TERTIARY)
-            ) * exact_bonus * shortcut_bonus  # Bonuses multiply
+            ) * exact_bonus * shortcut_bonus * usage_bonus  # All bonuses multiply
             
             scored.append((word, final_score, dl_distance, is_shortcut))
         
@@ -499,6 +979,14 @@ if not ngram_model.load_cache():
     print("No cache found. Training from dataset...")
     ngram_model.train_from_dataset()
     ngram_model.save_cache()
+
+# Load user-specific learning (shortcuts, new words, etc.)
+print("\nLoading user learning...")
+ngram_model.load_user_learning()
+
+# Load additional shortcut library from GitHub CSV files
+print("\nLoading shortcut library...")
+ngram_model.load_shortcut_library()
 
 # ---------------------------------------------------------------------
 # DAMERAU-LEVENSHTEIN DISTANCE
@@ -796,8 +1284,12 @@ class FilipinoIME(tk.Tk):
         """Apply word completion suggestion"""
         text = self.text_display.get("1.0", "end-1c")
         token = get_current_token(text)
+        context = get_context_words(text, n=2)
         
         if token:
+            # LEARN FROM USER: Track shortcut pattern
+            ngram_model.learn_from_user_typing(token, word)
+            
             # Find position and replace
             lines = text.split('\n')
             current_line = len(lines) - 1
@@ -809,18 +1301,26 @@ class FilipinoIME(tk.Tk):
         else:
             self.text_display.insert("end", word + " ")
         
+        # LEARN FROM USER: Track word usage
+        ngram_model.track_word_usage(word, context)
+        
         self.update_suggestions()
         self.status_bar.config(text=f"Applied: '{word}'")
     
     def apply_prediction(self, word):
         """Apply next word prediction"""
         text = self.text_display.get("1.0", "end-1c")
+        context = get_context_words(text, n=2)
         
         # Add space if needed
         if text and not text.endswith(" "):
             self.text_display.insert("end", " ")
         
         self.text_display.insert("end", word + " ")
+        
+        # LEARN FROM USER: Track word usage with context
+        ngram_model.track_word_usage(word, context)
+        
         self.update_suggestions()
         self.status_bar.config(text=f"Predicted: '{word}'")
 
@@ -930,6 +1430,7 @@ class FilipinoIME(tk.Tk):
                               style="Keyboard.TButton",
                               command=self.space)
         space_btn.pack(ipadx=50, ipady=10, expand=True, fill="x")
+    
 
 # ---------------------------------------------------------------------
 # RUN APPLICATION
