@@ -9,379 +9,55 @@ import pickle
 MAX_SUGGESTIONS = 8
 NGRAM_CACHE_FILE = "ngram_model_standalone.pkl"
 USER_LEARNING_FILE = "user_learning.json"
-MODEL_VERSION = "2.0_with_corpus"  # Change this to force rebuild
+DATASET_FILE = "filipino_dataset.json"  # NEW: External dataset file
+MODEL_VERSION = "2.1_json_dataset"  # Updated version
 
 # =============================================================================
-# BUILT-IN FILIPINO VOCABULARY (NO EXTERNAL DATASETS NEEDED!)
+# LOAD DATASET FROM JSON
 # =============================================================================
+def load_dataset():
+    """Load Filipino vocabulary and corpus from JSON file"""
+    try:
+        with open(DATASET_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        print(f"✓ Loaded dataset: {data['metadata']['description']}")
+        print(f"  Version: {data['metadata']['version']}")
+        print(f"  Words: {data['metadata']['total_words']}")
+        print(f"  Phrases: {data['metadata']['total_phrases']}")
+        
+        # Flatten vocabulary
+        words = []
+        for category, word_list in data['vocabulary'].items():
+            words.extend(word_list)
+        
+        shortcuts = data['shortcuts']
+        corpus = data['communication_corpus']
+        
+        return words, shortcuts, corpus
+        
+    except FileNotFoundError:
+        print(f"⚠ Warning: {DATASET_FILE} not found!")
+        print("⚠ Using minimal fallback vocabulary...")
+        return _get_fallback_data()
+    except Exception as e:
+        print(f"⚠ Error loading dataset: {e}")
+        print("⚠ Using minimal fallback vocabulary...")
+        return _get_fallback_data()
 
-# Common conversational Filipino words (~2000+ words)
-FILIPINO_WORDS = [
-    # Pronouns
-    "ako", "ko", "akin", "ikaw", "ka", "mo", "iyo", "siya", "niya", "kaniya",
-    "kami", "namin", "amin", "tayo", "natin", "atin", "kayo", "ninyo", "inyo",
-    "sila", "nila", "kanila",
-    
-    # Common Verbs - Base + Conjugations
-    "kain", "kumain", "kakain", "kumakain", "kinain",
-    "inom", "uminom", "iinom", "umiinom", "ininom",
-    "punta", "pumunta", "pupunta", "pumupunta",
-    "uwi", "umuwi", "uuwi", "umuuwi",
-    "lakad", "lumakad", "lalakad", "lumalakad",
-    "takbo", "tumakbo", "tatakbo", "tumatakbo",
-    "dating", "dumating", "darating", "dumarating",
-    "alis", "umalis", "aalis", "umaalis",
-    "tulog", "matulog", "matutulog", "natutulog", "natulog",
-    "gising", "gumising", "gigising", "gumagising",
-    "ligo", "maligo", "maliligo", "naliligo",
-    "linis", "maglinis", "maglilinis", "naglilinis",
-    "sabi", "sabihin", "sinabi", "nagsabi", "nagsasabi",
-    "salita", "magsalita", "magsasalita", "nagsasalita",
-    "tanong", "magtanong", "magtatanong", "nagtatanong",
-    "sagot", "sumagot", "sasagot", "sumasagot",
-    "aral", "mag-aral", "mag-aaral", "nag-aaral",
-    "trabaho", "magtrabaho", "magtatrabaho", "nagtatrabaho",
-    "basa", "magbasa", "magbabasa", "nagbabasa",
-    "sulat", "magsulat", "magsusulat", "nagsusulat",
-    "laro", "maglaro", "maglalaro", "naglalaro",
-    "nood", "manood", "manonood", "nanonood",
-    "kanta", "kumanta", "kakanta", "kumakanta",
-    "sayaw", "sumayaw", "sasayaw", "sumasayaw",
-    "bili", "bumili", "bibili", "bumibili",
-    "bayad", "magbayad", "magbabayad", "nagbabayad",
-    "tuwa", "matuwa", "matutuwa", "natutuwa",
-    "iyak", "umiyak", "iiyak", "umiiyak",
-    "tawa", "tumawa", "tatawa", "tumatawa",
-    "galit", "magalit", "magagalit", "nagagalit",
-    "luto", "magluto", "magluluto", "nagluluto",
-    "hugas", "maghugas", "maghuhugas", "naghuhugas",
-    "hintay", "maghintay", "maghihintay", "naghihintay",
-    "hanap", "maghanap", "maghahanap", "naghahanap",
-    "bigay", "magbigay", "magbibigay", "nagbibigay",
-    "kuha", "kumuha", "kukuha", "kumukuha",
-    "gamit", "gumamit", "gagamit", "gumagamit",
-    
-    # Adjectives
-    "maganda", "ganda", "pangit", "pogi", "guwapo", "gwapo",
-    "malaki", "laki", "maliit", "liit", "mataba", "taba", "payat",
-    "mataas", "taas", "mababa", "baba",
-    "mabuti", "buti", "masama", "sama", "magaling", "galing", "mahusay", "husay",
-    "mabilis", "bilis", "mabagal", "bagal",
-    "mainit", "init", "malamig", "lamig",
-    "masarap", "sarap", "mapait", "pait", "matamis", "tamis", "maasim", "asim", "maalat", "alat",
-    "masaya", "saya", "malungkot", "lungkot",
-    "gutom", "nagugutom", "busog", "nabusog",
-    "uhaw", "nauuhaw", "pagod", "napagod", "antok", "inaantok",
-    "mahirap", "hirap", "madali", "dali", "mahal", "mura",
-    
-    # People
-    "tao", "lalaki", "babae", "bata", "sanggol", "baby",
-    "pamilya", "angkan", "ina", "nanay", "mama", "mommy", "inay",
-    "ama", "tatay", "papa", "daddy", "itay",
-    "lolo", "lola", "kuya", "ate", "bunso", "panganay",
-    "kapatid", "tito", "tita", "tiyuhin", "tiyahin", "pamangkin", "pinsan",
-    "asawa", "misis", "mister",
-    "kaibigan", "barkada", "tropa", "kapitbahay", "kasama", "kasamahan",
-    "guro", "titser", "maestra", "maestro", "estudyante", "mag-aaral",
-    "doktor", "manggagamot", "nars", "nurse", "pulis", "police",
-    "sundalo", "militar", "drayber", "tsuper", "negosyante", "manggagawa", "empleado",
-    
-    # Places
-    "lugar", "pwesto", "bahay", "tahanan", "kwarto", "silid",
-    "kusina", "banyo", "palikuran", "sala", "salas", "hardin", "bakuran", "garahe",
-    "paaralan", "eskwela", "eskwelahan", "unibersidad", "kolehiyo",
-    "silid-aralan", "classroom", "library", "aklatan",
-    "opisina", "tanggapan", "pabrika", "tindahan", "tindaan", "store",
-    "palengke", "merkado", "market", "mall", "shopping",
-    "sinehan", "sine", "restawran", "kainan", "ospital",
-    "simbahan", "church", "parke", "park",
-    "kalsada", "daan", "kalye", "street", "eskinita", "tulay", "bridge",
-    "istasyon", "station", "terminal",
-    "bayan", "lungsod", "siyudad", "baryo", "nayon",
-    "probinsya", "province", "rehiyon", "region", "bansa", "country", "mundo", "world",
-    
-    # Things
-    "pera", "salapi", "kwarta", "trabaho", "hanapbuhay",
-    "damit", "kasuotan", "pantalon", "pants", "sando", "shirt",
-    "sapatos", "tsinelas", "medyas", "socks", "jacket", "dyaket",
-    "libro", "aklat", "kuwaderno", "notebook", "papel",
-    "lapis", "pensil", "ballpen", "bolpen", "bag",
-    "telepono", "cellphone", "phone", "kompyuter", "computer",
-    "telebisyon", "radyo", "radio",
-    "sasakyan", "kotse", "auto", "jeep", "jeepney", "bus", "tren", "train",
-    "eroplano", "plane", "barko", "boat", "bisikleta", "bike", "motorsiklo", "motor",
-    "mesa", "table", "silya", "upuan", "chair", "kama", "higaan",
-    "aparador", "cabinet",
-    "payong", "umbrella", "relo", "orasan", "watch", "salamin", "mirror",
-    "gunting", "scissors", "kutsilyo", "knife", "kutsara", "spoon",
-    "tinidor", "fork", "plato", "plate", "baso", "glass",
-    
-    # Food & Drink
-    "pagkain", "inumin",
-    "almusal", "breakfast", "tanghalian", "lunch", "hapunan", "dinner", "meryenda", "snack",
-    "kanin", "rice", "bigas", "tinapay", "bread", "ulam", "viand",
-    "karne", "meat", "manok", "chicken", "baboy", "pork", "baka", "beef",
-    "isda", "fish", "hipon", "shrimp", "itlog", "egg",
-    "gulay", "vegetable", "talong", "eggplant", "kamatis", "tomato",
-    "sibuyas", "onion", "bawang", "garlic",
-    "prutas", "fruit", "mansanas", "apple", "saging", "banana",
-    "mangga", "mango", "orange", "dalandan", "ubas", "grapes",
-    "tubig", "water", "kape", "coffee", "tsaa", "tea", "gatas", "milk",
-    "juice", "katas", "softdrinks", "coke",
-    "adobo", "sinigang", "lechon", "pancit", "lumpia", "sisig",
-    "kare-kare", "bulalo", "tinola",
-    
-    # Time
-    "oras", "time", "panahon",
-    "ngayon", "now", "mamaya", "later", "mamayang", "bukas", "tomorrow",
-    "kahapon", "yesterday", "kanina", "earlier", "kaninang",
-    "umaga", "morning", "tanghali", "noon", "hapon", "afternoon",
-    "gabi", "evening", "night", "hatinggabi", "midnight", "madaling-araw", "dawn",
-    "araw", "day", "Lunes", "Monday", "Martes", "Tuesday",
-    "Miyerkules", "Wednesday", "Huwebes", "Thursday", "Biyernes", "Friday",
-    "Sabado", "Saturday", "Linggo", "Sunday",
-    "linggo", "week", "buwan", "month", "taon", "year",
-    "araw-araw", "everyday", "bawat", "minsan", "sometimes",
-    "madalas", "often", "lagi", "always", "kadalasan", "usually",
-    "hindi", "kailanman", "never",
-    
-    # Particles & Connectors
-    "ang", "ng", "sa", "na", "ay",
-    "at", "and", "o", "or", "pero", "but", "ngunit", "however",
-    "kasi", "because", "dahil", "kaya", "so", "kung", "if",
-    "kapag", "when", "habang", "while", "para", "for",
-    "upang", "saka", "and then",
-    "naman", "din", "rin", "lang", "lamang", "talaga", "really",
-    "sobra", "very", "masyado", "too much",
-    "pala", "ba", "po", "ho", "pa", "nga", "indeed",
-    "daw", "raw", "they say", "muna", "first",
-    "sana", "hopefully", "yata", "maybe", "siguro", "probably",
-    
-    # Questions
-    "ano", "what", "sino", "who", "saan", "where",
-    "kailan", "when", "bakit", "why", "paano", "how",
-    "ilan", "how many", "magkano", "how much",
-    "alin", "which", "kanino", "whose",
-    
-    # Expressions
-    "oo", "yes", "hindi", "no", "opo", "yes po",
-    "ewan", "I don't know", "alam",
-    "sige", "okay", "ayos", "fine", "tama", "correct", "mali", "wrong",
-    "gusto", "want", "like", "ayoko", "don't want", "ayaw", "refuse", "ibig", "desire",
-    "pwede", "can", "puwede", "maaari", "may", "kailangan", "need", "dapat", "should",
-    "kumusta", "how are you", "salamat", "thank you",
-    "pasensya", "sorry", "patawad", "walang", "anuman", "you're welcome",
-    "paalam", "goodbye",
-    
-    # Location
-    "dito", "here", "diyan", "there", "doon", "far",
-    "mula", "from", "hanggang", "until",
-    "loob", "inside", "labas", "outside", "itaas", "above", "ibaba", "below",
-    "tabi", "beside", "harap", "front", "likod", "back",
-    "kanan", "right", "kaliwa", "left", "gitna", "middle",
-    
-    # Quantity
-    "lahat", "all", "wala", "none", "may", "have",
-    "marami", "many", "konti", "few", "kaunti", "little",
-    "kulang", "lacking", "sapat", "enough",
-    "higit", "more than", "lampas", "over",
-    
-    # Numbers
-    "isa", "dalawa", "tatlo", "apat", "lima",
-    "anim", "pito", "walo", "siyam", "sampu",
-    "labing-isa", "labindalawa", "dalawampu", "tatlumpu",
-    "daan", "libo", "milyon",
-    
-    # Body Parts
-    "katawan", "body", "ulo", "head", "mukha", "face",
-    "mata", "eyes", "ilong", "nose", "bibig", "mouth",
-    "tainga", "ear", "ngipin", "teeth", "dila", "tongue",
-    "buhok", "hair", "leeg", "neck", "balikat", "shoulder",
-    "braso", "arm", "kamay", "hand", "daliri", "finger",
-    "dibdib", "chest", "tiyan", "stomach", "puwit", "buttocks",
-    "hita", "thigh", "tuhod", "knee", "binti", "leg",
-    "paa", "foot", "puso", "heart",
-    
-    # Weather & Nature
-    "ulan", "rain", "hangin", "wind", "bagyo", "typhoon",
-    "lindol", "earthquake", "kidlat", "lightning", "kulog", "thunder",
-    "ulap", "cloud", "bituin", "star",
-    "tag-init", "summer", "tag-ulan", "rainy season",
-    "dagat", "sea", "ilog", "river", "bundok", "mountain",
-    "puno", "tree", "bulaklak", "flower", "damo", "grass", "hayop", "animal",
-    
-    # Modern Slang
-    "petmalu", "cool", "lodi", "idol", "werpa", "power",
-    "syota", "girlfriend", "boyfriend", "jowa", "partner",
-    "beshie", "bestfriend", "besh", "mare", "friend", "pare",
-    "bro", "brother", "sis", "sister",
-    "chika", "talk", "chismis", "gossip", "eme", "nonsense",
-]
+def _get_fallback_data():
+    """Minimal fallback if JSON file is missing"""
+    words = [
+        "ako", "ikaw", "siya", "kami", "tayo", "kayo", "sila",
+        "kumain", "uminom", "matulog", "maganda", "masaya",
+        "oo", "hindi", "salamat", "sorry"
+    ]
+    shortcuts = {"lng": "lang", "nmn": "naman"}
+    corpus = ["kumusta ka", "mabuti naman"]
+    return words, shortcuts, corpus
 
-# Communication corpus for better predictions (500+ common phrases)
-COMMUNICATION_CORPUS = [
-    # Greetings
-    "kumusta ka na", "kumusta ka", "mabuti naman", "ayos lang", "okay lang naman",
-    "hello kumusta", "hi kumusta ka", "hey ano na", "oy kumusta",
-    
-    # Common Questions
-    "ano ginagawa mo", "saan ka pupunta", "saan ka na", "kailan ka darating",
-    "bakit ka nandito", "paano pumunta doon", "magkano yan", "sino kasama mo",
-    "ano gusto mo", "ano kain mo", "saan ka nakatira", "anong oras na",
-    
-    # Yes/No
-    "oo naman", "oo sige", "oo tara", "hindi naman", "hindi pa",
-    "hindi ko alam", "ewan ko", "siguro nga", "baka oo",
-    
-    # Food
-    "kumain ka na ba", "gutom na ako", "tara kain tayo", "ano ulam natin",
-    "sama ka kumain", "busog na ako", "masarap yan", "ayoko nyan",
-    "gusto ko ng", "bili tayo pagkain", "order tayo", "may tubig ka",
-    
-    # Going Places
-    "tara na", "sama ka", "saan tayo pupunta", "dito lang ako",
-    "andito na ako", "pauwi na ako", "papunta na ako", "nasaan ka na",
-    "malapit na ako", "traffic pa", "otw na ako", "wait lang",
-    
-    # Time
-    "mamaya na lang", "bukas na lang", "next time na", "maya maya",
-    "konti lang", "saglit lang", "ngayon na", "kanina pa ako",
-    "tagal mo naman", "bilisan mo", "dali na",
-    
-    # Feelings
-    "pagod na ako", "antok na ako", "masaya ako", "okay lang ako",
-    "sad ako ngayon", "stressed ako", "excited ako", "miss na kita",
-    
-    # School/Work
-    "may pasok ba", "wala pasok", "may klase pa", "may exam bukas",
-    "may trabaho pa ako", "off ko ngayon", "bakasyon na", "late na naman",
-    
-    # Plans
-    "sama ka sakin", "tara labas tayo", "gala tayo", "manood tayo",
-    "game ka ba", "free ka ba", "pwede ka ba", "ano plans mo",
-    "sige game", "di ako pwede", "may lakad pa ako",
-    
-    # Money
-    "magkano to", "mahal naman", "mura lang yan", "bili mo na",
-    "wala akong pera", "may pera ka ba", "bayad ko na", "sweldo na bukas",
-    
-    # Family & Friends
-    "nandito si mama", "nasaan si papa", "kasama ko kapatid ko",
-    "sabi niya", "ayaw niya", "gusto niya", "alam niya ba",
-    
-    # Tech & Communication
-    "chat mo ako", "text mo ako", "call kita later", "message mo ako",
-    "reply ka naman", "seen mo lang", "may wifi ba", "lowbat na ako",
-    
-    # Weather
-    "init ngayon", "mainit na naman", "umuulan ba", "umulan kanina",
-    "malamig ngayon", "ganda ng panahon", "maraming tao",
-    
-    # Agreement
-    "tama ka", "mali ka", "oo nga", "hindi nga", "talaga ba",
-    "totoo yan", "joke lang", "seryoso ako", "sure ka ba",
-    
-    # Help & Thanks
-    "tulungan mo ako", "help naman", "pakiusap", "please lang",
-    "thank you", "salamat talaga", "salamat ha", "walang anuman",
-    
-    # Apologies
-    "sorry na", "pasensya na", "di ko sinasadya", "okay lang", "ayos lang yun",
-    
-    # Taglish
-    "bye na ako", "see you bukas", "good morning sa lahat", "good night na",
-    "thank you very much", "excited na ako", "ang ganda naman", "so cute",
-    "grabe naman", "super sarap", "sobrang init",
-    
-    # Social Media
-    "hahaha funny mo", "lol true", "omg talaga ba", "grabe ka",
-    
-    # Common Starters
-    "alam mo ba", "alam mo na ba", "sabi ko na nga ba", "gusto ko ng",
-    "pwede ba", "kailangan ko ng", "hindi ko alam",
-    
-    # Activities
-    "ligo muna ako", "tulog na ako", "gising na ako", "aalis na ako",
-    "uuwi na ako", "pauwi na",
-    
-    # Descriptions
-    "maganda yan", "ang ganda", "ang pangit naman", "ang laki",
-    "masarap talaga", "matamis masyado",
-    
-    # With 'Na'
-    "kumain ka na ba", "tapos ka na ba", "alis na ako", "kain na tayo",
-    "tara na", "sige na", "wala na",
-    
-    # Negations
-    "wala akong alam", "ayoko nyan", "ayaw ko", "wag na", "hindi pa",
-    
-    # With 'Ba'
-    "okay ka ba", "kaya mo ba", "nandito ka ba", "pupunta ka ba",
-    "totoo ba yan",
-    
-    # With 'Lang'
-    "joke lang", "konti lang", "sandali lang", "dito lang", "okay lang",
-    
-    # Natural Phrases
-    "ano ulam niyo", "nasaan yung", "kanino yan", "para saan yan",
-    "talaga ba yan", "grabe ka naman", "hay nako",
-    
-    # More Taglish
-    "see you na lang", "call me pag free ka", "text mo lang ako",
-    "chat na lang tayo", "send mo sakin",
-]
-
-# Built-in shortcuts (text speak)
-FILIPINO_SHORTCUTS = {
-    # Vowel Removal
-    "lng": "lang", "nmn": "naman", "ksi": "kasi", "kng": "kung",
-    "tlg": "talaga", "sna": "sana", "dpt": "dapat",
-    "mgnd": "maganda", "mgndng": "magandang",
-    
-    # Number Substitution
-    "d2": "dito", "dn": "doon", "dyn": "diyan",
-    
-    # Phonetic
-    "pde": "pwede", "pwd": "pwede", "pede": "pwede",
-    "kya": "kaya", "dko": "hindi ko",
-    
-    # Pronouns
-    "aq": "ako", "aqo": "ako", "ikw": "ikaw",
-    "xa": "siya", "sya": "siya", "cya": "siya",
-    "kmi": "kami", "tyo": "tayo", "kyo": "kayo", "cla": "sila",
-    
-    # Common
-    "nd": "hindi", "nde": "hindi", "hnd": "hindi", "hdi": "hindi",
-    "nu": "ano", "sn": "sino", "san": "saan",
-    "bkt": "bakit", "bat": "bakit",
-    "pno": "paano", "panu": "paano",
-    "klan": "kailan", "kln": "kailan",
-    
-    # Actions
-    "kn": "kumain", "pnta": "pumunta",
-    
-    # Expressions
-    "sge": "sige", "gsto": "gusto", "ayko": "ayoko",
-    
-    # Time
-    "ngyn": "ngayon", "ngaun": "ngayon",
-    "mya": "mamaya", "mmya": "mamaya",
-    "knina": "kanina", "knna": "kanina",
-    "bkas": "bukas", "khpon": "kahapon",
-    
-    # Greetings
-    "kumsta": "kumusta", "musta": "kumusta",
-    
-    # Social
-    "brb": "be right back", "omg": "oh my god",
-    "btw": "by the way", "idk": "i don't know",
-    "tbh": "to be honest", "lol": "laughing",
-    "jk": "just kidding",
-    
-    # Others
-    "asap": "as soon as possible", "otw": "on the way",
-    "omw": "on my way",
-}
+# Load dataset at startup
+FILIPINO_WORDS, FILIPINO_SHORTCUTS, COMMUNICATION_CORPUS = load_dataset()
 
 # =============================================================================
 # DAMERAU-LEVENSHTEIN DISTANCE (Typo Tolerance)
