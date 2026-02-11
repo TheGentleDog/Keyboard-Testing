@@ -6,7 +6,7 @@ import os
 import pickle
 
 # Configuration
-MAX_SUGGESTIONS = 8
+MAX_SUGGESTIONS = 5
 NGRAM_CACHE_FILE = "ngram_model_standalone.pkl"
 USER_LEARNING_FILE = "user_learning.json"
 DATASET_FILE = "filipino_dataset.json"  # NEW: External dataset file
@@ -535,7 +535,7 @@ class NgramModel:
             # Updated scoring with DL component
             final_score = (
                 prob * 0.70 +          # 70% n-gram probability
-                dl_score * 0.20 +      # 20% edit distance (NEW!)
+                dl_score * 0.20 +      # 20% edit distance 
                 prefix_ratio * 0.10    # 10% prefix coverage
             ) * exact_bonus * shortcut_bonus * usage_bonus
             
@@ -677,7 +677,7 @@ class FilipinoKeyboard(tk.Tk):
         
         # Word completion
         if token:
-            completions = ngram_model.get_completion_suggestions(token, context, max_results=8)
+            completions = ngram_model.get_completion_suggestions(token, context, max_results=5)
             
             if completions:
                 for word in completions[:8]:
@@ -692,7 +692,7 @@ class FilipinoKeyboard(tk.Tk):
                     btn.pack(side="left", padx=5, pady=5, ipadx=12, ipady=8)
         
         # Next word prediction
-        predictions = ngram_model.get_next_word_suggestions(context, max_results=6)
+        predictions = ngram_model.get_next_word_suggestions(context, max_results=5)
         
         if predictions:
             for word in predictions[:6]:
