@@ -4,16 +4,24 @@
     "caf": "coffee",
     "r": "rin",
     "tr": "tara",
-    "w": "wow"
+    "w": "wow",
+    "kamu": "kamusta",
+    "kmsta": "kamusta"
   },
   "user_shortcut_usage": {
     "c": 1,
     "caf": 1,
     "r": 1,
     "tr": 1,
-    "w": 1
+    "w": 1,
+    "kamu": 1,
+    "kmsta": 1
   },
-  "new_words": [],
+  "new_words": [
+    "tyo",
+    "sl",
+    "l"
+  ],
   "word_usage_history": [
     [
       "ako",
@@ -291,6 +299,31 @@
     [
       "yun",
       []
+    ],
+    [
+      "tyo",
+      []
+    ],
+    [
+      "na",
+      []
+    ],
+    [
+      "sl",
+      []
+    ],
+    [
+      "na",
+      [
+        "sl"
+      ]
+    ],
+    [
+      "l",
+      [
+        "sl",
+        "na"
+      ]
     ]
   ]
 }

@@ -535,7 +535,7 @@ class NgramModel:
             # Updated scoring with DL component
             final_score = (
                 prob * 0.70 +          # 70% n-gram probability
-                dl_score * 0.20 +      # 20% edit distance 
+                dl_score * 0.30 +      # 20% edit distance 
                 prefix_ratio * 0.10    # 10% prefix coverage
             ) * exact_bonus * shortcut_bonus * usage_bonus
             
@@ -618,222 +618,175 @@ def get_context_words(text, n=2):
         words = words[:-1]
     return words[-n:] if len(words) >= n else words
 
-# =============================================================================
-# GUI
-# =============================================================================
 class FilipinoKeyboard(tk.Tk):
     def __init__(self):
         super().__init__()
         
         self.title("Filipino Keyboard - Standalone")
-        self.geometry("1200x850")  # Increased from 900x700
+        self.geometry("1200x850")
         self.configure(bg="#f0f0f0")
         
         self.create_widgets()
-    
+        
+        # Bind space key in input_display to commit autocomplete
+        self.input_display.bind("<space>", self.on_space_pressed)
+
     def create_widgets(self):
-        # Text display - smaller height
-        text_frame = ttk.Frame(self)
-        text_frame.pack(fill="both", expand=False, padx=15, pady=15)  # expand=False
+        # --------------------------
+        # Output display (autocomplete)
+        # --------------------------
+        output_frame = ttk.Frame(self)
+        output_frame.pack(fill="both", expand=False, padx=15, pady=(15,5))
         
-        self.text_display = tk.Text(text_frame, wrap="word", font=("Segoe UI", 16), height=6)  # Reduced from 12 to 6
-        self.text_display.pack(fill="both", expand=False)  # expand=False
-        self.text_display.bind('<KeyRelease>', lambda e: self.update_suggestions())
+        ttk.Label(output_frame, text="Output (Autocompleted):", font=("Segoe UI", 12, "bold")).pack(anchor="w")
+        self.output_display = tk.Text(output_frame, wrap="word", font=("Segoe UI", 16), height=6, state="disabled", bg="#e0e0e0")
+        self.output_display.pack(fill="both", expand=True)
         
-        # Suggestions - more space
-        suggestions_frame = ttk.LabelFrame(self, text="Suggestions", padding="15")
-        suggestions_frame.pack(fill="x", padx=15, pady=10)
+        # --------------------------
+        # Input text box
+        # --------------------------
+        input_frame = ttk.Frame(self)
+        input_frame.pack(fill="both", expand=False, padx=15, pady=(5,15))
         
-        ttk.Label(suggestions_frame, text="Word Completion:", font=("Segoe UI", 10, "bold")).pack(anchor="w")
-        self.completion_container = ttk.Frame(suggestions_frame)
-        self.completion_container.pack(fill="x", pady=8)
+        ttk.Label(input_frame, text="Input:", font=("Segoe UI", 12, "bold")).pack(anchor="w")
+        self.input_display = tk.Text(input_frame, wrap="word", font=("Segoe UI", 16), height=6)
+        self.input_display.pack(fill="both", expand=True)
+        self.input_display.bind('<KeyRelease>', lambda e: self.update_autocomplete())
         
-        ttk.Label(suggestions_frame, text="Next Word:", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(15,0))
-        self.predictive_container = ttk.Frame(suggestions_frame)
-        self.predictive_container.pack(fill="x", pady=8)
-        
-        # Virtual keyboard - more spacing
-        keyboard_frame = ttk.LabelFrame(self, text="Virtual Keyboard", padding="15")
-        keyboard_frame.pack(fill="both", padx=15, pady=10)
-        
+        # --------------------------
+        # Virtual keyboard
+        # --------------------------
+        keyboard_frame = ttk.LabelFrame(self, text="Virtual Keyboard", padding="10")
+        keyboard_frame.pack(fill="both", expand=False, padx=15, pady=10)
         self.create_keyboard(keyboard_frame)
         
         # Status bar
         self.status_bar = ttk.Label(self, text="Ready", relief="sunken", anchor="w", font=("Segoe UI", 9))
         self.status_bar.pack(fill="x", side="bottom")
-        
-        self.update_suggestions()
     
-    def update_suggestions(self):
-        """Update suggestions"""
-        for widget in self.completion_container.winfo_children():
-            widget.destroy()
-        for widget in self.predictive_container.winfo_children():
-            widget.destroy()
-        
-        text = self.text_display.get("1.0", "end-1c")
-        token = get_current_token(text)
+    # --------------------------
+    # Autocomplete logic
+    # --------------------------
+    def update_autocomplete(self):
+        """Show suggestion in output display without touching input box"""
+        text = self.input_display.get("1.0", "end-1c")
+        current_token = get_current_token(text)
         context = get_context_words(text, n=2)
-        
-        # Word completion
-        if token:
-            completions = ngram_model.get_completion_suggestions(token, context, max_results=5)
-            
-            if completions:
-                for word in completions[:8]:
-                    display_word = word.capitalize() if token and token[0].isupper() else word
-                    
-                    btn = ttk.Button(
-                        self.completion_container,
-                        text=display_word,
-                        command=lambda w=display_word: self.apply_completion(w),
-                        style="Suggestion.TButton"
-                    )
-                    btn.pack(side="left", padx=5, pady=5, ipadx=12, ipady=8)
-        
-        # Next word prediction
-        predictions = ngram_model.get_next_word_suggestions(context, max_results=5)
-        
-        if predictions:
-            for word in predictions[:6]:
-                btn = ttk.Button(
-                    self.predictive_container,
-                    text=word,
-                    command=lambda w=word: self.apply_prediction(w),
-                    style="Suggestion.TButton"
-                )
-                btn.pack(side="left", padx=5, pady=5, ipadx=12, ipady=8)
-    
-    def apply_completion(self, word):
-        """Apply completion"""
-        text = self.text_display.get("1.0", "end-1c")
-        token = get_current_token(text)
-        context = get_context_words(text, n=2)
-        
-        if token:
-            ngram_model.learn_from_user_typing(token, word)
-            
-            lines = text.split('\n')
-            current_line = len(lines) - 1
-            current_char = len(lines[-1]) - len(token)
-            start_index = f"{current_line + 1}.{current_char}"
-            
-            self.text_display.delete(start_index, "end-1c")
-            self.text_display.insert(start_index, word + " ")
+
+        if current_token:
+            completions = ngram_model.get_completion_suggestions(current_token, context, max_results=1)
+            suggestion = completions[0] if completions else current_token
         else:
-            self.text_display.insert("end", word + " ")
-        
-        ngram_model.track_word_usage(word, context)
-        
-        self.update_suggestions()
-        self.status_bar.config(text=f"Applied: '{word}'")
-    
-    def apply_prediction(self, word):
-        """Apply prediction"""
-        text = self.text_display.get("1.0", "end-1c")
+            suggestion = ""
+
+        # Build display text: previous words + suggested token
+        words = text.strip().split()
+        if words:
+            if text.endswith(" "):
+                # User already pressed space, no suggestion needed
+                display_text = text.strip()
+            else:
+                display_text = " ".join(words[:-1] + [suggestion])
+        else:
+            display_text = suggestion
+
+        # Update output box
+        self.output_display.config(state="normal")
+        self.output_display.delete("1.0", "end")
+        self.output_display.insert("1.0", display_text)
+        self.output_display.config(state="disabled")
+
+        self.status_bar.config(text=f"Suggestion: '{suggestion}'")
+
+
+    def on_space_pressed(self):
+        """Commit the current suggestion and insert a space"""
+        text = self.input_display.get("1.0", "end-1c")
+        current_token = get_current_token(text)
         context = get_context_words(text, n=2)
-        
-        if text and not text.endswith(" "):
-            self.text_display.insert("end", " ")
-        
-        self.text_display.insert("end", word + " ")
-        
-        ngram_model.track_word_usage(word, context)
-        
-        self.update_suggestions()
-        self.status_bar.config(text=f"Predicted: '{word}'")
-    
+
+        if current_token:
+            # Get best suggestion for current token
+            completions = ngram_model.get_completion_suggestions(current_token, context, max_results=1)
+            commit_word = completions[0] if completions else current_token
+
+            # Replace the current token with the committed word
+            words = text.strip().split()
+            new_text = " ".join(words[:-1] + [commit_word]) + " "
+        else:
+            new_text = text + " "
+
+        # Update input display only when committing
+        self.input_display.delete("1.0", "end")
+        self.input_display.insert("1.0", new_text)
+
+        # Refresh autocomplete display for next word
+        self.update_autocomplete()
+
+     # --------------------------
+    # Virtual keyboard functions
+    # --------------------------
     def insert_char(self, char):
-        """Insert character"""
-        self.text_display.insert("end", char)
-        self.update_suggestions()
+        self.input_display.insert("end", char)
+        self.update_autocomplete()
     
     def backspace(self):
-        """Backspace"""
-        self.text_display.delete("end-2c", "end-1c")
-        self.update_suggestions()
+        self.input_display.delete("end-2c", "end-1c")
+        self.update_autocomplete()
     
     def space(self):
-        """Space"""
-        self.text_display.insert("end", " ")
-        self.update_suggestions()
+        """Virtual keyboard space button"""
+        self.on_space_pressed()
     
     def enter(self):
-        """Enter"""
-        self.text_display.insert("end", "\n")
-        self.update_suggestions()
+        self.input_display.insert("end", "\n")
+        self.update_autocomplete()
     
     def create_keyboard(self, parent):
-        """Create virtual keyboard"""
         style = ttk.Style()
         style.configure("Keyboard.TButton", font=("Segoe UI", 11), padding=8)
-        style.configure("Suggestion.TButton", font=("Segoe UI", 11), padding=6)
-        
-        parent.grid_columnconfigure(0, weight=1)
-        
-        # Function row
-        func_row = ttk.Frame(parent)
-        func_row.grid(row=0, column=0, sticky="ew", pady=(0, 8))
-        
-        clear_btn = ttk.Button(func_row, text="Clear", 
-                             style="Keyboard.TButton",
-                             command=lambda: [self.text_display.delete("1.0", "end"), 
-                                            self.update_suggestions()])
-        clear_btn.pack(side="left", padx=3, ipadx=8, ipady=4, expand=True, fill="x")
         
         # Number row
         row_num = ttk.Frame(parent)
-        row_num.grid(row=1, column=0, sticky="ew", pady=3)
-        
+        row_num.pack(fill="x", pady=3)
         for ch in "1234567890":
             btn = ttk.Button(row_num, text=ch, style="Keyboard.TButton",
-                           command=lambda c=ch: self.insert_char(c))
-            btn.pack(side="left", ipadx=12, ipady=8, expand=True, fill="x", padx=2)
+                             command=lambda c=ch: self.insert_char(c))
+            btn.pack(side="left", expand=True, fill="x", padx=2)
         
-        # First letter row: Q-P + Backspace
+        # Q-P row + Backspace
         row1 = ttk.Frame(parent)
-        row1.grid(row=2, column=0, sticky="ew", pady=3)
-        
+        row1.pack(fill="x", pady=3)
         for ch in "qwertyuiop":
             btn = ttk.Button(row1, text=ch.upper(), style="Keyboard.TButton",
-                           command=lambda c=ch: self.insert_char(c))
-            btn.pack(side="left", ipadx=12, ipady=8, expand=True, fill="x", padx=2)
+                             command=lambda c=ch: self.insert_char(c))
+            btn.pack(side="left", expand=True, fill="x", padx=2)
+        backspace_btn = ttk.Button(row1, text="⌫", style="Keyboard.TButton", command=self.backspace)
+        backspace_btn.pack(side="left", expand=True, fill="x", padx=2)
         
-        # Backspace after P
-        backspace_btn = ttk.Button(row1, text="⌫", style="Keyboard.TButton",
-                                   command=self.backspace)
-        backspace_btn.pack(side="left", ipadx=15, ipady=8, padx=2)
-        
-        # Second letter row: A-L + Enter
+        # A-L row + Enter
         row2 = ttk.Frame(parent)
-        row2.grid(row=3, column=0, sticky="ew", pady=3)
-        
+        row2.pack(fill="x", pady=3)
         for ch in "asdfghjkl":
             btn = ttk.Button(row2, text=ch.upper(), style="Keyboard.TButton",
-                           command=lambda c=ch: self.insert_char(c))
-            btn.pack(side="left", ipadx=12, ipady=8, expand=True, fill="x", padx=2)
+                             command=lambda c=ch: self.insert_char(c))
+            btn.pack(side="left", expand=True, fill="x", padx=2)
+        enter_btn = ttk.Button(row2, text="↵", style="Keyboard.TButton", command=self.enter)
+        enter_btn.pack(side="left", expand=True, fill="x", padx=2)
         
-        # Enter after L
-        enter_btn = ttk.Button(row2, text="↵", style="Keyboard.TButton",
-                              command=self.enter)
-        enter_btn.pack(side="left", ipadx=15, ipady=8, padx=2)
-        
-        # Third letter row: Z-M
+        # Z-M row
         row3 = ttk.Frame(parent)
-        row3.grid(row=4, column=0, sticky="ew", pady=3)
-        
+        row3.pack(fill="x", pady=3)
         for ch in "zxcvbnm":
             btn = ttk.Button(row3, text=ch.upper(), style="Keyboard.TButton",
-                           command=lambda c=ch: self.insert_char(c))
-            btn.pack(side="left", ipadx=12, ipady=8, expand=True, fill="x", padx=2)
+                             command=lambda c=ch: self.insert_char(c))
+            btn.pack(side="left", expand=True, fill="x", padx=2)
         
-        # Bottom row - just SPACE
+        # Space row
         bottom_row = ttk.Frame(parent)
-        bottom_row.grid(row=5, column=0, sticky="ew", pady=3)
-        
-        space_btn = ttk.Button(bottom_row, text="SPACE", style="Keyboard.TButton",
-                              command=self.space)
-        space_btn.pack(ipadx=80, ipady=12, expand=True, fill="x", padx=3)
+        bottom_row.pack(fill="x", pady=3)
+        space_btn = ttk.Button(bottom_row, text="SPACE", style="Keyboard.TButton", command=self.space)
+        space_btn.pack(expand=True, fill="x", padx=3, ipadx=80, ipady=12)
 
 if __name__ == "__main__":
     app = FilipinoKeyboard()
