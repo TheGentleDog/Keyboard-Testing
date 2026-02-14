@@ -152,51 +152,9 @@ class NgramModel:
             # Add full words too
             all_tokens.extend([full_word.lower()] * 5)
         
-        # CRITICAL: Add essential shortcuts that MUST exist (even if not in dataset)
-        essential_shortcuts = {
-            "nlng": "nalang",
-            "lng": "lang",
-            "nmn": "naman",
-            "ksi": "kasi",
-            "kng": "kung",
-            "khit": "kahit",
-            "d2": "dito",
-            "dn": "doon",
-            "pde": "pwede",
-            "pwd": "pwede",
-            "sna": "sana",
-            "tlg": "talaga",
-            "tlga": "talaga",
-            "sya": "siya",
-            "xa": "siya",
-            "aq": "ako",
-            "q": "ako",
-            "nde": "hindi",
-            "hnd": "hindi",
-            "di": "hindi",
-            "pra": "para",
-            "wla": "wala",
-            "my": "may",
-            "ung": "yung",
-            "un": "yun",
-            "dba": "diba",
-            "db": "diba",
-            "bat": "bakit",
-            "bkt": "bakit",
-            "pno": "paano",
-            "pano": "paano"
-        }
-        
-        print(f"📌 Adding {len(essential_shortcuts)} essential shortcuts...")
-        for shortcut, full_word in essential_shortcuts.items():
-            self.csv_shortcuts[shortcut] = full_word
-            # Add full words to vocabulary
-            all_tokens.extend([full_word.lower()] * 5)
-        
         print(f"✓ Built-in words: {len(FILIPINO_WORDS)}")
         print(f"✓ Communication phrases: {len(COMMUNICATION_CORPUS)}")
-        print(f"✓ Loaded shortcuts: {len(FILIPINO_SHORTCUTS)}")
-        print(f"✓ Total shortcuts (with essentials): {len(self.csv_shortcuts)}")
+        print(f"✓ Built-in shortcuts: {len(FILIPINO_SHORTCUTS)}")
         print(f"✓ Total tokens for training: {len(all_tokens)}")
         
         # Build vocabulary
@@ -504,23 +462,37 @@ class NgramModel:
         """Get word completion suggestions"""
         prefix = prefix.lower()
         
+        # DEBUG: Print what we're looking for
+        if prefix == "nlng":
+            print(f"\n🔍 DEBUG: Looking for '{prefix}'")
+            print(f"  csv_shortcuts has nlng? {'nlng' in self.csv_shortcuts}")
+            if 'nlng' in self.csv_shortcuts:
+                print(f"  nlng maps to: {self.csv_shortcuts['nlng']}")
+            print(f"  Total shortcuts: {len(self.csv_shortcuts)}")
+        
         # PRIORITY 1: Check shortcuts (HIGHEST PRIORITY)
         shortcut_candidates = []
         all_expansions = self.get_all_shortcut_expansions(prefix)
+        
+        if prefix == "nlng":
+            print(f"  Expansions found: {all_expansions}")
         
         if all_expansions:
             for full_word, source in all_expansions:
                 priority_multiplier = 10.0 if source == 'user' else 8.0
                 shortcut_candidates.append((full_word, False, True, priority_multiplier))
         
-        # PRIORITY 2: Exact prefix matches
-        prefix_candidates = []
+        if prefix == "nlng":
+            print(f"  Shortcut candidates: {shortcut_candidates}")
         
-        # Minimum word length - allow words same length or longer
+        # PRIORITY 2: Exact prefix matches
+        candidates = []
+        
+        # Minimum word length
         if len(prefix) == 1:
             min_word_length = 2
         else:
-            min_word_length = 2  # Allow short words for better fuzzy matching
+            min_word_length = max(len(prefix) + 1, 3)
         
         exact_matches = [
             word for word in self.vocabulary 
@@ -530,19 +502,21 @@ class NgramModel:
             and self._has_vowels(word)
         ]
         
+        if prefix == "nlng":
+            print(f"  Exact matches: {exact_matches}")
+        
         char_completions = self.get_char_level_completions(prefix, max_results=10)
         
         # Add exact prefix matches
         for word in exact_matches:
             if word in char_completions:
-                prefix_candidates.append((word, True, False, 2.0))
+                candidates.append((word, True, False, 2.0))
             else:
-                prefix_candidates.append((word, True, False, 1.0))
+                candidates.append((word, True, False, 1.0))
         
-        # PRIORITY 3: Fuzzy/closest matches (ALWAYS show these to fill up to max_results)
+        # PRIORITY 3: Fuzzy matches (ONLY if no exact matches or shortcuts)
         fuzzy_candidates = []
-        if len(prefix) >= 2:
-            # We want to find close matches to fill remaining slots
+        if not shortcut_candidates and len(exact_matches) < 3 and len(prefix) >= 2:
             for word in self.vocabulary:
                 if word in exact_matches:
                     continue
@@ -559,38 +533,40 @@ class NgramModel:
                 if not self._has_vowels(word):
                     continue
                 
-                # Strategy 1: Word contains the prefix somewhere
+                # Check if word contains the prefix
                 if prefix in word:
                     position = word.index(prefix)
-                    fuzzy_candidates.append((word, False, False, 0.5 / (position + 1)))
+                    fuzzy_candidates.append((word, False, False, 0.3 / (position + 1)))
                     continue
                 
-                # Strategy 2: Similar length and small edit distance
-                if abs(len(word) - len(prefix)) <= 3:
+                # Only consider words of similar length
+                if abs(len(word) - len(prefix)) <= 2:
                     distance = damerau_levenshtein_distance(prefix, word[:len(prefix)])
-                    # Allow up to 2 edits for fuzzy matches
-                    if distance <= 2:
-                        # Closer distance = higher score
-                        similarity = 1.0 / (1.0 + distance)
-                        fuzzy_candidates.append((word, False, False, similarity * 0.3))
+                    # Only if very close (1 edit)
+                    if distance <= 1:
+                        fuzzy_candidates.append((word, False, False, 0.1))
         
         # Combine all candidates
-        all_candidates = shortcut_candidates + prefix_candidates + fuzzy_candidates
+        all_candidates = shortcut_candidates + candidates + fuzzy_candidates
+        
+        if prefix == "nlng":
+            print(f"  Total candidates: {len(all_candidates)}")
+            print(f"  All candidates: {[w for w, _, _, _ in all_candidates]}")
         
         # Score all candidates
         scored = []
         for word, is_exact_match, is_shortcut, priority_mult in all_candidates:
             prob = self.get_word_probability(word, context)
             
-            # Calculate scores with different weights
+            # Calculate scores
             if is_shortcut:
-                # Shortcuts get MASSIVE boost (always appear first)
-                final_score = prob * priority_mult * 1000
+                # Shortcuts get MASSIVE boost
+                final_score = prob * priority_mult * 100
             elif is_exact_match:
                 # Exact prefix matches get good boost
                 final_score = prob * priority_mult * 10
             else:
-                # Fuzzy matches get small boost (but still shown)
+                # Fuzzy matches get small boost
                 final_score = prob * priority_mult
             
             # Extra boost for frequently used shortcuts
@@ -610,8 +586,12 @@ class NgramModel:
         unique_scored = [(word, score) for word, score in seen.items()]
         unique_scored.sort(key=lambda x: -x[1])
         
-        # Return top results (shortcuts will naturally be first due to high scores)
-        return [word for word, score in unique_scored[:max_results]]
+        result = [word for word, score in unique_scored[:max_results]]
+        
+        if prefix == "nlng":
+            print(f"  Final result: {result}\n")
+        
+        return result
     
     def get_next_word_suggestions(self, context=None, max_results=6):
         """Predict next word"""
