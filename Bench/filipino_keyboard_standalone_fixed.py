@@ -9,8 +9,8 @@ import pickle
 MAX_SUGGESTIONS = 5
 NGRAM_CACHE_FILE = "ngram_model_standalone.pkl"
 USER_LEARNING_FILE = "user_learning.json"
-DATASET_FILE = "filipino_dataset.json"  # NEW: External dataset file
-MODEL_VERSION = "2.1_json_dataset"  # Updated version
+DATASET_FILE = "filipino_dataset.json"
+MODEL_VERSION = "2.1_json_dataset"
 
 # =============================================================================
 # LOAD DATASET FROM JSON
@@ -26,7 +26,6 @@ def load_dataset():
         print(f"  Words: {data['metadata']['total_words']}")
         print(f"  Phrases: {data['metadata']['total_phrases']}")
         
-        # Flatten vocabulary
         words = []
         for category, word_list in data['vocabulary'].items():
             words.extend(word_list)
@@ -67,7 +66,6 @@ def _get_fallback_data():
     corpus = ["kumusta ka", "mabuti naman", "salamat", "ok lang"]
     return words, shortcuts, corpus
 
-# Load dataset at startup
 FILIPINO_WORDS, FILIPINO_SHORTCUTS, COMMUNICATION_CORPUS = load_dataset()
 
 # =============================================================================
@@ -80,7 +78,6 @@ def damerau_levenshtein_distance(s1, s2):
     """
     len1, len2 = len(s1), len(s2)
     
-    # Create distance matrix
     d = {}
     for i in range(-1, len1 + 1):
         d[(i, -1)] = i + 1
@@ -92,12 +89,11 @@ def damerau_levenshtein_distance(s1, s2):
             cost = 0 if s1[i] == s2[j] else 1
             
             d[(i, j)] = min(
-                d[(i-1, j)] + 1,      # deletion
-                d[(i, j-1)] + 1,      # insertion
-                d[(i-1, j-1)] + cost, # substitution
+                d[(i-1, j)] + 1,
+                d[(i, j-1)] + 1,
+                d[(i-1, j-1)] + cost,
             )
             
-            # Transposition
             if i > 0 and j > 0 and s1[i] == s2[j-1] and s1[i-1] == s2[j]:
                 d[(i, j)] = min(d[(i, j)], d[(i-2, j-2)] + cost)
     
@@ -114,11 +110,9 @@ class NgramModel:
         self.vocabulary = set()
         self.total_words = 0
         
-        # Character-level n-grams
         self.char_bigrams = defaultdict(Counter)
         self.char_trigrams = defaultdict(Counter)
         
-        # Shortcuts
         self.csv_shortcuts = {}
         self.user_shortcuts = {}
         self.user_shortcut_usage = Counter()
@@ -126,30 +120,22 @@ class NgramModel:
         self.word_usage_history = []
     
     def train_from_builtin(self):
-        """Train from built-in Filipino vocabulary (NO external datasets!)"""
+        """Train from built-in Filipino vocabulary"""
         print("📚 Loading built-in Filipino vocabulary...")
         
-        # Add all words multiple times to simulate corpus
         all_tokens = []
         
-        # Add conversational words (high frequency)
         for word in FILIPINO_WORDS:
-            # Add each word 10 times to give it good frequency
             all_tokens.extend([word.lower()] * 10)
         
-        # Add communication corpus (IMPORTANT for predictions!)
         print("📝 Processing communication corpus...")
         for phrase in COMMUNICATION_CORPUS:
-            # Split phrase into words
             words = phrase.lower().split()
-            # Add phrase multiple times (50x) for VERY strong n-gram patterns
             for _ in range(50):
                 all_tokens.extend(words)
         
-        # Add shortcuts as vocabulary
         for shortcut, full_word in FILIPINO_SHORTCUTS.items():
             self.csv_shortcuts[shortcut] = full_word
-            # Add full words too
             all_tokens.extend([full_word.lower()] * 5)
         
         print(f"✓ Built-in words: {len(FILIPINO_WORDS)}")
@@ -157,10 +143,8 @@ class NgramModel:
         print(f"✓ Built-in shortcuts: {len(FILIPINO_SHORTCUTS)}")
         print(f"✓ Total tokens for training: {len(all_tokens)}")
         
-        # Build vocabulary
         self.vocabulary.update(all_tokens)
         
-        # Build n-grams
         print("\n🔨 Building n-grams...")
         for i, token in enumerate(all_tokens):
             self.unigrams[token] += 1
@@ -355,7 +339,7 @@ class NgramModel:
     def save_cache(self):
         """Save model to cache"""
         data = {
-            'version': MODEL_VERSION,  # Track version
+            'version': MODEL_VERSION,
             'unigrams': dict(self.unigrams),
             'bigrams': {k: dict(v) for k, v in self.bigrams.items()},
             'trigrams': {k: dict(v) for k, v in self.trigrams.items()},
@@ -378,7 +362,6 @@ class NgramModel:
             with open(NGRAM_CACHE_FILE, 'rb') as f:
                 data = pickle.load(f)
             
-            # Check version - rebuild if outdated
             cached_version = data.get('version', '1.0')
             if cached_version != MODEL_VERSION:
                 print(f"⚠ Cache version mismatch ({cached_version} vs {MODEL_VERSION})")
@@ -459,36 +442,21 @@ class NgramModel:
             return (count + alpha) / (context_count + alpha * vocab_size)
     
     def get_completion_suggestions(self, prefix, context=None, max_results=8):
-        """Get word completion suggestions"""
+        """Get word completion suggestions using ngram and Damerau-Levenshtein"""
         prefix = prefix.lower()
         
-        # DEBUG: Print what we're looking for
-        if prefix == "nlng":
-            print(f"\n🔍 DEBUG: Looking for '{prefix}'")
-            print(f"  csv_shortcuts has nlng? {'nlng' in self.csv_shortcuts}")
-            if 'nlng' in self.csv_shortcuts:
-                print(f"  nlng maps to: {self.csv_shortcuts['nlng']}")
-            print(f"  Total shortcuts: {len(self.csv_shortcuts)}")
-        
-        # PRIORITY 1: Check shortcuts (HIGHEST PRIORITY)
+        # PRIORITY 1: Shortcuts
         shortcut_candidates = []
         all_expansions = self.get_all_shortcut_expansions(prefix)
-        
-        if prefix == "nlng":
-            print(f"  Expansions found: {all_expansions}")
         
         if all_expansions:
             for full_word, source in all_expansions:
                 priority_multiplier = 10.0 if source == 'user' else 8.0
                 shortcut_candidates.append((full_word, False, True, priority_multiplier))
         
-        if prefix == "nlng":
-            print(f"  Shortcut candidates: {shortcut_candidates}")
-        
         # PRIORITY 2: Exact prefix matches
         candidates = []
         
-        # Minimum word length
         if len(prefix) == 1:
             min_word_length = 2
         else:
@@ -502,99 +470,74 @@ class NgramModel:
             and self._has_vowels(word)
         ]
         
-        if prefix == "nlng":
-            print(f"  Exact matches: {exact_matches}")
-        
         char_completions = self.get_char_level_completions(prefix, max_results=10)
         
-        # Add exact prefix matches
         for word in exact_matches:
             if word in char_completions:
                 candidates.append((word, True, False, 2.0))
             else:
                 candidates.append((word, True, False, 1.0))
         
-        # PRIORITY 3: Fuzzy matches (ONLY if no exact matches or shortcuts)
+        # PRIORITY 3: Fuzzy matches using Damerau-Levenshtein
         fuzzy_candidates = []
         if not shortcut_candidates and len(exact_matches) < 3 and len(prefix) >= 2:
             for word in self.vocabulary:
                 if word in exact_matches:
                     continue
                 
-                # Skip very short words
                 if len(word) < min_word_length:
                     continue
                 
-                # Skip words with punctuation
                 if not word.isalpha():
                     continue
                 
-                # Skip acronyms without vowels
                 if not self._has_vowels(word):
                     continue
                 
-                # Check if word contains the prefix
                 if prefix in word:
                     position = word.index(prefix)
                     fuzzy_candidates.append((word, False, False, 0.3 / (position + 1)))
                     continue
                 
-                # Only consider words of similar length
                 if abs(len(word) - len(prefix)) <= 2:
                     distance = damerau_levenshtein_distance(prefix, word[:len(prefix)])
-                    # Only if very close (1 edit)
                     if distance <= 1:
                         fuzzy_candidates.append((word, False, False, 0.1))
         
         # Combine all candidates
         all_candidates = shortcut_candidates + candidates + fuzzy_candidates
         
-        if prefix == "nlng":
-            print(f"  Total candidates: {len(all_candidates)}")
-            print(f"  All candidates: {[w for w, _, _, _ in all_candidates]}")
-        
-        # Score all candidates
+        # Score using ngram probabilities
         scored = []
         for word, is_exact_match, is_shortcut, priority_mult in all_candidates:
             prob = self.get_word_probability(word, context)
             
-            # Calculate scores
             if is_shortcut:
-                # Shortcuts get MASSIVE boost
                 final_score = prob * priority_mult * 100
             elif is_exact_match:
-                # Exact prefix matches get good boost
                 final_score = prob * priority_mult * 10
             else:
-                # Fuzzy matches get small boost
                 final_score = prob * priority_mult
             
-            # Extra boost for frequently used shortcuts
             if is_shortcut and prefix in self.user_shortcut_usage:
                 usage_count = self.user_shortcut_usage[prefix]
                 final_score *= (1.0 + min(usage_count / 10.0, 2.0))
             
             scored.append((word, final_score))
         
-        # Remove duplicates (keep highest score)
+        # Remove duplicates
         seen = {}
         for word, score in scored:
             if word not in seen or score > seen[word]:
                 seen[word] = score
         
-        # Sort by score
         unique_scored = [(word, score) for word, score in seen.items()]
         unique_scored.sort(key=lambda x: -x[1])
         
-        result = [word for word, score in unique_scored[:max_results]]
-        
-        if prefix == "nlng":
-            print(f"  Final result: {result}\n")
-        
-        return result
+        return [word for word, score in unique_scored[:max_results]]
     
     def get_next_word_suggestions(self, context=None, max_results=6):
-        """Predict next word"""
+        """Predict next word using ngrams"""
         if context is None or len(context) == 0:
             most_common = self.unigrams.most_common(max_results)
             return [word for word, count in most_common]
@@ -632,8 +575,8 @@ class NgramModel:
 
 # Initialize model
 print("="*60)
-print("FILIPINO KEYBOARD - STANDALONE VERSION")
-print("Built-in vocabulary only (no external datasets!)")
+print("FILIPINO KEYBOARD - LIVE AUTOCOMPLETE VERSION")
+print("Gaze-Based Digital Keyboard")
 print("="*60)
 
 ngram_model = NgramModel()
@@ -668,80 +611,410 @@ def get_context_words(text, n=2):
     return words[-n:] if len(words) >= n else words
 
 # =============================================================================
-# GUI
+# GUI WITH LIVE AUTOCOMPLETE
 # =============================================================================
 class FilipinoKeyboard(tk.Tk):
     def __init__(self):
         super().__init__()
         
-        self.title("Filipino Keyboard - Standalone")
-        self.geometry("1200x850")  # Increased from 900x700
+        self.title("Filipino Keyboard - Live Autocomplete (Gaze-Based)")
+        self.geometry("1400x1000")  # Taller window for bigger keys
         self.configure(bg="#f0f0f0")
+        
+        self.current_completion = ""
+        self.alternative_suggestions = []
+        self.current_input = ""
+        self.finalized_text = ""  # Stores the actual finalized output
+        
+        # Theme settings
+        self.current_theme = "light"  # default theme
+        self.themes = {
+            "light": {
+                "bg": "#f0f0f0",
+                "output_bg": "#ffffff",
+                "input_bg": "#f9f9f9",
+                "text_fg": "black",
+                "suggestion_fg": "gray",
+                "popup_bg": "#fff9e6",
+                "popup_border": "#ffcc00",
+                "button_bg": "#e0e0e0",
+                "button_fg": "black",
+                "button_active_bg": "#d0d0d0"
+            },
+            "dark": {
+                "bg": "#36393f",  # Discord dark gray
+                "output_bg": "#2f3136",  # Discord darker gray
+                "input_bg": "#40444b",  # Discord input gray
+                "text_fg": "#dcddde",  # Discord light text
+                "suggestion_fg": "#8e9297",  # Discord muted text
+                "popup_bg": "#202225",  # Discord darkest
+                "popup_border": "#5865f2",  # Discord blurple
+                "button_bg": "#4f545c",  # Discord button gray
+                "button_fg": "#ffffff",  # White text
+                "button_active_bg": "#5865f2"  # Discord blurple on hover
+            }
+        }
+        
+        # Alternative popup window
+        self.alt_popup = None
         
         self.create_widgets()
     
     def create_widgets(self):
-        # Text display - smaller height
-        text_frame = ttk.Frame(self)
-        text_frame.pack(fill="both", expand=False, padx=15, pady=15)  # expand=False
+        # Output display (top) - VERY COMPACT
+        output_frame = ttk.LabelFrame(self, text="Output", padding="3")
+        output_frame.pack(fill="x", padx=5, pady=(5, 2))
         
-        self.text_display = tk.Text(text_frame, wrap="word", font=("Segoe UI", 16), height=6)  # Reduced from 12 to 6
-        self.text_display.pack(fill="both", expand=False)  # expand=False
-        self.text_display.bind('<KeyRelease>', lambda e: self.update_suggestions())
+        self.output_display = tk.Text(output_frame, wrap="word", font=("Segoe UI", 14), height=2)
+        self.output_display.pack(fill="x")
+        self.output_display.config(state="disabled")
         
-        # Suggestions - more space
-        suggestions_frame = ttk.LabelFrame(self, text="Suggestions", padding="15")
-        suggestions_frame.pack(fill="x", padx=15, pady=10)
+        # Input display - VERY COMPACT
+        input_frame = ttk.LabelFrame(self, text="Current Word", padding="3")
+        input_frame.pack(fill="x", padx=5, pady=2)
         
-        ttk.Label(suggestions_frame, text="Word Completion:", font=("Segoe UI", 10, "bold")).pack(anchor="w")
-        self.completion_container = ttk.Frame(suggestions_frame)
-        self.completion_container.pack(fill="x", pady=8)
+        self.input_display = tk.Text(input_frame, wrap="word", font=("Segoe UI", 12), height=1)
+        self.input_display.pack(fill="x")
+        self.input_display.config(state="disabled")
         
-        ttk.Label(suggestions_frame, text="Next Word:", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(15,0))
-        self.predictive_container = ttk.Frame(suggestions_frame)
-        self.predictive_container.pack(fill="x", pady=8)
+        # Next word predictions - VERY COMPACT
+        predictive_frame = ttk.LabelFrame(self, text="Next Word", padding="3")
+        predictive_frame.pack(fill="x", padx=5, pady=2)
         
-        # Virtual keyboard - more spacing
-        keyboard_frame = ttk.LabelFrame(self, text="Virtual Keyboard", padding="15")
-        keyboard_frame.pack(fill="both", padx=15, pady=10)
+        self.predictive_container = ttk.Frame(predictive_frame)
+        self.predictive_container.pack(fill="x", pady=2)
+        
+        # Virtual keyboard - MAXIMIZED (takes ALL remaining space, NO padding)
+        keyboard_frame = ttk.LabelFrame(self, text="Keyboard", padding="0")
+        keyboard_frame.pack(fill="both", expand=True, padx=5, pady=(2, 5))
         
         self.create_keyboard(keyboard_frame)
         
         # Status bar
-        self.status_bar = ttk.Label(self, text="Ready", relief="sunken", anchor="w", font=("Segoe UI", 9))
+        self.status_bar = ttk.Label(self, text="Type to autocomplete | SPACE to finalize", relief="sunken", anchor="w", font=("Segoe UI", 8))
         self.status_bar.pack(fill="x", side="bottom")
         
-        self.update_suggestions()
+        # Apply initial theme
+        self.apply_theme()
+        
+        self.update_display()
     
-    def update_suggestions(self):
-        """Update suggestions"""
-        for widget in self.completion_container.winfo_children():
-            widget.destroy()
+    def update_display(self):
+        """Update all displays with live autocomplete"""
+        # Get finalized text (everything except what we're currently typing)
+        finalized_text = self.get_finalized_text()
+        context = get_context_words(finalized_text, n=2)
+        
+        # Update input display
+        self.input_display.config(state="normal")
+        self.input_display.delete("1.0", "end")
+        self.input_display.insert("1.0", self.current_input)
+        self.input_display.config(state="disabled")
+        
+        # Get autocomplete suggestions
+        if self.current_input:
+            suggestions = ngram_model.get_completion_suggestions(
+                self.current_input, context, max_results=5
+            )
+            
+            if suggestions:
+                self.current_completion = suggestions[0]
+                self.alternative_suggestions = suggestions[1:5]
+            else:
+                self.current_completion = self.current_input
+                self.alternative_suggestions = []
+            
+            # Show live autocomplete in output
+            self.output_display.config(state="normal")
+            self.output_display.delete("1.0", "end")
+            
+            # Show finalized text
+            if finalized_text:
+                self.output_display.insert("1.0", finalized_text)
+            
+            theme = self.themes[self.current_theme]
+            
+            # Show current input in normal color
+            self.output_display.insert("end", self.current_input, "input")
+            
+            # Show completion suggestion in gray
+            if len(self.current_completion) > len(self.current_input):
+                remaining = self.current_completion[len(self.current_input):]
+                self.output_display.insert("end", remaining, "suggestion")
+            
+            # Configure tags
+            self.output_display.tag_config("input", foreground=theme["text_fg"])
+            self.output_display.tag_config("suggestion", foreground=theme["suggestion_fg"])
+            
+            self.output_display.config(state="disabled")
+            
+            # Show popup for alternatives if they exist
+            if self.alternative_suggestions:
+                self.show_alternative_popup()
+            else:
+                self.close_popup()
+            
+        else:
+            self.current_completion = ""
+            self.alternative_suggestions = []
+            
+            # Just show finalized text
+            self.output_display.config(state="normal")
+            self.output_display.delete("1.0", "end")
+            if finalized_text:
+                self.output_display.insert("1.0", finalized_text)
+            self.output_display.config(state="disabled")
+            
+            # Close popup
+            self.close_popup()
+        
+        # Update next word predictions
+        self.update_predictions()
+    
+    def show_settings(self):
+        """Show settings dialog for theme selection"""
+        settings_window = tk.Toplevel(self)
+        settings_window.title("Settings")
+        settings_window.geometry("400x250")
+        settings_window.resizable(False, False)
+        
+        # Center the window
+        settings_window.transient(self)
+        settings_window.grab_set()
+        
+        # Theme selection
+        theme_frame = ttk.LabelFrame(settings_window, text="Theme", padding=20)
+        theme_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        ttk.Label(theme_frame, text="Select Theme:", font=("Segoe UI", 11)).pack(anchor="w", pady=(0, 15))
+        
+        # Light mode button
+        light_btn = ttk.Button(
+            theme_frame, 
+            text="☀ Light Mode",
+            command=lambda: self.change_theme("light", settings_window),
+            width=20
+        )
+        light_btn.pack(pady=8, ipady=10)
+        
+        # Dark mode button
+        dark_btn = ttk.Button(
+            theme_frame, 
+            text="🌙 Dark Mode",
+            command=lambda: self.change_theme("dark", settings_window),
+            width=20
+        )
+        dark_btn.pack(pady=8, ipady=10)
+        
+        # Current theme indicator
+        current_label = ttk.Label(
+            theme_frame, 
+            text=f"Current: {self.current_theme.capitalize()} Mode",
+            font=("Segoe UI", 9, "italic")
+        )
+        current_label.pack(pady=(15, 0))
+        
+        # Close button
+        close_btn = ttk.Button(settings_window, text="Close", command=settings_window.destroy)
+        close_btn.pack(pady=(0, 10))
+    
+    def change_theme(self, theme, settings_window=None):
+        """Change the application theme"""
+        self.current_theme = theme
+        self.apply_theme()
+        if settings_window:
+            settings_window.destroy()
+        self.status_bar.config(text=f"Theme changed to {theme.capitalize()} Mode")
+    
+    def apply_theme(self):
+        """Apply the selected theme to all widgets"""
+        theme = self.themes[self.current_theme]
+        
+        # Main window
+        self.configure(bg=theme["bg"])
+        
+        # Output display
+        self.output_display.config(
+            bg=theme["output_bg"],
+            fg=theme["text_fg"],
+            insertbackground=theme["text_fg"]
+        )
+        
+        # Input display
+        self.input_display.config(
+            bg=theme["input_bg"],
+            fg=theme["text_fg"],
+            insertbackground=theme["text_fg"]
+        )
+        
+        # Update text tags for autocomplete
+        self.output_display.tag_config("input", foreground=theme["text_fg"])
+        self.output_display.tag_config("suggestion", foreground=theme["suggestion_fg"])
+        
+        # Update keyboard buttons
+        if hasattr(self, 'keyboard_buttons'):
+            for btn in self.keyboard_buttons:
+                btn.config(
+                    bg=theme["button_bg"],
+                    fg=theme["button_fg"],
+                    activebackground=theme["button_active_bg"],
+                    activeforeground=theme["button_fg"]
+                )
+    
+    def get_finalized_text(self):
+        """Get the finalized text from output (without current typing preview)"""
+        if not hasattr(self, 'finalized_text'):
+            self.finalized_text = ""
+        return self.finalized_text
+    
+    def show_alternative_popup(self):
+        """Show alternative suggestions as a popup near the predicted word"""
+        # Close existing popup if any
+        if self.alt_popup:
+            self.alt_popup.destroy()
+            self.alt_popup = None
+        
+        if not self.alternative_suggestions:
+            return
+        
+        # Create popup window
+        self.alt_popup = tk.Toplevel(self)
+        self.alt_popup.overrideredirect(True)  # Remove window decorations
+        
+        theme = self.themes[self.current_theme]
+        
+        # Create frame with border
+        popup_frame = tk.Frame(
+            self.alt_popup, 
+            bg=theme["popup_border"], 
+            highlightthickness=2,
+            highlightbackground=theme["popup_border"]
+        )
+        popup_frame.pack(fill="both", expand=True)
+        
+        inner_frame = tk.Frame(popup_frame, bg=theme["popup_bg"], padx=10, pady=8)
+        inner_frame.pack(fill="both", expand=True, padx=2, pady=2)
+        
+        # Label
+        label = tk.Label(
+            inner_frame, 
+            text="Or do you mean:",
+            font=("Segoe UI", 9, "italic"),
+            bg=theme["popup_bg"],
+            fg=theme["text_fg"]
+        )
+        label.pack(anchor="w")
+        
+        # Alternative buttons
+        btn_frame = tk.Frame(inner_frame, bg=theme["popup_bg"])
+        btn_frame.pack(fill="x", pady=(5, 0))
+        
+        for word in self.alternative_suggestions[:4]:  # Show max 4 alternatives
+            btn = tk.Button(
+                btn_frame,
+                text=word,
+                command=lambda w=word: self.apply_alternative_from_popup(w),
+                font=("Segoe UI", 10),
+                relief="raised",
+                bd=1,
+                padx=8,
+                pady=4,
+                cursor="hand2"
+            )
+            btn.pack(side="left", padx=3)
+        
+        # Position the popup
+        self.position_popup()
+        
+        # Auto-close popup after 8 seconds
+        self.alt_popup.after(8000, self.close_popup)
+    
+    def position_popup(self):
+        """Position popup near the predicted word (follows cursor, doesn't block text)"""
+        if not self.alt_popup:
+            return
+        
+        # Update to get accurate sizes
+        self.alt_popup.update_idletasks()
+        
+        # Get the position of the cursor in the output display
+        try:
+            # Get the index of the end of text
+            cursor_index = self.output_display.index("end-1c")
+            
+            # Get the bounding box of the cursor position
+            bbox = self.output_display.bbox(cursor_index)
+            
+            if bbox:
+                # bbox returns (x, y, width, height) relative to the text widget
+                cursor_x, cursor_y, cursor_width, cursor_height = bbox
+                
+                # Convert to screen coordinates
+                widget_x = self.output_display.winfo_rootx()
+                widget_y = self.output_display.winfo_rooty()
+                
+                # Get popup size
+                popup_width = self.alt_popup.winfo_width()
+                popup_height = self.alt_popup.winfo_height()
+                
+                # Get screen width
+                screen_width = self.winfo_screenwidth()
+                
+                # Position below the cursor line to not block text
+                x = widget_x + cursor_x + cursor_width + 10  # 10px offset from cursor
+                y = widget_y + cursor_y + cursor_height + 5   # Below the line
+                
+                # If popup goes off right edge, move to left of cursor
+                if x + popup_width > screen_width - 20:
+                    x = widget_x + cursor_x - popup_width - 10
+                
+                # If still off screen (very left), align with widget
+                if x < 20:
+                    x = widget_x + 20
+                
+                self.alt_popup.geometry(f"+{x}+{y}")
+            else:
+                # Fallback if bbox fails - position at bottom right of output
+                output_x = self.output_display.winfo_rootx()
+                output_y = self.output_display.winfo_rooty()
+                output_height = self.output_display.winfo_height()
+                
+                x = output_x + 20
+                y = output_y + output_height - 100
+                
+                self.alt_popup.geometry(f"+{x}+{y}")
+                
+        except Exception as e:
+            # Fallback positioning
+            output_x = self.output_display.winfo_rootx()
+            output_y = self.output_display.winfo_rooty()
+            output_height = self.output_display.winfo_height()
+            
+            x = output_x + 20
+            y = output_y + output_height - 100
+            
+            self.alt_popup.geometry(f"+{x}+{y}")
+    
+    def close_popup(self):
+        """Close the alternative suggestions popup"""
+        if self.alt_popup:
+            self.alt_popup.destroy()
+            self.alt_popup = None
+    
+    def apply_alternative_from_popup(self, word):
+        """Apply alternative suggestion from popup"""
+        self.close_popup()
+        self.apply_alternative(word)
+    
+    def update_predictions(self):
+        """Update next word prediction buttons"""
         for widget in self.predictive_container.winfo_children():
             widget.destroy()
         
-        text = self.text_display.get("1.0", "end-1c")
-        token = get_current_token(text)
-        context = get_context_words(text, n=2)
+        # Use finalized text for context, not the display with preview
+        context = get_context_words(self.finalized_text, n=2)
         
-        # Word completion
-        if token:
-            completions = ngram_model.get_completion_suggestions(token, context, max_results=5)
-            
-            if completions:
-                for word in completions[:8]:
-                    display_word = word.capitalize() if token and token[0].isupper() else word
-                    
-                    btn = ttk.Button(
-                        self.completion_container,
-                        text=display_word,
-                        command=lambda w=display_word: self.apply_completion(w),
-                        style="Suggestion.TButton"
-                    )
-                    btn.pack(side="left", padx=5, pady=5, ipadx=12, ipady=8)
-        
-        # Next word prediction
-        predictions = ngram_model.get_next_word_suggestions(context, max_results=5)
+        predictions = ngram_model.get_next_word_suggestions(context, max_results=6)
         
         if predictions:
             for word in predictions[:6]:
@@ -751,138 +1024,300 @@ class FilipinoKeyboard(tk.Tk):
                     command=lambda w=word: self.apply_prediction(w),
                     style="Suggestion.TButton"
                 )
-                btn.pack(side="left", padx=5, pady=5, ipadx=12, ipady=8)
+                btn.pack(side="left", padx=5, ipadx=15, ipady=10)
     
-    def apply_completion(self, word):
-        """Apply completion"""
-        text = self.text_display.get("1.0", "end-1c")
-        token = get_current_token(text)
-        context = get_context_words(text, n=2)
+    def finalize_word(self):
+        """Finalize current word with SPACE - accepts autocomplete"""
+        # Close popup
+        self.close_popup()
         
-        if token:
-            ngram_model.learn_from_user_typing(token, word)
-            
-            lines = text.split('\n')
-            current_line = len(lines) - 1
-            current_char = len(lines[-1]) - len(token)
-            start_index = f"{current_line + 1}.{current_char}"
-            
-            self.text_display.delete(start_index, "end-1c")
-            self.text_display.insert(start_index, word + " ")
-        else:
-            self.text_display.insert("end", word + " ")
+        if not self.current_completion:
+            # Just add space if no input
+            self.finalized_text += " "
+            self.output_display.config(state="normal")
+            self.output_display.delete("1.0", "end")
+            self.output_display.insert("1.0", self.finalized_text)
+            self.output_display.config(state="disabled")
+            self.status_bar.config(text="Space added")
+            return
         
+        # Get context before finalizing
+        context = get_context_words(self.finalized_text, n=2)
+        
+        # Learn from user typing
+        if self.current_input != self.current_completion:
+            ngram_model.learn_from_user_typing(self.current_input, self.current_completion)
+        
+        # Track word usage
+        ngram_model.track_word_usage(self.current_completion, context)
+        
+        # Add to finalized text
+        self.finalized_text += self.current_completion + " "
+        
+        # Update output display
+        self.output_display.config(state="normal")
+        self.output_display.delete("1.0", "end")
+        self.output_display.insert("1.0", self.finalized_text)
+        self.output_display.config(state="disabled")
+        
+        # Clear input
+        saved_completion = self.current_completion
+        self.current_input = ""
+        self.current_completion = ""
+        self.alternative_suggestions = []
+        
+        self.status_bar.config(text=f"Finalized: '{saved_completion}'")
+        self.update_display()
+    
+    def apply_alternative(self, word):
+        """Apply alternative suggestion (when autocomplete gives error)"""
+        # Close popup
+        self.close_popup()
+        
+        context = get_context_words(self.finalized_text, n=2)
+        
+        # Learn and track
+        if self.current_input != word:
+            ngram_model.learn_from_user_typing(self.current_input, word)
         ngram_model.track_word_usage(word, context)
         
-        self.update_suggestions()
-        self.status_bar.config(text=f"Applied: '{word}'")
+        # Add to finalized text
+        self.finalized_text += word + " "
+        
+        # Update output
+        self.output_display.config(state="normal")
+        self.output_display.delete("1.0", "end")
+        self.output_display.insert("1.0", self.finalized_text)
+        self.output_display.config(state="disabled")
+        
+        # Clear
+        self.current_input = ""
+        self.current_completion = ""
+        self.alternative_suggestions = []
+        
+        self.status_bar.config(text=f"Alternative selected: '{word}'")
+        self.update_display()
     
     def apply_prediction(self, word):
-        """Apply prediction"""
-        text = self.text_display.get("1.0", "end-1c")
-        context = get_context_words(text, n=2)
+        """Apply next word prediction"""
+        context = get_context_words(self.finalized_text, n=2)
         
-        if text and not text.endswith(" "):
-            self.text_display.insert("end", " ")
+        # Add space if needed before prediction
+        if self.finalized_text and not self.finalized_text.endswith(" "):
+            self.finalized_text += " "
         
-        self.text_display.insert("end", word + " ")
+        # Add predicted word
+        self.finalized_text += word + " "
+        
+        # Update output
+        self.output_display.config(state="normal")
+        self.output_display.delete("1.0", "end")
+        self.output_display.insert("1.0", self.finalized_text)
+        self.output_display.config(state="disabled")
         
         ngram_model.track_word_usage(word, context)
         
-        self.update_suggestions()
         self.status_bar.config(text=f"Predicted: '{word}'")
+        self.update_display()
     
     def insert_char(self, char):
-        """Insert character"""
-        self.text_display.insert("end", char)
-        self.update_suggestions()
+        """Insert character into current input"""
+        self.current_input += char
+        self.update_display()
+        self.status_bar.config(text=f"Typing: '{self.current_input}'")
     
     def backspace(self):
-        """Backspace"""
-        self.text_display.delete("end-2c", "end-1c")
-        self.update_suggestions()
-    
-    def space(self):
-        """Space"""
-        self.text_display.insert("end", " ")
-        self.update_suggestions()
+        """Remove last character from input"""
+        if self.current_input:
+            # Remove from current input
+            self.current_input = self.current_input[:-1]
+            self.update_display()
+            self.status_bar.config(text="Backspace")
+        else:
+            # Remove from finalized text
+            if self.finalized_text:
+                self.finalized_text = self.finalized_text[:-1]
+                self.output_display.config(state="normal")
+                self.output_display.delete("1.0", "end")
+                self.output_display.insert("1.0", self.finalized_text)
+                self.output_display.config(state="disabled")
+                self.update_display()
     
     def enter(self):
-        """Enter"""
-        self.text_display.insert("end", "\n")
-        self.update_suggestions()
+        """New line"""
+        # Finalize current word first if exists
+        if self.current_input:
+            self.finalize_word()
+        
+        # Add newline to finalized text
+        self.finalized_text += "\n"
+        
+        self.output_display.config(state="normal")
+        self.output_display.delete("1.0", "end")
+        self.output_display.insert("1.0", self.finalized_text)
+        self.output_display.config(state="disabled")
+        self.status_bar.config(text="New line")
+        self.update_display()
+    
+    def clear_all(self):
+        """Clear everything"""
+        self.output_display.config(state="normal")
+        self.output_display.delete("1.0", "end")
+        self.output_display.config(state="disabled")
+        
+        self.current_input = ""
+        self.current_completion = ""
+        self.alternative_suggestions = []
+        self.finalized_text = ""  # Clear finalized text too
+        
+        self.update_display()
+        self.status_bar.config(text="Cleared")
     
     def create_keyboard(self, parent):
-        """Create virtual keyboard"""
-        style = ttk.Style()
-        style.configure("Keyboard.TButton", font=("Segoe UI", 11), padding=8)
-        style.configure("Suggestion.TButton", font=("Segoe UI", 11), padding=6)
+        """Create gaze-based virtual keyboard with MAXIMUM space (biggest possible keys)"""
+        # Store references for theme updates
+        self.keyboard_buttons = []
         
-        parent.grid_columnconfigure(0, weight=1)
+        theme = self.themes[self.current_theme]
         
-        # Function row
-        func_row = ttk.Frame(parent)
-        func_row.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        # Main container - fills entire parent with NO gaps
+        main_container = tk.Frame(parent, bg=theme["bg"])
+        main_container.pack(fill="both", expand=True, padx=0, pady=0)
         
-        clear_btn = ttk.Button(func_row, text="Clear", 
-                             style="Keyboard.TButton",
-                             command=lambda: [self.text_display.delete("1.0", "end"), 
-                                            self.update_suggestions()])
-        clear_btn.pack(side="left", padx=3, ipadx=8, ipady=4, expand=True, fill="x")
+        # Configure grid to distribute space evenly with uniform sizing
+        for i in range(5):  # 5 rows
+            main_container.grid_rowconfigure(i, weight=1, uniform="row")
+        main_container.grid_columnconfigure(0, weight=1)
         
-        # Number row
-        row_num = ttk.Frame(parent)
-        row_num.grid(row=1, column=0, sticky="ew", pady=3)
+        # Row 0: CLEAR ALL and SETTINGS (50/50 split)
+        row0_frame = tk.Frame(main_container, bg=theme["bg"])
+        row0_frame.grid(row=0, column=0, sticky="nsew", padx=1, pady=1)
+        row0_frame.grid_columnconfigure(0, weight=1, uniform="func")
+        row0_frame.grid_columnconfigure(1, weight=1, uniform="func")
+        row0_frame.grid_rowconfigure(0, weight=1)
         
-        for ch in "1234567890":
-            btn = ttk.Button(row_num, text=ch, style="Keyboard.TButton",
-                           command=lambda c=ch: self.insert_char(c))
-            btn.pack(side="left", ipadx=12, ipady=8, expand=True, fill="x", padx=2)
+        clear_btn = tk.Button(
+            row0_frame, text="CLEAR ALL",
+            font=("Segoe UI", 18, "bold"),
+            command=self.clear_all,
+            relief="raised",
+            bd=1,
+            cursor="hand2"
+        )
+        clear_btn.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        self.keyboard_buttons.append(clear_btn)
         
-        # First letter row: Q-P + Backspace
-        row1 = ttk.Frame(parent)
-        row1.grid(row=2, column=0, sticky="ew", pady=3)
+        settings_btn = tk.Button(
+            row0_frame, text="⚙ SETTINGS",
+            font=("Segoe UI", 18, "bold"),
+            command=self.show_settings,
+            relief="raised",
+            bd=1,
+            cursor="hand2"
+        )
+        settings_btn.grid(row=0, column=1, sticky="nsew", padx=0, pady=0)
+        self.keyboard_buttons.append(settings_btn)
         
-        for ch in "qwertyuiop":
-            btn = ttk.Button(row1, text=ch.upper(), style="Keyboard.TButton",
-                           command=lambda c=ch: self.insert_char(c))
-            btn.pack(side="left", ipadx=12, ipady=8, expand=True, fill="x", padx=2)
+        # Row 1: Q W E R T Y U I O P (10 keys, equal width)
+        row1_frame = tk.Frame(main_container, bg=theme["bg"])
+        row1_frame.grid(row=1, column=0, sticky="nsew", padx=1, pady=1)
+        row1_frame.grid_rowconfigure(0, weight=1)
         
-        # Backspace after P
-        backspace_btn = ttk.Button(row1, text="⌫", style="Keyboard.TButton",
-                                   command=self.backspace)
-        backspace_btn.pack(side="left", ipadx=15, ipady=8, padx=2)
+        keys_row1 = "qwertyuiop"
+        for i, ch in enumerate(keys_row1):
+            row1_frame.grid_columnconfigure(i, weight=1, uniform="key")
+            btn = tk.Button(
+                row1_frame, text=ch.upper(),
+                font=("Segoe UI", 22, "bold"),
+                command=lambda c=ch: self.insert_char(c),
+                relief="raised",
+                bd=1,
+                cursor="hand2"
+            )
+            btn.grid(row=0, column=i, sticky="nsew", padx=0, pady=0)
+            self.keyboard_buttons.append(btn)
         
-        # Second letter row: A-L + Enter
-        row2 = ttk.Frame(parent)
-        row2.grid(row=3, column=0, sticky="ew", pady=3)
+        # Row 2: A S D F G H J K L (9 keys, equal width)
+        row2_frame = tk.Frame(main_container, bg=theme["bg"])
+        row2_frame.grid(row=2, column=0, sticky="nsew", padx=1, pady=1)
+        row2_frame.grid_rowconfigure(0, weight=1)
         
-        for ch in "asdfghjkl":
-            btn = ttk.Button(row2, text=ch.upper(), style="Keyboard.TButton",
-                           command=lambda c=ch: self.insert_char(c))
-            btn.pack(side="left", ipadx=12, ipady=8, expand=True, fill="x", padx=2)
+        keys_row2 = "asdfghjkl"
+        for i, ch in enumerate(keys_row2):
+            row2_frame.grid_columnconfigure(i, weight=1, uniform="key")
+            btn = tk.Button(
+                row2_frame, text=ch.upper(),
+                font=("Segoe UI", 22, "bold"),
+                command=lambda c=ch: self.insert_char(c),
+                relief="raised",
+                bd=1,
+                cursor="hand2"
+            )
+            btn.grid(row=0, column=i, sticky="nsew", padx=0, pady=0)
+            self.keyboard_buttons.append(btn)
         
-        # Enter after L
-        enter_btn = ttk.Button(row2, text="↵", style="Keyboard.TButton",
-                              command=self.enter)
-        enter_btn.pack(side="left", ipadx=15, ipady=8, padx=2)
+        # Row 3: Z X C V B N M BACKSPACE (8 keys)
+        row3_frame = tk.Frame(main_container, bg=theme["bg"])
+        row3_frame.grid(row=3, column=0, sticky="nsew", padx=1, pady=1)
+        row3_frame.grid_rowconfigure(0, weight=1)
         
-        # Third letter row: Z-M
-        row3 = ttk.Frame(parent)
-        row3.grid(row=4, column=0, sticky="ew", pady=3)
+        keys_row3 = "zxcvbnm"
+        for i, ch in enumerate(keys_row3):
+            row3_frame.grid_columnconfigure(i, weight=1, uniform="key")
+            btn = tk.Button(
+                row3_frame, text=ch.upper(),
+                font=("Segoe UI", 22, "bold"),
+                command=lambda c=ch: self.insert_char(c),
+                relief="raised",
+                bd=1,
+                cursor="hand2"
+            )
+            btn.grid(row=0, column=i, sticky="nsew", padx=0, pady=0)
+            self.keyboard_buttons.append(btn)
         
-        for ch in "zxcvbnm":
-            btn = ttk.Button(row3, text=ch.upper(), style="Keyboard.TButton",
-                           command=lambda c=ch: self.insert_char(c))
-            btn.pack(side="left", ipadx=12, ipady=8, expand=True, fill="x", padx=2)
+        # BACKSPACE button (takes 2 columns worth of space)
+        row3_frame.grid_columnconfigure(7, weight=2, uniform="key")
+        backspace_btn = tk.Button(
+            row3_frame, text="⌫",
+            font=("Segoe UI", 26, "bold"),
+            command=self.backspace,
+            relief="raised",
+            bd=1,
+            cursor="hand2"
+        )
+        backspace_btn.grid(row=0, column=7, sticky="nsew", padx=0, pady=0)
+        self.keyboard_buttons.append(backspace_btn)
         
-        # Bottom row - just SPACE
-        bottom_row = ttk.Frame(parent)
-        bottom_row.grid(row=5, column=0, sticky="ew", pady=3)
+        # Row 4: SPACE (big) and ENTER
+        row4_frame = tk.Frame(main_container, bg=theme["bg"])
+        row4_frame.grid(row=4, column=0, sticky="nsew", padx=1, pady=1)
+        row4_frame.grid_rowconfigure(0, weight=1)
         
-        space_btn = ttk.Button(bottom_row, text="SPACE", style="Keyboard.TButton",
-                              command=self.space)
-        space_btn.pack(ipadx=80, ipady=12, expand=True, fill="x", padx=3)
+        # SPACE takes 85% of width
+        row4_frame.grid_columnconfigure(0, weight=85, uniform="bottom")
+        space_btn = tk.Button(
+            row4_frame, text="SPACE",
+            font=("Segoe UI", 22, "bold"),
+            command=self.finalize_word,
+            relief="raised",
+            bd=1,
+            cursor="hand2"
+        )
+        space_btn.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        self.keyboard_buttons.append(space_btn)
+        
+        # ENTER takes 15% of width
+        row4_frame.grid_columnconfigure(1, weight=15, uniform="bottom")
+        enter_btn = tk.Button(
+            row4_frame, text="↵",
+            font=("Segoe UI", 26, "bold"),
+            command=self.enter,
+            relief="raised",
+            bd=1,
+            cursor="hand2"
+        )
+        enter_btn.grid(row=0, column=1, sticky="nsew", padx=0, pady=0)
+        self.keyboard_buttons.append(enter_btn)
 
 if __name__ == "__main__":
     app = FilipinoKeyboard()
