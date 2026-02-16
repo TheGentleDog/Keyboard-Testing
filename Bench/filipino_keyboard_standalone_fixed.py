@@ -618,16 +618,25 @@ class FilipinoKeyboard(tk.Tk):
         super().__init__()
         
         self.title("Filipino Keyboard - Live Autocomplete (Gaze-Based)")
-        self.geometry("1400x1000")  # Taller window for bigger keys
+        
+        # Make window truly fullscreen (no taskbar)
+        self.attributes('-fullscreen', True)
+        
+        # Bind ESC key to exit fullscreen
+        self.bind('<Escape>', lambda e: self.attributes('-fullscreen', False))
+        
         self.configure(bg="#f0f0f0")
         
         self.current_completion = ""
         self.alternative_suggestions = []
         self.current_input = ""
-        self.finalized_text = ""  # Stores the actual finalized output
+        
+        # Output word list and cursor
+        self.output_words = []  # List of finalized words in output
+        self.output_cursor = -1  # Position in output (-1 = at end, typing new word)
         
         # Theme settings
-        self.current_theme = "light"  # default theme
+        self.current_theme = "light"
         self.themes = {
             "light": {
                 "bg": "#f0f0f0",
@@ -642,16 +651,16 @@ class FilipinoKeyboard(tk.Tk):
                 "button_active_bg": "#d0d0d0"
             },
             "dark": {
-                "bg": "#36393f",  # Discord dark gray
-                "output_bg": "#2f3136",  # Discord darker gray
-                "input_bg": "#40444b",  # Discord input gray
-                "text_fg": "#dcddde",  # Discord light text
-                "suggestion_fg": "#8e9297",  # Discord muted text
-                "popup_bg": "#202225",  # Discord darkest
-                "popup_border": "#5865f2",  # Discord blurple
-                "button_bg": "#4f545c",  # Discord button gray
-                "button_fg": "#ffffff",  # White text
-                "button_active_bg": "#5865f2"  # Discord blurple on hover
+                "bg": "#36393f",
+                "output_bg": "#2f3136",
+                "input_bg": "#40444b",
+                "text_fg": "#dcddde",
+                "suggestion_fg": "#8e9297",
+                "popup_bg": "#202225",
+                "popup_border": "#5865f2",
+                "button_bg": "#4f545c",
+                "button_fg": "#ffffff",
+                "button_active_bg": "#5865f2"
             }
         }
         
@@ -661,37 +670,28 @@ class FilipinoKeyboard(tk.Tk):
         self.create_widgets()
     
     def create_widgets(self):
-        # Output display (top) - VERY COMPACT
-        output_frame = ttk.LabelFrame(self, text="Output", padding="3")
-        output_frame.pack(fill="x", padx=5, pady=(5, 2))
-        
-        self.output_display = tk.Text(output_frame, wrap="word", font=("Segoe UI", 14), height=2)
-        self.output_display.pack(fill="x")
+        # Output display (top) - NO LABEL, just the text box
+        self.output_display = tk.Text(self, wrap="word", font=("Segoe UI", 18), height=2)
+        self.output_display.pack(fill="x", padx=5, pady=(5, 3))
         self.output_display.config(state="disabled")
         
-        # Input display - VERY COMPACT
-        input_frame = ttk.LabelFrame(self, text="Current Word", padding="3")
-        input_frame.pack(fill="x", padx=5, pady=2)
-        
-        self.input_display = tk.Text(input_frame, wrap="word", font=("Segoe UI", 12), height=1)
-        self.input_display.pack(fill="x")
+        # Current Input display - NO LABEL, bigger font
+        self.input_display = tk.Text(self, wrap="word", font=("Segoe UI", 16), height=1)
+        self.input_display.pack(fill="x", padx=5, pady=3)
         self.input_display.config(state="disabled")
         
-        # Next word predictions - VERY COMPACT
-        predictive_frame = ttk.LabelFrame(self, text="Next Word", padding="3")
-        predictive_frame.pack(fill="x", padx=5, pady=2)
+        # Next word predictions - NO LABEL, BIGGER buttons
+        self.predictive_container = ttk.Frame(self)
+        self.predictive_container.pack(fill="x", padx=5, pady=3)
         
-        self.predictive_container = ttk.Frame(predictive_frame)
-        self.predictive_container.pack(fill="x", pady=2)
-        
-        # Virtual keyboard - MAXIMIZED (takes ALL remaining space, NO padding)
-        keyboard_frame = ttk.LabelFrame(self, text="Keyboard", padding="0")
-        keyboard_frame.pack(fill="both", expand=True, padx=5, pady=(2, 5))
+        # Virtual keyboard - MAXIMIZED
+        keyboard_frame = tk.Frame(self, bg=self.themes[self.current_theme]["bg"])
+        keyboard_frame.pack(fill="both", expand=True, padx=5, pady=(3, 5))
         
         self.create_keyboard(keyboard_frame)
         
         # Status bar
-        self.status_bar = ttk.Label(self, text="Type to autocomplete | SPACE to finalize", relief="sunken", anchor="w", font=("Segoe UI", 8))
+        self.status_bar = ttk.Label(self, text="Type → SPACE to add word → ENTER to speak & clear input | ◄=Backspace ►=Clear", relief="sunken", anchor="w", font=("Segoe UI", 8))
         self.status_bar.pack(fill="x", side="bottom")
         
         # Apply initial theme
@@ -700,19 +700,97 @@ class FilipinoKeyboard(tk.Tk):
         self.update_display()
     
     def update_display(self):
-        """Update all displays with live autocomplete"""
-        # Get finalized text (everything except what we're currently typing)
-        finalized_text = self.get_finalized_text()
-        context = get_context_words(finalized_text, n=2)
+        """Update displays - output shows with transparent suggestion, input shows all words"""
+        theme = self.themes[self.current_theme]
         
-        # Update input display
+        # Update OUTPUT display - shows finalized words with transparent suggestion and cursor
+        self.output_display.config(state="normal")
+        self.output_display.delete("1.0", "end")
+        
+        # Show finalized words
+        for i, word in enumerate(self.output_words):
+            if i == self.output_cursor and self.current_input:
+                # Skip this word being edited - it will be replaced with current input
+                continue
+            else:
+                self.output_display.insert("end", word + " ", "normal")
+        
+        # If typing (either new word or editing existing)
+        if self.current_input:
+            self.output_display.insert("end", self.current_input, "typing")
+            
+            # Show transparent autocomplete suggestion
+            if self.current_completion and len(self.current_completion) > len(self.current_input):
+                remaining = self.current_completion[len(self.current_input):]
+                self.output_display.insert("end", remaining, "suggestion")
+            
+            self.output_display.insert("end", " |", "cursor")
+        else:
+            # Just show all words with cursor at end
+            output_text = " ".join(self.output_words)
+            if output_text:
+                self.output_display.delete("1.0", "end")
+                self.output_display.insert("1.0", output_text + " ")
+            self.output_display.insert("end", "|", "cursor")
+        
+        # Configure tags
+        self.output_display.tag_config("cursor", foreground="red", font=("Segoe UI", 18, "bold"))
+        self.output_display.tag_config("normal", foreground=theme["text_fg"])
+        self.output_display.tag_config("typing", foreground=theme["text_fg"])
+        self.output_display.tag_config("suggestion", foreground=theme["suggestion_fg"])
+        
+        self.output_display.config(state="disabled")
+        
+        # Update INPUT display - shows all words with cursor on selected word
         self.input_display.config(state="normal")
         self.input_display.delete("1.0", "end")
-        self.input_display.insert("1.0", self.current_input)
+        
+        # Show each word
+        for i, word in enumerate(self.output_words):
+            if i == self.output_cursor and self.current_input:
+                # User is editing this word - show current input + cursor
+                self.input_display.insert("end", self.current_input, "editing")
+                self.input_display.insert("end", "|", "cursor")
+                
+                # Add space after
+                if i < len(self.output_words) - 1:
+                    self.input_display.insert("end", " ")
+            elif i == self.output_cursor:
+                # Cursor on this word but not typing yet - highlight it
+                self.input_display.insert("end", word, "highlighted")
+                self.input_display.insert("end", "|", "cursor")
+                if i < len(self.output_words) - 1:
+                    self.input_display.insert("end", " ")
+            else:
+                # Normal word
+                self.input_display.insert("end", word, "normal")
+                if i < len(self.output_words) - 1:
+                    self.input_display.insert("end", " ")
+        
+        # If cursor at end (typing new word)
+        if self.output_cursor == -1 or self.output_cursor >= len(self.output_words):
+            if self.output_words:
+                self.input_display.insert("end", " ")
+            
+            if self.current_input:
+                self.input_display.insert("end", self.current_input, "editing")
+                self.input_display.insert("end", "|", "cursor")
+            else:
+                self.input_display.insert("end", "|", "cursor")
+        
+        # Configure tags
+        self.input_display.tag_config("cursor", foreground="red", font=("Segoe UI", 16, "bold"))
+        self.input_display.tag_config("highlighted", foreground=theme["text_fg"], background="yellow")
+        self.input_display.tag_config("editing", foreground=theme["text_fg"])
+        self.input_display.tag_config("normal", foreground=theme["text_fg"])
+        
         self.input_display.config(state="disabled")
         
-        # Get autocomplete suggestions
+        # Get autocomplete if typing
         if self.current_input:
+            context_words = self.output_words[:self.output_cursor] if self.output_cursor != -1 else self.output_words
+            context = get_context_words(" ".join(context_words), n=2)
+            
             suggestions = ngram_model.get_completion_suggestions(
                 self.current_input, context, max_results=5
             )
@@ -720,56 +798,81 @@ class FilipinoKeyboard(tk.Tk):
             if suggestions:
                 self.current_completion = suggestions[0]
                 self.alternative_suggestions = suggestions[1:5]
+                
+                if self.alternative_suggestions:
+                    self.show_alternative_popup()
+                else:
+                    self.close_popup()
             else:
                 self.current_completion = self.current_input
                 self.alternative_suggestions = []
-            
-            # Show live autocomplete in output
-            self.output_display.config(state="normal")
-            self.output_display.delete("1.0", "end")
-            
-            # Show finalized text
-            if finalized_text:
-                self.output_display.insert("1.0", finalized_text)
-            
-            theme = self.themes[self.current_theme]
-            
-            # Show current input in normal color
-            self.output_display.insert("end", self.current_input, "input")
-            
-            # Show completion suggestion in gray
-            if len(self.current_completion) > len(self.current_input):
-                remaining = self.current_completion[len(self.current_input):]
-                self.output_display.insert("end", remaining, "suggestion")
-            
-            # Configure tags
-            self.output_display.tag_config("input", foreground=theme["text_fg"])
-            self.output_display.tag_config("suggestion", foreground=theme["suggestion_fg"])
-            
-            self.output_display.config(state="disabled")
-            
-            # Show popup for alternatives if they exist
-            if self.alternative_suggestions:
-                self.show_alternative_popup()
-            else:
                 self.close_popup()
-            
         else:
             self.current_completion = ""
             self.alternative_suggestions = []
-            
-            # Just show finalized text
-            self.output_display.config(state="normal")
-            self.output_display.delete("1.0", "end")
-            if finalized_text:
-                self.output_display.insert("1.0", finalized_text)
-            self.output_display.config(state="disabled")
-            
-            # Close popup
             self.close_popup()
         
-        # Update next word predictions
+        # Update predictions
         self.update_predictions()
+    
+    def move_word_left(self):
+        """Move cursor left in output (select previous word)"""
+        if not self.output_words:
+            self.status_bar.config(text="No words in output")
+            return
+        
+        if self.output_cursor == -1:
+            # Currently at end, move to last word
+            self.output_cursor = len(self.output_words) - 1
+        elif self.output_cursor > 0:
+            self.output_cursor -= 1
+        
+        self.update_display()
+        self.status_bar.config(text=f"Cursor at word {self.output_cursor + 1}: '{self.output_words[self.output_cursor]}'")
+    
+    def move_word_right(self):
+        """Move cursor right in output (select next word)"""
+        if not self.output_words:
+            self.status_bar.config(text="No words in output")
+            return
+        
+        if self.output_cursor == -1:
+            self.status_bar.config(text="Already at end")
+            return
+        
+        if self.output_cursor < len(self.output_words) - 1:
+            self.output_cursor += 1
+        else:
+            # Move to end
+            self.output_cursor = -1
+        
+        self.update_display()
+        
+        if self.output_cursor == -1:
+            self.status_bar.config(text="Cursor at end - ready for new word")
+        else:
+            self.status_bar.config(text=f"Cursor at word {self.output_cursor + 1}: '{self.output_words[self.output_cursor]}'")
+    
+    def clear_selected_word(self):
+        """Clear the word at cursor position"""
+        if self.output_cursor == -1:
+            self.status_bar.config(text="No word selected - cursor at end")
+            return
+        
+        if self.output_cursor >= len(self.output_words):
+            self.status_bar.config(text="No word at cursor")
+            return
+        
+        # Remove word at cursor
+        removed_word = self.output_words.pop(self.output_cursor)
+        
+        # Stay at same position
+        # If we removed last word, move cursor to end
+        if self.output_cursor >= len(self.output_words):
+            self.output_cursor = -1
+        
+        self.update_display()
+        self.status_bar.config(text=f"Removed '{removed_word}'")
     
     def show_settings(self):
         """Show settings dialog for theme selection"""
@@ -860,6 +963,17 @@ class FilipinoKeyboard(tk.Tk):
                     activebackground=theme["button_active_bg"],
                     activeforeground=theme["button_fg"]
                 )
+        
+        # Update prediction buttons
+        if hasattr(self, 'predictive_container'):
+            for widget in self.predictive_container.winfo_children():
+                if isinstance(widget, tk.Button):
+                    widget.config(
+                        bg=theme["button_bg"],
+                        fg=theme["button_fg"],
+                        activebackground=theme["button_active_bg"],
+                        activeforeground=theme["button_fg"]
+                    )
     
     def get_finalized_text(self):
         """Get the finalized text from output (without current typing preview)"""
@@ -1007,171 +1121,185 @@ class FilipinoKeyboard(tk.Tk):
         self.apply_alternative(word)
     
     def update_predictions(self):
-        """Update next word prediction buttons"""
+        """Update next word prediction buttons - BIGGER"""
         for widget in self.predictive_container.winfo_children():
             widget.destroy()
         
-        # Use finalized text for context, not the display with preview
-        context = get_context_words(self.finalized_text, n=2)
+        # Use output words for context
+        output_text = " ".join(self.output_words)
+        context = get_context_words(output_text, n=2)
         
         predictions = ngram_model.get_next_word_suggestions(context, max_results=6)
         
         if predictions:
             for word in predictions[:6]:
-                btn = ttk.Button(
+                btn = tk.Button(
                     self.predictive_container,
                     text=word,
                     command=lambda w=word: self.apply_prediction(w),
-                    style="Suggestion.TButton"
+                    font=("Segoe UI", 14, "bold"),
+                    relief="raised",
+                    bd=2,
+                    cursor="hand2"
                 )
-                btn.pack(side="left", padx=5, ipadx=15, ipady=10)
+                btn.pack(side="left", padx=3, ipadx=20, ipady=12, expand=True, fill="both")
+    
+    def move_cursor_left(self):
+        """Edit input - move cursor left in input (backspace)"""
+        if self.current_input:
+            # Remove last character (like backspace)
+            self.current_input = self.current_input[:-1]
+            self.update_display()
+            self.status_bar.config(text="Removed last character from input")
+        else:
+            self.status_bar.config(text="Input is empty")
+    
+    def move_cursor_right(self):
+        """Clear input without speaking"""
+        if self.current_input:
+            self.current_input = ""
+            self.current_completion = ""
+            self.alternative_suggestions = []
+            self.update_display()
+            self.status_bar.config(text="Input cleared (no speech)")
+        else:
+            self.status_bar.config(text="Input already empty")
+    
+    def update_cursor_display(self):
+        """Update output display to show cursor position (deprecated - now in update_display)"""
+        self.update_display()
     
     def finalize_word(self):
-        """Finalize current word with SPACE - accepts autocomplete"""
+        """SPACE - finalize current word (replace at cursor or add at end)"""
+        if not self.current_input:
+            self.status_bar.config(text="Nothing to finalize")
+            return
+        
         # Close popup
         self.close_popup()
         
-        if not self.current_completion:
-            # Just add space if no input
-            self.finalized_text += " "
-            self.output_display.config(state="normal")
-            self.output_display.delete("1.0", "end")
-            self.output_display.insert("1.0", self.finalized_text)
-            self.output_display.config(state="disabled")
-            self.status_bar.config(text="Space added")
-            return
+        # Use autocomplete or typed word
+        word_to_add = self.current_completion if self.current_completion else self.current_input
         
-        # Get context before finalizing
-        context = get_context_words(self.finalized_text, n=2)
+        # Get context
+        context_words = self.output_words[:self.output_cursor] if self.output_cursor != -1 else self.output_words
+        context = get_context_words(" ".join(context_words), n=2)
         
-        # Learn from user typing
-        if self.current_input != self.current_completion:
-            ngram_model.learn_from_user_typing(self.current_input, self.current_completion)
+        # Learn and track
+        if self.current_input != word_to_add:
+            ngram_model.learn_from_user_typing(self.current_input, word_to_add)
+        ngram_model.track_word_usage(word_to_add, context)
         
-        # Track word usage
-        ngram_model.track_word_usage(self.current_completion, context)
-        
-        # Add to finalized text
-        self.finalized_text += self.current_completion + " "
-        
-        # Update output display
-        self.output_display.config(state="normal")
-        self.output_display.delete("1.0", "end")
-        self.output_display.insert("1.0", self.finalized_text)
-        self.output_display.config(state="disabled")
+        # Replace or insert word
+        if self.output_cursor == -1 or self.output_cursor >= len(self.output_words):
+            # Add at end
+            self.output_words.append(word_to_add)
+            self.output_cursor = -1  # Stay at end
+        else:
+            # Replace word at cursor
+            self.output_words[self.output_cursor] = word_to_add
+            # Move cursor forward
+            self.output_cursor += 1
+            if self.output_cursor >= len(self.output_words):
+                self.output_cursor = -1
         
         # Clear input
-        saved_completion = self.current_completion
         self.current_input = ""
         self.current_completion = ""
         self.alternative_suggestions = []
         
-        self.status_bar.config(text=f"Finalized: '{saved_completion}'")
         self.update_display()
+        self.status_bar.config(text=f"Added '{word_to_add}'")
     
     def apply_alternative(self, word):
         """Apply alternative suggestion (when autocomplete gives error)"""
         # Close popup
         self.close_popup()
         
-        context = get_context_words(self.finalized_text, n=2)
+        output_text = " ".join(self.output_words)
+        context = get_context_words(output_text, n=2)
         
         # Learn and track
         if self.current_input != word:
             ngram_model.learn_from_user_typing(self.current_input, word)
         ngram_model.track_word_usage(word, context)
         
-        # Add to finalized text
-        self.finalized_text += word + " "
+        # Add word at cursor position
+        if self.output_cursor == -1:
+            self.output_words.append(word)
+        else:
+            self.output_words.insert(self.output_cursor, word)
+            self.output_cursor += 1
+            if self.output_cursor >= len(self.output_words):
+                self.output_cursor = -1
         
-        # Update output
-        self.output_display.config(state="normal")
-        self.output_display.delete("1.0", "end")
-        self.output_display.insert("1.0", self.finalized_text)
-        self.output_display.config(state="disabled")
-        
-        # Clear
+        # Clear input
         self.current_input = ""
         self.current_completion = ""
         self.alternative_suggestions = []
         
-        self.status_bar.config(text=f"Alternative selected: '{word}'")
         self.update_display()
+        self.status_bar.config(text=f"Alternative selected: '{word}'")
     
     def apply_prediction(self, word):
         """Apply next word prediction"""
-        context = get_context_words(self.finalized_text, n=2)
+        output_text = " ".join(self.output_words)
+        context = get_context_words(output_text, n=2)
         
-        # Add space if needed before prediction
-        if self.finalized_text and not self.finalized_text.endswith(" "):
-            self.finalized_text += " "
-        
-        # Add predicted word
-        self.finalized_text += word + " "
-        
-        # Update output
-        self.output_display.config(state="normal")
-        self.output_display.delete("1.0", "end")
-        self.output_display.insert("1.0", self.finalized_text)
-        self.output_display.config(state="disabled")
+        # Add predicted word at end
+        self.output_words.append(word)
+        self.output_cursor = -1  # Move cursor to end
         
         ngram_model.track_word_usage(word, context)
         
-        self.status_bar.config(text=f"Predicted: '{word}'")
         self.update_display()
+        self.status_bar.config(text=f"Predicted: '{word}'")
     
     def insert_char(self, char):
-        """Insert character into current input"""
+        """Insert character - just add to current input (word stays in list until space)"""
         self.current_input += char
         self.update_display()
         self.status_bar.config(text=f"Typing: '{self.current_input}'")
     
     def backspace(self):
-        """Remove last character from input"""
+        """Remove last character from current input"""
         if self.current_input:
-            # Remove from current input
             self.current_input = self.current_input[:-1]
             self.update_display()
             self.status_bar.config(text="Backspace")
         else:
-            # Remove from finalized text
-            if self.finalized_text:
-                self.finalized_text = self.finalized_text[:-1]
-                self.output_display.config(state="normal")
-                self.output_display.delete("1.0", "end")
-                self.output_display.insert("1.0", self.finalized_text)
-                self.output_display.config(state="disabled")
-                self.update_display()
+            self.status_bar.config(text="Nothing to delete")
     
     def enter(self):
-        """New line"""
-        # Finalize current word first if exists
+        """ENTER - finalize any pending word, speak, and clear all"""
+        # Finalize if typing
         if self.current_input:
             self.finalize_word()
         
-        # Add newline to finalized text
-        self.finalized_text += "\n"
+        # Speak output
+        output_text = " ".join(self.output_words)
+        if output_text.strip():
+            print(f"🔊 TTS: {output_text.strip()}")
+            # TODO: Implement TTS with pyttsx3 or gTTS
         
-        self.output_display.config(state="normal")
-        self.output_display.delete("1.0", "end")
-        self.output_display.insert("1.0", self.finalized_text)
-        self.output_display.config(state="disabled")
-        self.status_bar.config(text="New line")
+        # Clear everything
+        self.output_words = []
+        self.output_cursor = -1
+        self.current_input = ""
+        
         self.update_display()
+        self.status_bar.config(text="Spoken and cleared")
     
     def clear_all(self):
         """Clear everything"""
-        self.output_display.config(state="normal")
-        self.output_display.delete("1.0", "end")
-        self.output_display.config(state="disabled")
-        
+        self.output_words = []
+        self.output_cursor = -1
         self.current_input = ""
         self.current_completion = ""
         self.alternative_suggestions = []
-        self.finalized_text = ""  # Clear finalized text too
         
         self.update_display()
-        self.status_bar.config(text="Cleared")
+        self.status_bar.config(text="All cleared")
     
     def create_keyboard(self, parent):
         """Create gaze-based virtual keyboard with MAXIMUM space (biggest possible keys)"""
@@ -1189,34 +1317,73 @@ class FilipinoKeyboard(tk.Tk):
             main_container.grid_rowconfigure(i, weight=1, uniform="row")
         main_container.grid_columnconfigure(0, weight=1)
         
-        # Row 0: CLEAR ALL and SETTINGS (50/50 split)
+        # Row 0: LEFT ARROW | CLEAR WORD | CLEAR ALL | SETTINGS | RIGHT ARROW
         row0_frame = tk.Frame(main_container, bg=theme["bg"])
         row0_frame.grid(row=0, column=0, sticky="nsew", padx=1, pady=1)
         row0_frame.grid_columnconfigure(0, weight=1, uniform="func")
-        row0_frame.grid_columnconfigure(1, weight=1, uniform="func")
+        row0_frame.grid_columnconfigure(1, weight=2, uniform="func")
+        row0_frame.grid_columnconfigure(2, weight=2, uniform="func")
+        row0_frame.grid_columnconfigure(3, weight=2, uniform="func")
+        row0_frame.grid_columnconfigure(4, weight=1, uniform="func")
         row0_frame.grid_rowconfigure(0, weight=1)
         
-        clear_btn = tk.Button(
+        # Left arrow
+        left_arrow_btn = tk.Button(
+            row0_frame, text="◄",
+            font=("Segoe UI", 20, "bold"),
+            command=self.move_word_left,
+            relief="raised",
+            bd=1,
+            cursor="hand2"
+        )
+        left_arrow_btn.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        self.keyboard_buttons.append(left_arrow_btn)
+        
+        # Clear Word button
+        clear_word_btn = tk.Button(
+            row0_frame, text="CLEAR WORD",
+            font=("Segoe UI", 16, "bold"),
+            command=self.clear_selected_word,
+            relief="raised",
+            bd=1,
+            cursor="hand2"
+        )
+        clear_word_btn.grid(row=0, column=1, sticky="nsew", padx=0, pady=0)
+        self.keyboard_buttons.append(clear_word_btn)
+        
+        clear_all_btn = tk.Button(
             row0_frame, text="CLEAR ALL",
-            font=("Segoe UI", 18, "bold"),
+            font=("Segoe UI", 16, "bold"),
             command=self.clear_all,
             relief="raised",
             bd=1,
             cursor="hand2"
         )
-        clear_btn.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
-        self.keyboard_buttons.append(clear_btn)
+        clear_all_btn.grid(row=0, column=2, sticky="nsew", padx=0, pady=0)
+        self.keyboard_buttons.append(clear_all_btn)
         
         settings_btn = tk.Button(
             row0_frame, text="⚙ SETTINGS",
-            font=("Segoe UI", 18, "bold"),
+            font=("Segoe UI", 16, "bold"),
             command=self.show_settings,
             relief="raised",
             bd=1,
             cursor="hand2"
         )
-        settings_btn.grid(row=0, column=1, sticky="nsew", padx=0, pady=0)
+        settings_btn.grid(row=0, column=3, sticky="nsew", padx=0, pady=0)
         self.keyboard_buttons.append(settings_btn)
+        
+        # Right arrow
+        right_arrow_btn = tk.Button(
+            row0_frame, text="►",
+            font=("Segoe UI", 20, "bold"),
+            command=self.move_word_right,
+            relief="raised",
+            bd=1,
+            cursor="hand2"
+        )
+        right_arrow_btn.grid(row=0, column=4, sticky="nsew", padx=0, pady=0)
+        self.keyboard_buttons.append(right_arrow_btn)
         
         # Row 1: Q W E R T Y U I O P (10 keys, equal width)
         row1_frame = tk.Frame(main_container, bg=theme["bg"])
