@@ -138,9 +138,40 @@ class NgramModel:
             self.csv_shortcuts[shortcut] = full_word
             all_tokens.extend([full_word.lower()] * 5)
         
-        print(f"✓ Built-in words: {len(FILIPINO_WORDS)}")
+        # CRITICAL: Add essential shortcuts that MUST exist (even if not in dataset)
+        essential_shortcuts = {
+            "nlng": "nalang", "lng": "lang", "nmn": "naman",
+            "ksi": "kasi", "kse": "kasi", "kng": "kung", "khit": "kahit",
+            "d2": "dito", "dn": "doon", "dun": "doon",
+            "pde": "pwede", "pwd": "pwede",
+            "sna": "sana", "tlg": "talaga", "tlga": "talaga",
+            "sya": "siya", "xa": "siya", "aq": "ako", "q": "ako",
+            "nde": "hindi", "hnd": "hindi", "di": "hindi",
+            "pra": "para", "wla": "wala", "my": "may",
+            "ung": "yung", "un": "yun", "dba": "diba", "db": "diba",
+            "bat": "bakit", "bkt": "bakit", "pno": "paano", "pano": "paano",
+            "tyo": "tayo", "kyo": "kayo", "kmi": "kami", "cla": "sila",  # Added pronouns
+            "ikw": "ikaw", "ako": "ako"
+        }
+        
+        print(f"📌 Adding {len(essential_shortcuts)} essential shortcuts...")
+        for shortcut, full_word in essential_shortcuts.items():
+            self.csv_shortcuts[shortcut] = full_word
+            all_tokens.extend([full_word.lower()] * 5)
+        
+        # VERIFY critical shortcuts are loaded
+        print(f"\n🔍 VERIFYING SHORTCUTS:")
+        critical_shortcuts = ["tyo", "nlng", "kyo", "lng"]
+        for sc in critical_shortcuts:
+            if sc in self.csv_shortcuts:
+                print(f"   ✓ '{sc}' → '{self.csv_shortcuts[sc]}'")
+            else:
+                print(f"   ✗ '{sc}' MISSING!")
+        
+        print(f"\n✓ Built-in words: {len(FILIPINO_WORDS)}")
         print(f"✓ Communication phrases: {len(COMMUNICATION_CORPUS)}")
-        print(f"✓ Built-in shortcuts: {len(FILIPINO_SHORTCUTS)}")
+        print(f"✓ Loaded shortcuts: {len(FILIPINO_SHORTCUTS)}")
+        print(f"✓ Total shortcuts (with essentials): {len(self.csv_shortcuts)}")
         print(f"✓ Total tokens for training: {len(all_tokens)}")
         
         self.vocabulary.update(all_tokens)
@@ -445,22 +476,36 @@ class NgramModel:
         """Get word completion suggestions using ngram and Damerau-Levenshtein"""
         prefix = prefix.lower()
         
+        # DEBUG
+        if prefix == "tyo":
+            print(f"\n🔍 DEBUG get_completion_suggestions for 'tyo':")
+            print(f"   csv_shortcuts has 'tyo'? {'tyo' in self.csv_shortcuts}")
+            if 'tyo' in self.csv_shortcuts:
+                print(f"   'tyo' maps to: '{self.csv_shortcuts['tyo']}'")
+        
         # PRIORITY 1: Shortcuts
         shortcut_candidates = []
         all_expansions = self.get_all_shortcut_expansions(prefix)
+        
+        if prefix == "tyo":
+            print(f"   all_expansions: {all_expansions}")
         
         if all_expansions:
             for full_word, source in all_expansions:
                 priority_multiplier = 10.0 if source == 'user' else 8.0
                 shortcut_candidates.append((full_word, False, True, priority_multiplier))
         
+        if prefix == "tyo":
+            print(f"   shortcut_candidates: {shortcut_candidates}")
+        
         # PRIORITY 2: Exact prefix matches
         candidates = []
         
+        # FIXED: Allow minimum 2-letter words to find closer matches
         if len(prefix) == 1:
             min_word_length = 2
         else:
-            min_word_length = max(len(prefix) + 1, 3)
+            min_word_length = 2  # Was max(len(prefix) + 1, 3)
         
         exact_matches = [
             word for word in self.vocabulary 
@@ -478,9 +523,9 @@ class NgramModel:
             else:
                 candidates.append((word, True, False, 1.0))
         
-        # PRIORITY 3: Fuzzy matches using Damerau-Levenshtein
+        # PRIORITY 3: Fuzzy matches using Damerau-Levenshtein (ALWAYS run to fill suggestions)
         fuzzy_candidates = []
-        if not shortcut_candidates and len(exact_matches) < 3 and len(prefix) >= 2:
+        if len(prefix) >= 2:  # FIXED: Always run fuzzy matching
             for word in self.vocabulary:
                 if word in exact_matches:
                     continue
@@ -496,13 +541,16 @@ class NgramModel:
                 
                 if prefix in word:
                     position = word.index(prefix)
-                    fuzzy_candidates.append((word, False, False, 0.3 / (position + 1)))
+                    fuzzy_candidates.append((word, False, False, 0.5 / (position + 1)))
                     continue
                 
+                # Only very close matches: distance = 1 AND similar start
                 if abs(len(word) - len(prefix)) <= 2:
                     distance = damerau_levenshtein_distance(prefix, word[:len(prefix)])
-                    if distance <= 1:
-                        fuzzy_candidates.append((word, False, False, 0.1))
+                    # ONLY distance 1 for fuzzy (very strict)
+                    if distance == 1:
+                        similarity = 1.0 / (1.0 + distance)
+                        fuzzy_candidates.append((word, False, False, similarity * 0.2))
         
         # Combine all candidates
         all_candidates = shortcut_candidates + candidates + fuzzy_candidates
@@ -513,7 +561,7 @@ class NgramModel:
             prob = self.get_word_probability(word, context)
             
             if is_shortcut:
-                final_score = prob * priority_mult * 100
+                final_score = prob * priority_mult * 1000  # FIXED: Was 100, now 1000
             elif is_exact_match:
                 final_score = prob * priority_mult * 10
             else:
@@ -719,10 +767,23 @@ class FilipinoKeyboard(tk.Tk):
         if self.current_input:
             self.output_display.insert("end", self.current_input, "typing")
             
-            # Show transparent autocomplete suggestion
-            if self.current_completion and len(self.current_completion) > len(self.current_input):
-                remaining = self.current_completion[len(self.current_input):]
-                self.output_display.insert("end", remaining, "suggestion")
+            # DEBUG: Check completion state
+            print(f"📊 Display - Input: '{self.current_input}', Completion: '{self.current_completion}'")
+            
+            # Show transparent autocomplete suggestion (GRAY TEXT)
+            if self.current_completion:
+                if self.current_completion != self.current_input and len(self.current_completion) > len(self.current_input):
+                    # Check if completion actually starts with input
+                    if self.current_completion.lower().startswith(self.current_input.lower()):
+                        remaining = self.current_completion[len(self.current_input):]
+                        self.output_display.insert("end", remaining, "suggestion")
+                        print(f"   ✓ Showing gray: '{remaining}'")
+                    else:
+                        print(f"   ✗ Completion doesn't start with input!")
+                else:
+                    print(f"   ✗ Completion same as input or too short")
+            else:
+                print(f"   ✗ No completion available")
             
             self.output_display.insert("end", " |", "cursor")
         else:
@@ -795,9 +856,15 @@ class FilipinoKeyboard(tk.Tk):
                 self.current_input, context, max_results=5
             )
             
+            # DEBUG: Print suggestions
+            print(f"🔍 Input: '{self.current_input}' → Suggestions: {suggestions}")
+            
             if suggestions:
                 self.current_completion = suggestions[0]
                 self.alternative_suggestions = suggestions[1:5]
+                
+                print(f"   ✓ Completion: '{self.current_completion}'")
+                print(f"   ✓ Alternatives: {self.alternative_suggestions}")
                 
                 if self.alternative_suggestions:
                     self.show_alternative_popup()
@@ -1181,6 +1248,12 @@ class FilipinoKeyboard(tk.Tk):
         # Use autocomplete or typed word
         word_to_add = self.current_completion if self.current_completion else self.current_input
         
+        # DEBUG
+        print(f"\n🔹 FINALIZE_WORD:")
+        print(f"   current_input: '{self.current_input}'")
+        print(f"   current_completion: '{self.current_completion}'")
+        print(f"   word_to_add: '{word_to_add}'")
+        
         # Get context
         context_words = self.output_words[:self.output_cursor] if self.output_cursor != -1 else self.output_words
         context = get_context_words(" ".join(context_words), n=2)
@@ -1262,14 +1335,49 @@ class FilipinoKeyboard(tk.Tk):
         self.status_bar.config(text=f"Typing: '{self.current_input}'")
     
     def backspace(self):
-        """Remove last character from current input"""
+        """Backspace - delete character from autocompleted word, current input, or pull back last word"""
+        
+        # DEBUG
+        print(f"\n⌫ BACKSPACE:")
+        print(f"   current_input: '{self.current_input}'")
+        print(f"   current_completion: '{self.current_completion}'")
+        print(f"   output_words: {self.output_words}")
+        print(f"   output_cursor: {self.output_cursor}")
+        
         if self.current_input:
+            # MODE 1: Currently typing - ALWAYS just delete one character
+            # Simple and foolproof - just remove last character from current_input
             self.current_input = self.current_input[:-1]
+            self.current_completion = ""  # Clear to prevent loops
+            self.alternative_suggestions = []
+            print(f"   → Backspace: '{self.current_input}'")
             self.update_display()
-            self.status_bar.config(text="Backspace")
+            self.status_bar.config(text=f"Backspace")
+        
+        elif self.output_cursor == -1 and self.output_words:
+            # MODE 2: Not typing, at end - pull back last word for editing
+            last_word = self.output_words.pop()
+            if len(last_word) > 1:
+                self.current_input = last_word[:-1]
+            else:
+                self.current_input = ""
+            print(f"   → Pulled back '{last_word}', now editing: '{self.current_input}'")
+            self.update_display()
+            self.status_bar.config(text=f"Editing: '{last_word}' → '{self.current_input}'")
+        
+        elif self.output_cursor != -1 and self.output_cursor < len(self.output_words):
+            # MODE 3: Cursor on a word - delete that word
+            deleted_word = self.output_words.pop(self.output_cursor)
+            if self.output_cursor >= len(self.output_words):
+                self.output_cursor = -1
+            print(f"   → Deleted word: '{deleted_word}'")
+            self.update_display()
+            self.status_bar.config(text=f"Deleted word: '{deleted_word}'")
+        
         else:
+            # MODE 4: Nothing to delete
+            print(f"   → Nothing to delete")
             self.status_bar.config(text="Nothing to delete")
-    
     def enter(self):
         """ENTER - finalize any pending word, speak, and clear all"""
         # Finalize if typing
@@ -1317,14 +1425,13 @@ class FilipinoKeyboard(tk.Tk):
             main_container.grid_rowconfigure(i, weight=1, uniform="row")
         main_container.grid_columnconfigure(0, weight=1)
         
-        # Row 0: LEFT ARROW | CLEAR WORD | CLEAR ALL | SETTINGS | RIGHT ARROW
+        # Row 0: LEFT ARROW | CLEAR ALL | SETTINGS | RIGHT ARROW (4 buttons)
         row0_frame = tk.Frame(main_container, bg=theme["bg"])
         row0_frame.grid(row=0, column=0, sticky="nsew", padx=1, pady=1)
         row0_frame.grid_columnconfigure(0, weight=1, uniform="func")
-        row0_frame.grid_columnconfigure(1, weight=2, uniform="func")
-        row0_frame.grid_columnconfigure(2, weight=2, uniform="func")
-        row0_frame.grid_columnconfigure(3, weight=2, uniform="func")
-        row0_frame.grid_columnconfigure(4, weight=1, uniform="func")
+        row0_frame.grid_columnconfigure(1, weight=3, uniform="func")
+        row0_frame.grid_columnconfigure(2, weight=3, uniform="func")
+        row0_frame.grid_columnconfigure(3, weight=1, uniform="func")
         row0_frame.grid_rowconfigure(0, weight=1)
         
         # Left arrow
@@ -1339,18 +1446,6 @@ class FilipinoKeyboard(tk.Tk):
         left_arrow_btn.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
         self.keyboard_buttons.append(left_arrow_btn)
         
-        # Clear Word button
-        clear_word_btn = tk.Button(
-            row0_frame, text="CLEAR WORD",
-            font=("Segoe UI", 16, "bold"),
-            command=self.clear_selected_word,
-            relief="raised",
-            bd=1,
-            cursor="hand2"
-        )
-        clear_word_btn.grid(row=0, column=1, sticky="nsew", padx=0, pady=0)
-        self.keyboard_buttons.append(clear_word_btn)
-        
         clear_all_btn = tk.Button(
             row0_frame, text="CLEAR ALL",
             font=("Segoe UI", 16, "bold"),
@@ -1359,7 +1454,7 @@ class FilipinoKeyboard(tk.Tk):
             bd=1,
             cursor="hand2"
         )
-        clear_all_btn.grid(row=0, column=2, sticky="nsew", padx=0, pady=0)
+        clear_all_btn.grid(row=0, column=1, sticky="nsew", padx=0, pady=0)
         self.keyboard_buttons.append(clear_all_btn)
         
         settings_btn = tk.Button(
@@ -1370,7 +1465,7 @@ class FilipinoKeyboard(tk.Tk):
             bd=1,
             cursor="hand2"
         )
-        settings_btn.grid(row=0, column=3, sticky="nsew", padx=0, pady=0)
+        settings_btn.grid(row=0, column=2, sticky="nsew", padx=0, pady=0)
         self.keyboard_buttons.append(settings_btn)
         
         # Right arrow
@@ -1382,7 +1477,7 @@ class FilipinoKeyboard(tk.Tk):
             bd=1,
             cursor="hand2"
         )
-        right_arrow_btn.grid(row=0, column=4, sticky="nsew", padx=0, pady=0)
+        right_arrow_btn.grid(row=0, column=3, sticky="nsew", padx=0, pady=0)
         self.keyboard_buttons.append(right_arrow_btn)
         
         # Row 1: Q W E R T Y U I O P (10 keys, equal width)
