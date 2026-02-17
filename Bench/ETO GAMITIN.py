@@ -582,6 +582,7 @@ class NgramModel:
         unique_scored = [(word, score) for word, score in seen.items()]
         unique_scored.sort(key=lambda x: -x[1])
         
+        # Return all suggestions (including multi-word phrases)
         return [word for word, score in unique_scored[:max_results]]
     
     def get_next_word_suggestions(self, context=None, max_results=6):
@@ -748,106 +749,12 @@ class FilipinoKeyboard(tk.Tk):
         self.update_display()
     
     def update_display(self):
-        """Update displays - output shows with transparent suggestion, input shows all words"""
+        """Update displays - fetch suggestions FIRST, then draw"""
         theme = self.themes[self.current_theme]
         
-        # Update OUTPUT display - shows finalized words with transparent suggestion and cursor
-        self.output_display.config(state="normal")
-        self.output_display.delete("1.0", "end")
-        
-        # Show finalized words
-        for i, word in enumerate(self.output_words):
-            if i == self.output_cursor and self.current_input:
-                # Skip this word being edited - it will be replaced with current input
-                continue
-            else:
-                self.output_display.insert("end", word + " ", "normal")
-        
-        # If typing (either new word or editing existing)
-        if self.current_input:
-            self.output_display.insert("end", self.current_input, "typing")
-            
-            # DEBUG: Check completion state
-            print(f"📊 Display - Input: '{self.current_input}', Completion: '{self.current_completion}'")
-            
-            # Show transparent autocomplete suggestion (GRAY TEXT)
-            if self.current_completion:
-                if self.current_completion != self.current_input and len(self.current_completion) > len(self.current_input):
-                    # Check if completion actually starts with input
-                    if self.current_completion.lower().startswith(self.current_input.lower()):
-                        remaining = self.current_completion[len(self.current_input):]
-                        self.output_display.insert("end", remaining, "suggestion")
-                        print(f"   ✓ Showing gray: '{remaining}'")
-                    else:
-                        print(f"   ✗ Completion doesn't start with input!")
-                else:
-                    print(f"   ✗ Completion same as input or too short")
-            else:
-                print(f"   ✗ No completion available")
-            
-            self.output_display.insert("end", " |", "cursor")
-        else:
-            # Just show all words with cursor at end
-            output_text = " ".join(self.output_words)
-            if output_text:
-                self.output_display.delete("1.0", "end")
-                self.output_display.insert("1.0", output_text + " ")
-            self.output_display.insert("end", "|", "cursor")
-        
-        # Configure tags
-        self.output_display.tag_config("cursor", foreground="red", font=("Segoe UI", 18, "bold"))
-        self.output_display.tag_config("normal", foreground=theme["text_fg"])
-        self.output_display.tag_config("typing", foreground=theme["text_fg"])
-        self.output_display.tag_config("suggestion", foreground=theme["suggestion_fg"])
-        
-        self.output_display.config(state="disabled")
-        
-        # Update INPUT display - shows all words with cursor on selected word
-        self.input_display.config(state="normal")
-        self.input_display.delete("1.0", "end")
-        
-        # Show each word
-        for i, word in enumerate(self.output_words):
-            if i == self.output_cursor and self.current_input:
-                # User is editing this word - show current input + cursor
-                self.input_display.insert("end", self.current_input, "editing")
-                self.input_display.insert("end", "|", "cursor")
-                
-                # Add space after
-                if i < len(self.output_words) - 1:
-                    self.input_display.insert("end", " ")
-            elif i == self.output_cursor:
-                # Cursor on this word but not typing yet - highlight it
-                self.input_display.insert("end", word, "highlighted")
-                self.input_display.insert("end", "|", "cursor")
-                if i < len(self.output_words) - 1:
-                    self.input_display.insert("end", " ")
-            else:
-                # Normal word
-                self.input_display.insert("end", word, "normal")
-                if i < len(self.output_words) - 1:
-                    self.input_display.insert("end", " ")
-        
-        # If cursor at end (typing new word)
-        if self.output_cursor == -1 or self.output_cursor >= len(self.output_words):
-            if self.output_words:
-                self.input_display.insert("end", " ")
-            
-            if self.current_input:
-                self.input_display.insert("end", self.current_input, "editing")
-                self.input_display.insert("end", "|", "cursor")
-            else:
-                self.input_display.insert("end", "|", "cursor")
-        
-        # Configure tags
-        self.input_display.tag_config("cursor", foreground="red", font=("Segoe UI", 16, "bold"))
-        self.input_display.tag_config("highlighted", foreground=theme["text_fg"], background="yellow")
-        self.input_display.tag_config("editing", foreground=theme["text_fg"])
-        self.input_display.tag_config("normal", foreground=theme["text_fg"])
-        
-        self.input_display.config(state="disabled")
-        
-        # Get autocomplete if typing
+        # ============================================================
+        # STEP 1: FETCH SUGGESTIONS FIRST before drawing anything
+        # ============================================================
         if self.current_input:
             context_words = self.output_words[:self.output_cursor] if self.output_cursor != -1 else self.output_words
             context = get_context_words(" ".join(context_words), n=2)
@@ -856,30 +763,101 @@ class FilipinoKeyboard(tk.Tk):
                 self.current_input, context, max_results=5
             )
             
-            # DEBUG: Print suggestions
             print(f"🔍 Input: '{self.current_input}' → Suggestions: {suggestions}")
             
             if suggestions:
                 self.current_completion = suggestions[0]
                 self.alternative_suggestions = suggestions[1:5]
-                
                 print(f"   ✓ Completion: '{self.current_completion}'")
-                print(f"   ✓ Alternatives: {self.alternative_suggestions}")
-                
-                if self.alternative_suggestions:
-                    self.show_alternative_popup()
-                else:
-                    self.close_popup()
             else:
                 self.current_completion = self.current_input
                 self.alternative_suggestions = []
-                self.close_popup()
         else:
             self.current_completion = ""
             self.alternative_suggestions = []
+        
+        # ============================================================
+        # STEP 2: DRAW OUTPUT DISPLAY (top textbox) with correct completion
+        # ============================================================
+        self.output_display.config(state="normal")
+        self.output_display.delete("1.0", "end")
+        
+        # Show finalized words
+        for i, word in enumerate(self.output_words):
+            if i == self.output_cursor and self.current_input:
+                continue
+            else:
+                self.output_display.insert("end", word + " ", "normal")
+        
+        if self.current_input:
+            print(f"📊 Display - Input: '{self.current_input}', Completion: '{self.current_completion}'")
+            
+            # Show FULL completion in gray (could be multi-word like "thank you")
+            if self.current_completion and self.current_completion != self.current_input:
+                self.output_display.insert("end", self.current_completion, "suggestion")
+                print(f"   ✓ Showing gray: '{self.current_completion}'")
+            else:
+                self.output_display.insert("end", self.current_input, "typing")
+            
+            self.output_display.insert("end", " |", "cursor")
+        else:
+            output_text = " ".join(self.output_words)
+            if output_text:
+                self.output_display.delete("1.0", "end")
+                self.output_display.insert("1.0", output_text + " ")
+            self.output_display.insert("end", "|", "cursor")
+        
+        self.output_display.tag_config("cursor", foreground="red", font=("Segoe UI", 18, "bold"))
+        self.output_display.tag_config("normal", foreground=theme["text_fg"])
+        self.output_display.tag_config("typing", foreground=theme["text_fg"])
+        self.output_display.tag_config("suggestion", foreground=theme["suggestion_fg"])
+        self.output_display.config(state="disabled")
+        
+        # ============================================================
+        # STEP 3: DRAW INPUT DISPLAY (bottom textbox)
+        # ============================================================
+        self.input_display.config(state="normal")
+        self.input_display.delete("1.0", "end")
+        
+        for i, word in enumerate(self.output_words):
+            if i == self.output_cursor and self.current_input:
+                self.input_display.insert("end", self.current_input, "editing")
+                self.input_display.insert("end", "|", "cursor")
+                if i < len(self.output_words) - 1:
+                    self.input_display.insert("end", " ")
+            elif i == self.output_cursor:
+                self.input_display.insert("end", word, "highlighted")
+                self.input_display.insert("end", "|", "cursor")
+                if i < len(self.output_words) - 1:
+                    self.input_display.insert("end", " ")
+            else:
+                self.input_display.insert("end", word, "normal")
+                if i < len(self.output_words) - 1:
+                    self.input_display.insert("end", " ")
+        
+        if self.output_cursor == -1 or self.output_cursor >= len(self.output_words):
+            if self.output_words:
+                self.input_display.insert("end", " ")
+            if self.current_input:
+                self.input_display.insert("end", self.current_input, "editing")
+                self.input_display.insert("end", "|", "cursor")
+            else:
+                self.input_display.insert("end", "|", "cursor")
+        
+        self.input_display.tag_config("cursor", foreground="red", font=("Segoe UI", 16, "bold"))
+        self.input_display.tag_config("highlighted", foreground=theme["text_fg"], background="yellow")
+        self.input_display.tag_config("editing", foreground=theme["text_fg"])
+        self.input_display.tag_config("normal", foreground=theme["text_fg"])
+        self.input_display.config(state="disabled")
+        
+        # ============================================================
+        # STEP 4: SHOW POPUP and PREDICTIONS
+        # ============================================================
+        if self.current_input and self.alternative_suggestions:
+            self.show_alternative_popup()
+        else:
             self.close_popup()
         
-        # Update predictions
         self.update_predictions()
     
     def move_word_left(self):
