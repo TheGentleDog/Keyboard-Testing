@@ -16,180 +16,608 @@
     "nam": "naman",
     "ka": "kayo",
     "ky": "kami",
-    "tz": "tayo"
+    "tz": "tayo",
+    "sal": "salamat",
+    "ts": "tayo",
+    "sam": "naman",
+    "salam": "salamat",
+    "th": "tayo",
+    "ma": "mabuti"
   },
   "user_shortcut_usage": {
     "ty": 7,
-    "n": 3,
-    "s": 2,
-    "ta": 7,
-    "na": 3,
+    "n": 6,
+    "s": 4,
+    "ta": 34,
+    "na": 14,
     "ku": 1,
-    "t": 7,
-    "k": 3,
-    "sa": 3,
+    "t": 10,
+    "k": 8,
+    "sa": 11,
     "km": 1,
     "tu": 1,
-    "tayo": 4,
-    "nmn": 4,
-    "nam": 2,
-    "ka": 1,
+    "tayo": 5,
+    "nmn": 5,
+    "nam": 3,
+    "ka": 9,
     "ky": 1,
-    "tz": 1
+    "tz": 1,
+    "sal": 2,
+    "ts": 1,
+    "sam": 1,
+    "salam": 1,
+    "th": 1,
+    "ma": 1
   },
   "new_words": [],
   "word_usage_history": [
     [
-      "lang",
-      [
-        "lang",
-        "lang"
-      ]
-    ],
-    [
-      "lang",
-      [
-        "lang",
-        "lang"
-      ]
-    ],
-    [
-      "lang",
-      [
-        "lang",
-        "lang"
-      ]
-    ],
-    [
-      "lang",
-      [
-        "lang",
-        "lang"
-      ]
-    ],
-    [
-      "lang",
-      [
-        "lang",
-        "lang"
-      ]
-    ],
-    [
-      "lang",
-      [
-        "lang",
-        "lang"
-      ]
-    ],
-    [
-      "tyo",
+      "salamat",
       []
     ],
     [
-      "naman",
-      [
-        "tyo"
-      ]
-    ],
-    [
-      "tayo",
-      [
-        "tyo",
-        "naman"
-      ]
-    ],
-    [
-      "matulog",
-      [
-        "tyo",
-        "naman"
-      ]
-    ],
-    [
-      "tayo",
+      "kumusta",
       []
     ],
     [
-      "naman",
+      "kumusta",
+      []
+    ],
+    [
+      "ka",
       [
-        "tayo"
+        "kumusta"
       ]
     ],
     [
-      "hehe",
+      "ka",
       [
-        "tayo",
-        "naman"
+        "kumusta",
+        "kumusta"
       ]
-    ],
-    [
-      "tayo",
-      []
-    ],
-    [
-      "nalang",
-      []
-    ],
-    [
-      "tayo",
-      []
-    ],
-    [
-      "nalang",
-      [
-        "tayo"
-      ]
-    ],
-    [
-      "tyo",
-      []
     ],
     [
       "kayo",
       [
-        "nalang"
+        "kumusta",
+        "ka"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "ka",
+        "ka"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "ka",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
       ]
     ],
     [
       "tayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kumusta",
       []
     ],
     [
-      "tay nalang",
+      "kumusta",
+      []
+    ],
+    [
+      "ka",
       [
-        "tayo"
+        "kumusta"
       ]
     ],
     [
-      "tay nalang please",
+      "ka",
       [
-        "tay",
-        "nalang"
+        "kumusta",
+        "kumusta"
       ]
     ],
     [
-      "tayo",
+      "kayo",
       [
-        "nalang",
-        "please"
+        "kumusta",
+        "ka"
       ]
     ],
     [
-      " ",
+      "kayo",
       [
-        "please",
-        "tayo"
+        "ka",
+        "ka"
       ]
     ],
     [
-      "  tayo",
+      "kayo",
       [
-        "please",
-        "tayo"
+        "ka",
+        "kayo"
       ]
     ],
     [
-      "tayo",
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "kayo",
+      [
+        "kayo",
+        "kayo"
+      ]
+    ],
+    [
+      "salamat",
+      []
+    ],
+    [
+      "sax",
+      []
+    ],
+    [
+      "saaff",
+      []
+    ],
+    [
+      "thank",
+      []
+    ],
+    [
+      "thanks",
+      []
+    ],
+    [
+      "thank",
+      []
+    ],
+    [
+      "tytha",
+      []
+    ],
+    [
+      "thank",
+      []
+    ],
+    [
+      "thanks",
+      []
+    ],
+    [
+      "thankg",
       []
     ],
     [
@@ -201,324 +629,15 @@
       []
     ],
     [
-      "tyo",
-      []
-    ],
-    [
-      "tayo",
-      []
-    ],
-    [
-      "  tayo",
-      []
-    ],
-    [
-      "nalng",
-      []
-    ],
-    [
-      "tyo",
-      [
-        "tayo"
-      ]
-    ],
-    [
-      "tayo",
-      [
-        "tayo",
-        "nalng"
-      ]
-    ],
-    [
-      "test",
-      []
-    ],
-    [
-      "lang",
-      []
-    ],
-    [
-      "tayo",
-      []
-    ],
-    [
-      "naman",
-      []
-    ],
-    [
-      "tyo",
-      []
-    ],
-    [
-      "naman",
-      [
-        "tyo"
-      ]
-    ],
-    [
-      "tyo",
-      [
-        "tyo",
-        "naman"
-      ]
-    ],
-    [
-      "tayo",
-      [
-        "tyo",
-        "naman"
-      ]
-    ],
-    [
-      "lang",
-      [
-        "tayo",
-        "naman"
-      ]
-    ],
-    [
-      "lang",
-      [
-        "tayo",
-        "naman"
-      ]
-    ],
-    [
-      "lang",
-      [
-        "tayo",
-        "naman"
-      ]
-    ],
-    [
-      "lang",
-      [
-        "tayo",
-        "naman"
-      ]
-    ],
-    [
-      "lang",
-      [
-        "tayo",
-        "naman"
-      ]
-    ],
-    [
-      "lang",
-      [
-        "tayo",
-        "naman"
-      ]
-    ],
-    [
-      "tyi",
-      [
-        "tayo",
-        "naman"
-      ]
-    ],
-    [
-      "naman",
-      [
-        "naman",
-        "naman"
-      ]
-    ],
-    [
-      "naman",
-      [
-        "naman",
-        "naman"
-      ]
-    ],
-    [
-      "naman",
-      [
-        "naman",
-        "naman"
-      ]
-    ],
-    [
-      "talaga",
-      [
-        "naman",
-        "naman"
-      ]
-    ],
-    [
-      "tayo",
-      []
-    ],
-    [
-      "naman",
-      []
-    ],
-    [
-      "naman",
-      []
-    ],
-    [
-      "tayo",
-      [
-        "tayo"
-      ]
-    ],
-    [
-      "naman",
-      []
-    ],
-    [
-      "naman",
-      [
-        "tayo",
-        "naman"
-      ]
-    ],
-    [
-      "tayo",
-      [
-        "naman",
-        "tayo"
-      ]
-    ],
-    [
-      "naman",
-      [
-        "tayo",
-        "naman"
-      ]
-    ],
-    [
-      "naman",
-      [
-        "naman",
-        "tayo"
-      ]
-    ],
-    [
-      "tayo",
-      [
-        "naman",
-        "tayo"
-      ]
-    ],
-    [
-      "naman",
-      [
-        "tayo",
-        "naman"
-      ]
-    ],
-    [
-      "tayo",
-      [
-        "naman",
-        "tayo"
-      ]
-    ],
-    [
-      "nlng",
-      [
-        "tayo",
-        "naman"
-      ]
-    ],
-    [
-      "tayo",
-      []
-    ],
-    [
-      "kumusta",
-      []
-    ],
-    [
-      "tayo",
-      [
-        "tayo"
-      ]
-    ],
-    [
-      "ka",
-      [
-        "tayo",
-        "kumusta"
-      ]
-    ],
-    [
-      "tayo",
-      [
-        "kumusta",
-        "tayo"
-      ]
-    ],
-    [
-      "kumusta",
-      [
-        "tayo",
-        "ka"
-      ]
-    ],
-    [
-      "kayo",
-      [
-        "tayo",
-        "ka"
-      ]
-    ],
-    [
-      "kayo",
-      [
-        "tayo",
-        "ka"
-      ]
-    ],
-    [
-      "tyo",
-      []
-    ],
-    [
-      "tayo",
-      []
-    ],
-    [
-      "kumusta",
-      [
-        "tyo"
-      ]
-    ],
-    [
-      "ka",
-      [
-        "tyo",
-        "tayo"
-      ]
-    ],
-    [
-      "ka",
-      [
-        "tayo",
-        "kumusta"
-      ]
-    ],
-    [
-      "tayo",
-      []
-    ],
-    [
-      "nlang",
-      []
-    ],
-    [
       "kayo",
       []
     ],
     [
-      "naman",
+      "tayo",
       []
     ],
     [
-      "please",
+      "salamat",
       [
         "kayo"
       ]
@@ -532,84 +651,24 @@
       []
     ],
     [
-      "tayo",
+      "naman",
       []
     ],
     [
-      "nlng",
+      "tayo",
       []
     ],
     [
       "naman",
-      [
-        "tayo"
-      ]
-    ],
-    [
-      "kumusta",
       []
     ],
     [
-      "kumusta",
+      "kayo",
       []
     ],
     [
-      "tayo",
-      [
-        "kumusta"
-      ]
-    ],
-    [
-      "yy",
+      "kami",
       []
-    ],
-    [
-      "ttaty",
-      [
-        "kumusta"
-      ]
-    ],
-    [
-      "tyb",
-      [
-        "kumusta",
-        "yy"
-      ]
-    ],
-    [
-      "tayo",
-      [
-        "yy",
-        "ttaty"
-      ]
-    ],
-    [
-      "tayo",
-      [
-        "ttaty",
-        "tyb"
-      ]
-    ],
-    [
-      "tayo",
-      [
-        "tyb",
-        "tayo"
-      ]
-    ],
-    [
-      "tyo",
-      [
-        "yy",
-        "ttaty"
-      ]
-    ],
-    [
-      "naman",
-      [
-        "ttaty",
-        "tyb"
-      ]
     ]
   ]
 }
