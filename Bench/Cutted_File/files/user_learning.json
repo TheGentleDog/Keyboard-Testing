@@ -1,0 +1,32 @@
+{
+  "user_shortcuts": {
+    "ri": "rito"
+  },
+  "user_shortcut_usage": {
+    "ri": 1
+  },
+  "new_words": [],
+  "word_usage_history": [
+    [
+      "tayo",
+      []
+    ],
+    [
+      "ay",
+      []
+    ],
+    [
+      "sana",
+      [
+        "tayo"
+      ]
+    ],
+    [
+      "masaya",
+      [
+        "tayo",
+        "ay"
+      ]
+    ]
+  ]
+}
