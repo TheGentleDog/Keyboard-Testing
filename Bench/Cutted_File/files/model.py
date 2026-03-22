@@ -22,6 +22,9 @@ from config import NGRAM_CACHE_FILE, USER_LEARNING_FILE, MODEL_VERSION
 FILIPINO_DATASET_FILE = "filipino_dataset.json"
 ENGLISH_DATASET_FILE  = "english_dataset.json"
 
+# Flores et al. (2022) derived substitution rules
+FLORES_RULES_FILE = "flores_rules.json"
+
 
 # =============================================================================
 # DAMERAU-LEVENSHTEIN DISTANCE  (Typo Tolerance)
@@ -107,6 +110,8 @@ class NgramModel:
         self.user_shortcut_usage = Counter()
         self.new_words           = set()
         self.word_usage_history  = []
+        self.flores_word_rules   = {}   # Flores et al. whole-word rules
+        self.flores_char_rules   = {}   # Flores et al. character substitution rules
 
     # ── Training ──────────────────────────────────────────────────────────────
     def train_from_builtin(self):
@@ -214,6 +219,90 @@ class NgramModel:
         print(f"✓ Vocabulary: {len(self.vocabulary)} unique words")
         print(f"✓ Bigram contexts: {len(self.bigrams)}")
         print(f"✓ Trigram contexts: {len(self.trigrams)}")
+
+        # Load Flores et al. substitution rules
+        self.load_flores_rules()
+
+    # ── Flores et al. (2022) Rule-Based Candidate Generation ─────────────────
+    def load_flores_rules(self):
+        """Load the derived substitution rules from flores_rules.json."""
+        if not os.path.exists(FLORES_RULES_FILE):
+            print(f"⚠  Flores rules not found at '{FLORES_RULES_FILE}' — skipping.")
+            return
+        try:
+            with open(FLORES_RULES_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            self.flores_word_rules = data.get('word_rules', {})
+            self.flores_char_rules = data.get('char_rules', {})
+            print(f"✓ Flores rules loaded — "
+                  f"Word rules: {len(self.flores_word_rules)}, "
+                  f"Char rules: {len(self.flores_char_rules)}")
+        except Exception as e:
+            print(f"⚠  Error loading Flores rules: {e}")
+
+    def generate_rule_candidates(self, word, max_candidates=15):
+        """
+        Generate candidate full-word forms from an abbreviated/informal input
+        using the Flores et al. (2022) substitution rules.
+
+        Two passes:
+        1. Whole-word lookup — direct match in word_rules dict (highest confidence)
+        2. Character-level expansion — apply char_rules substrings recursively
+
+        Candidates are filtered to vocabulary words only, then ranked by
+        Damerau-Levenshtein distance from the original input (equivalent to
+        the likelihood scoring in Flores et al.).
+        """
+        word = word.lower().strip()
+        candidates = set()
+
+        # Pass 1 — whole-word rule (direct abbreviation mapping)
+        if word in self.flores_word_rules:
+            full = self.flores_word_rules[word]
+            if full in self.vocabulary:
+                candidates.add(full)
+            # also add each token if multi-word expansion
+            for token in full.split():
+                if token in self.vocabulary:
+                    candidates.add(token)
+
+        # Pass 2 — character-level substitution (recursive, depth-limited)
+        def expand(current, depth=0):
+            if depth > 2:
+                return set()
+            results = set()
+            for length in range(1, 3):   # try substrings of length 1-2
+                for i in range(len(current) - length + 1):
+                    substring = current[i:i+length]
+                    if substring in self.flores_char_rules:
+                        for replacement in self.flores_char_rules[substring]:
+                            new_word = current[:i] + replacement + current[i+length:]
+                            if new_word != current:
+                                results.add(new_word)
+                                results.update(expand(new_word, depth + 1))
+            return results
+
+        expanded = expand(word)
+
+        # filter to vocabulary words only
+        for candidate in expanded:
+            if (candidate in self.vocabulary
+                    and candidate.isalpha()
+                    and self._has_vowels(candidate)
+                    and candidate != word):
+                candidates.add(candidate)
+
+        if not candidates:
+            return []
+
+        # rank by Damerau-Levenshtein distance — mirrors Flores et al. likelihood scoring
+        scored = []
+        for candidate in candidates:
+            dist = damerau_levenshtein_distance(word, candidate)
+            scored.append((candidate, dist))
+        scored.sort(key=lambda x: x[1])
+
+        return [w for w, _ in scored[:max_candidates]]
 
     # ── Character n-grams ─────────────────────────────────────────────────────
     def _has_vowels(self, word):
@@ -421,6 +510,7 @@ class NgramModel:
                   f"Bigrams: {len(self.bigrams)}, "
                   f"Trigrams: {len(self.trigrams)}, "
                   f"Shortcuts: {len(self.csv_shortcuts)}")
+            self.load_flores_rules()
             return True
         except Exception as e:
             print(f"⚠ Error loading cache: {e}")
@@ -487,9 +577,16 @@ class NgramModel:
                             (word, False, False, (1.0 / (1.0 + dist)) * 0.2)
                         )
 
+        # Flores et al. rule-based candidates
+        rule_candidates = []
+        if len(prefix) >= 2:
+            for w in self.generate_rule_candidates(prefix):
+                if w not in [c for c, *_ in candidates + fuzzy_candidates]:
+                    rule_candidates.append((w, False, False, 1.5))
+
         scored = []
         for word, is_exact, is_shortcut, mult in (
-            shortcut_candidates + candidates + fuzzy_candidates
+            shortcut_candidates + candidates + fuzzy_candidates + rule_candidates
         ):
             prob = self.get_word_probability(word, context)
             if is_shortcut:

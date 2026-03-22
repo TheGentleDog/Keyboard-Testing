@@ -9,6 +9,7 @@ from config import (
     ENGLISH_DATASET_FILE,
     NGRAM_CACHE_FILE,
 )
+from generate_flores_rules import generate_if_missing as _ensure_flores
 
 
 # ─────────────────────────────────────────────
@@ -57,10 +58,23 @@ def _ensure_datasets():
 
 
 # ─────────────────────────────────────────────
-# STEP 2: Boot model + launch UI
+# STEP 2: Generate Flores rules if missing
+# ─────────────────────────────────────────────
+def _ensure_rules():
+    """
+    Fetch and generate flores_rules.json from the Flores et al. (2022)
+    GitHub repository if the file does not already exist.
+    Requires internet on first run — same requirement as the RoBERTa datasets.
+    """
+    _ensure_flores()
+
+
+# ─────────────────────────────────────────────
+# STEP 3: Boot model + launch UI
 # ─────────────────────────────────────────────
 def main():
     _ensure_datasets()
+    _ensure_rules()
 
     # Import after datasets are guaranteed to exist
     from model import ngram_model
