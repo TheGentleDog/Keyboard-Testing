@@ -1,32 +1,12 @@
 {
   "user_shortcuts": {
-    "ri": "rito"
+    "skit": "sakit",
+    "mskit": "masakit"
   },
   "user_shortcut_usage": {
-    "ri": 1
+    "skit": 1,
+    "mskit": 1
   },
   "new_words": [],
-  "word_usage_history": [
-    [
-      "tayo",
-      []
-    ],
-    [
-      "ay",
-      []
-    ],
-    [
-      "sana",
-      [
-        "tayo"
-      ]
-    ],
-    [
-      "masaya",
-      [
-        "tayo",
-        "ay"
-      ]
-    ]
-  ]
+  "word_usage_history": []
 }

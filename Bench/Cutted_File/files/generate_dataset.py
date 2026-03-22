@@ -4,6 +4,12 @@ generate_dataset.py — Filipino Dataset Generator using RoBERTa-Tagalog
 Generates filipino_dataset.json from scratch using:
   jcblaise/roberta-tagalog-base (masked language model)
 
+Changes from previous version:
+  - Added `corpus_sequences` field: full tokenised phrase lists for n-gram
+    training (preserves word-order context, unlike the flat vocabulary list)
+  - CATEGORY_MAP now includes slang_taglish -> slang
+  - generate_if_missing() helper for main.py integration
+
 Can be run standalone:
     python generate_dataset.py
 
@@ -21,7 +27,7 @@ from datetime import date
 MODEL_NAME  = "jcblaise/roberta-tagalog-base"
 TOP_K       = 50
 MIN_SCORE   = 0.003
-OUTPUT_FILE = "filipino_dataset.json"   # write directly to the standard name
+OUTPUT_FILE = "filipino_dataset.json"
 
 # ─────────────────────────────────────────────
 # SEED TEMPLATES
@@ -450,7 +456,7 @@ def generate(output_file: str = OUTPUT_FILE):
                 category_words["verbs"][variant] += 0.001
     print("✓ Done.\n")
 
-    # Post-process
+    # ── Post-process vocabulary ───────────────────────────────────────────────
     vocabulary     = {}
     all_words_flat = set()
     for cat, counter in category_words.items():
@@ -462,6 +468,7 @@ def generate(output_file: str = OUTPUT_FILE):
                 vocabulary[mapped].append(w)
                 all_words_flat.add(w)
 
+    # ── communication_corpus: deduplicated phrase strings (for display / legacy)
     seen_phrases = set()
     corpus = []
     for phrase in all_corpus_seeds:
@@ -472,6 +479,21 @@ def generate(output_file: str = OUTPUT_FILE):
         if len(corpus) >= 800:
             break
 
+    # ── corpus_sequences: tokenised lists — used by model.py for n-gram training
+    # Each entry is a list of word strings preserving sequential order so that
+    # bigram/trigram co-occurrence counts reflect real phrase structure.
+    corpus_sequences = []
+    seen_seq = set()
+    for phrase in all_corpus_seeds:
+        tokens = phrase.strip().lower().split()
+        if len(tokens) >= 2:
+            key = " ".join(tokens)
+            if key not in seen_seq:
+                corpus_sequences.append(tokens)
+                seen_seq.add(key)
+        if len(corpus_sequences) >= 1200:
+            break
+
     total_words     = sum(len(v) for v in vocabulary.values())
     total_phrases   = len(corpus)
     total_shortcuts = len(SHORTCUTS)
@@ -480,24 +502,27 @@ def generate(output_file: str = OUTPUT_FILE):
     print(f"   Vocabulary categories : {len(vocabulary)}")
     print(f"   Total unique words    : {total_words}")
     print(f"   Corpus phrases        : {total_phrases}")
+    print(f"   Corpus sequences      : {len(corpus_sequences)}")
     print(f"   Shortcuts             : {total_shortcuts}")
     for cat, words in vocabulary.items():
         print(f"     {cat:<22} {len(words)} words")
 
     dataset = {
         "metadata": {
-            "version":        "3.0-roberta",
-            "language":       "Filipino-Tagalog (RoBERTa-generated)",
-            "description":    "Auto-generated Dataset via jcblaise/roberta-tagalog-base — For Gaze Based Digital Keyboard",
-            "total_words":    total_words,
-            "total_phrases":  total_phrases,
-            "total_shortcuts":total_shortcuts,
-            "last_updated":   str(date.today()),
-            "model_used":     MODEL_NAME,
+            "version":          "4.0-roberta",
+            "language":         "Filipino-Tagalog (RoBERTa-generated)",
+            "description":      "Auto-generated Dataset via jcblaise/roberta-tagalog-base — For Gaze Based Digital Keyboard",
+            "total_words":      total_words,
+            "total_phrases":    total_phrases,
+            "total_shortcuts":  total_shortcuts,
+            "last_updated":     str(date.today()),
+            "model_used":       MODEL_NAME,
         },
-        "vocabulary":          vocabulary,
-        "shortcuts":           SHORTCUTS,
-        "communication_corpus":corpus,
+        "vocabulary":           vocabulary,
+        "shortcuts":            SHORTCUTS,
+        "communication_corpus": corpus,
+        # NEW — sequential token lists for n-gram training in model.py
+        "corpus_sequences":     corpus_sequences,
     }
 
     with open(output_file, "w", encoding="utf-8") as f:
@@ -509,5 +534,15 @@ def generate(output_file: str = OUTPUT_FILE):
 # ─────────────────────────────────────────────
 # STANDALONE ENTRY POINT
 # ─────────────────────────────────────────────
+def generate_if_missing(output_file: str = OUTPUT_FILE):
+    """Called by main.py — only regenerates if the file is absent."""
+    import os
+    if not os.path.exists(output_file):
+        print(f"⚠  {output_file} not found — generating now...")
+        generate(output_file)
+    else:
+        print(f"✓ Dataset found: {output_file}")
+
+
 if __name__ == "__main__":
     generate()

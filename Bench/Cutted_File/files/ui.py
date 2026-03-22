@@ -53,14 +53,15 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self.attributes('-fullscreen', True)
         self.bind('<Escape>', lambda e: self.attributes('-fullscreen', False))
 
-        self.current_theme          = "light"
-        self.themes                 = self.THEMES
-        self.current_completion     = ""
+        self.current_theme           = "light"
+        self.themes                  = self.THEMES
+        self.current_completion      = ""
         self.alternative_suggestions = []
-        self.current_input          = ""
-        self.output_words           = []
-        self.output_cursor          = -1
-        self.alt_popup              = None
+        self.current_input           = ""
+        self.output_words            = []
+        self.output_cursor           = -1
+        self.alt_popup               = None
+        self.shortcut_dialog         = None   # tracks open shortcut dialog
 
         self._dwell_init()
         self._create_widgets()
@@ -291,8 +292,19 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                 activeforeground=theme["button_fg"],
             )
             btn.pack(side="left", fill="y")
-            if idx < len(all_words) - 1:
-                tk.Frame(inner, bg=theme["popup_border"], width=1).pack(side="left", fill="y")
+            tk.Frame(inner, bg=theme["popup_border"], width=1).pack(side="left", fill="y")
+
+        # ＋ button — always shown so users can add or redefine shortcuts freely
+        add_btn = tk.Button(
+            inner, text="＋",
+            command=lambda: self._open_shortcut_dialog(self.current_input),
+            font=("Segoe UI", 20, "bold"),
+            relief="flat", bd=0, padx=20, pady=18, cursor="hand2",
+            bg=theme["popup_bg"], fg="#4caf50",
+            activebackground=theme["button_active_bg"],
+            activeforeground="#4caf50",
+        )
+        add_btn.pack(side="left", fill="y")
         self.alt_popup.update_idletasks()
         self._position_popup()
         self.alt_popup.after(8000, self.close_popup)
@@ -324,6 +336,116 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             self.alt_popup.geometry(f"+{x}+{y}")
         except Exception as e:
             print(f"⚠ Popup positioning error: {e}")
+
+    def _open_shortcut_dialog(self, prefix):
+        """
+        Opens a small banner at the top of the screen showing the shortcut
+        prompt and a live display of what the user is typing.
+        The MAIN keyboard below remains fully active — insert_char() and
+        backspace() redirect their input here while the dialog is open.
+        SAVE / CANCEL are dwell buttons so the user never needs a physical key.
+        """
+        if self.shortcut_dialog and self.shortcut_dialog.winfo_exists():
+            return
+        self.close_popup()
+
+        # Store the prefix so insert_char / backspace can reference it
+        self._shortcut_prefix       = prefix
+        self._shortcut_expansion_var = tk.StringVar()
+
+        theme  = self.themes[self.current_theme]
+
+        # Use a Toplevel pinned to the top of the screen, non-blocking
+        # (no grab_set) so the main keyboard stays clickable/dwellable
+        dialog = tk.Toplevel(self)
+        dialog.title("")
+        dialog.overrideredirect(True)
+        dialog.attributes('-topmost', True)
+        self.shortcut_dialog = dialog
+
+        # ── Banner frame ──────────────────────────────────────────────────────
+        border = tk.Frame(dialog, bg=theme["popup_border"], bd=0)
+        border.pack(fill="both", expand=True)
+        inner  = tk.Frame(border, bg=theme["popup_bg"], padx=16, pady=10)
+        inner.pack(fill="both", expand=True, padx=2, pady=2)
+
+        tk.Label(
+            inner,
+            text=f'Use the keyboard to type what  "{prefix}"  means, then SAVE:',
+            font=("Segoe UI", 13),
+            bg=theme["popup_bg"], fg=theme["text_fg"],
+        ).pack(anchor="w", pady=(0, 6))
+
+        # Live expansion display
+        disp = tk.Label(
+            inner,
+            textvariable=self._shortcut_expansion_var,
+            font=("Segoe UI", 26, "bold"),
+            bg=theme["input_bg"], fg=theme["text_fg"],
+            relief="sunken", bd=2,
+            anchor="w", padx=10, width=20,
+        )
+        disp.pack(side="left", fill="y", padx=(0, 16))
+
+        # SAVE and CANCEL as dwell buttons so gaze works normally
+        def save_shortcut():
+            expansion = self._shortcut_expansion_var.get().strip().lower()
+            if not expansion:
+                self.status_bar.config(text="⚠ Type the full word first.")
+                return
+            if len(prefix) >= len(expansion):
+                self.status_bar.config(
+                    text=f"⚠ '{expansion}' must be longer than '{prefix}'."
+                )
+                return
+            ngram_model.learn_from_user_typing(prefix, expansion, force=True)
+            ngram_model.load_user_learning()   # reload so shortcut works immediately
+            self.status_bar.config(text=f"✓ Shortcut saved: '{prefix}' → '{expansion}'")
+            self._close_shortcut_dialog()
+
+        def cancel():
+            self._close_shortcut_dialog()
+
+        save_btn = self._make_dwell_btn(
+            inner, save_shortcut,
+            text="✓ SAVE",
+            font=("Segoe UI", 14, "bold"),
+            bg="#4caf50", fg="white",
+            activebackground="#388e3c",
+            relief="raised", bd=2, cursor="hand2",
+            padx=20, pady=10,
+        )
+        save_btn.pack(side="left", padx=(0, 8))
+
+        cancel_btn = self._make_dwell_btn(
+            inner, cancel,
+            text="✗ CANCEL",
+            font=("Segoe UI", 14, "bold"),
+            bg=theme["button_bg"], fg=theme["button_fg"],
+            activebackground=theme["button_active_bg"],
+            relief="raised", bd=2, cursor="hand2",
+            padx=20, pady=10,
+        )
+        cancel_btn.pack(side="left")
+
+        # Pin to top-centre of screen
+        dialog.update_idletasks()
+        sw   = self.winfo_screenwidth()
+        dw   = dialog.winfo_width()
+        dialog.geometry(f"+{(sw - dw) // 2}+0")
+
+        self.status_bar.config(
+            text=f"Shortcut mode: type what '{prefix}' means, then SAVE"
+        )
+
+    def _close_shortcut_dialog(self):
+        """Tear down the shortcut dialog and restore normal keyboard input."""
+        if self.shortcut_dialog and self.shortcut_dialog.winfo_exists():
+            self.shortcut_dialog.destroy()
+        self.shortcut_dialog         = None
+        self._shortcut_prefix        = None
+        self._shortcut_expansion_var = None
+        self.status_bar.config(text="Ready")
 
     def close_popup(self):
         if self.alt_popup:
@@ -389,11 +511,23 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     # INPUT HANDLERS
     # =========================================================================
     def insert_char(self, char):
+        # Redirect to shortcut dialog if it is open
+        if self.shortcut_dialog and self.shortcut_dialog.winfo_exists():
+            self._shortcut_expansion_var.set(
+                self._shortcut_expansion_var.get() + char
+            )
+            return
         self.current_input += char
         self.update_display()
         self.status_bar.config(text=f"Typing: '{self.current_input}'")
 
     def backspace(self):
+        # Redirect to shortcut dialog if it is open
+        if self.shortcut_dialog and self.shortcut_dialog.winfo_exists():
+            val = self._shortcut_expansion_var.get()
+            if val:
+                self._shortcut_expansion_var.set(val[:-1])
+            return
         print(f"\n⌫ BACKSPACE: input='{self.current_input}' words={self.output_words} cursor={self.output_cursor}")
         if self.current_input:
             self.current_input           = self.current_input[:-1]
