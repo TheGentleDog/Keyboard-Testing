@@ -1,9 +1,10 @@
+# hi whats up
 """
 Gaze Tracker  –  EyeTrax-style fullscreen edition
 ==================================================
 •  Fullscreen 1920 × 1080 gaze canvas (pure black background)
 •  Camera PiP in the bottom-right corner
-•  9-point calibration (fallback: 5-point) with animated shrink-dot
+•  25-point calibration (also 9 or 5) with animated shrink-dot
 •  Polynomial regression gaze mapping
 •  Kalman Filter  +  EMA hybrid smoother
 •  Animated gaze cursor with fade trail
@@ -33,6 +34,11 @@ import argparse
 # ──────────────────────────────────────────────────────────────
 SCREEN_W, SCREEN_H = 1920, 1080
 
+CALIB_25 = [
+    (x, y)
+    for y in [0.08, 0.29, 0.50, 0.71, 0.92]
+    for x in [0.08, 0.29, 0.50, 0.71, 0.92]
+]
 CALIB_9 = [
     (0.10, 0.10), (0.50, 0.10), (0.90, 0.10),
     (0.10, 0.50), (0.50, 0.50), (0.90, 0.50),
@@ -176,8 +182,13 @@ class CalibrationManager:
     HOLD   = 20   # stabilisation frames before collecting
     SHRINK = 25   # collection animation frames
 
-    def __init__(self, use_9=True, spp=30):
-        self.pts   = CALIB_9 if use_9 else CALIB_5
+    def __init__(self, num_points=25, spp=40):
+        if num_points == 25:
+            self.pts = CALIB_25
+        elif num_points == 9:
+            self.pts = CALIB_9
+        else:
+            self.pts = CALIB_5
         self.n     = len(self.pts)
         self.spp   = spp
         self.idx   = 0
@@ -286,11 +297,11 @@ def overlay_pip(canvas, cam_frame, pip_w=320, pip_h=240):
 class GazeTrackerApp:
     WIN = "GazeTracker"
 
-    def __init__(self, camera_id=0, use_9=True, ema_alpha=0.3,
-                pnoise=5e-3, mnoise=8.0, spp=30):
-        self.cam_id  = camera_id
-        self.use_9   = use_9
-        self.spp     = spp
+    def __init__(self, camera_id=0, num_points=25, ema_alpha=0.3,
+                pnoise=5e-3, mnoise=8.0, spp=40):
+        self.cam_id     = camera_id
+        self.num_points = num_points
+        self.spp        = spp
 
         self.mesh = mp.solutions.face_mesh.FaceMesh(
             max_num_faces=1, refine_landmarks=True,
@@ -306,7 +317,7 @@ class GazeTrackerApp:
         self.canvas = np.zeros((SCREEN_H, SCREEN_W, 3), np.uint8)
 
     def _new_calib(self):
-        self.calib = CalibrationManager(self.use_9, self.spp)
+        self.calib = CalibrationManager(self.num_points, self.spp)
         self.smoother.reset(); self.hist.clear()
 
     def _fps(self):
@@ -395,7 +406,7 @@ class GazeTrackerApp:
         if not cap.isOpened():
             print(f"[Error] Cannot open camera {self.cam_id}"); return
 
-        print(f"[Info] Fullscreen 1920×1080  |  {'9' if self.use_9 else '5'}-point calibration")
+        print(f"[Info] Fullscreen 1920×1080  |  {self.num_points}-point calibration")
         print("[Info] Q=quit  R=recalibrate  H=pip  D=debug")
         self._new_calib()
 
@@ -441,18 +452,18 @@ class GazeTrackerApp:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Fullscreen 1920×1080 MediaPipe Gaze Tracker")
     ap.add_argument("--camera",  type=int,   default=0)
-    ap.add_argument("--points",  type=int,   default=9, choices=[5,9])
-    ap.add_argument("--samples", type=int,   default=30)
+    ap.add_argument("--points",  type=int,   default=25, choices=[5, 9, 25])
+    ap.add_argument("--samples", type=int,   default=40)
     ap.add_argument("--ema",     type=float, default=0.30)
     ap.add_argument("--pnoise",  type=float, default=5e-3)
     ap.add_argument("--mnoise",  type=float, default=8.0)
     args = ap.parse_args()
 
     GazeTrackerApp(
-        camera_id = args.camera,
-        use_9     = (args.points == 9),
-        ema_alpha = args.ema,
-        pnoise    = args.pnoise,
-        mnoise    = args.mnoise,
-        spp       = args.samples,
+        camera_id  = args.camera,
+        num_points = args.points,
+        ema_alpha  = args.ema,
+        pnoise     = args.pnoise,
+        mnoise     = args.mnoise,
+        spp        = args.samples,
     ).run()
