@@ -5,8 +5,9 @@ Gaze Tracker  –  EyeTrax-style fullscreen edition
 •  Fullscreen 1920 × 1080 gaze canvas (pure black background)
 •  Camera PiP in the bottom-right corner
 •  16-point calibration (also 5, 9, 25) with animated shrink-dot
-•  Polynomial regression gaze mapping
+•  Polynomial regression gaze mapping with HEAD POSE compensation
 •  Kalman Filter  +  EMA hybrid smoother
+•  Blink detection (pauses tracking during blinks)
 •  Animated gaze cursor with fade trail
 
 Requirements
@@ -130,7 +131,7 @@ class HybridSmoother:
 
 
 # ──────────────────────────────────────────────────────────────
-#  4.  Gaze Feature Extractor (with blink detection)
+#  4.  Gaze Feature Extractor (with blink detection + head pose)
 # ──────────────────────────────────────────────────────────────
 class GazeFeatureExtractor:
     L_CORNERS = [33,  133]
@@ -145,6 +146,80 @@ class GazeFeatureExtractor:
     R_EYE = [362, 385, 387, 263, 380, 373]
 
     EAR_THRESHOLD = 0.20  # Below this = blink detected
+
+    # Landmarks for head pose estimation (6-point model)
+    # Nose tip, chin, left eye outer, right eye outer, left mouth, right mouth
+    POSE_LANDMARKS = [1, 199, 33, 263, 61, 291]
+
+    # 3D model points for a generic face (in mm, centered at nose)
+    FACE_3D = np.array([
+        [0.0, 0.0, 0.0],           # Nose tip
+        [0.0, -63.6, -12.5],       # Chin
+        [-43.3, 32.7, -26.0],      # Left eye outer
+        [43.3, 32.7, -26.0],       # Right eye outer
+        [-28.9, -28.9, -24.1],     # Left mouth corner
+        [28.9, -28.9, -24.1],      # Right mouth corner
+    ], dtype=np.float64)
+
+    def __init__(self):
+        self._cam_matrix = None
+        self._dist_coeffs = np.zeros((4, 1), dtype=np.float64)
+
+    def _get_cam_matrix(self, w, h):
+        """Get camera matrix (estimate focal length from image size)."""
+        if self._cam_matrix is None or self._cam_matrix[0, 2] != w / 2:
+            focal_length = w  # Approximate focal length
+            self._cam_matrix = np.array([
+                [focal_length, 0, w / 2],
+                [0, focal_length, h / 2],
+                [0, 0, 1]
+            ], dtype=np.float64)
+        return self._cam_matrix
+
+    def get_head_pose(self, lms, w, h):
+        """Extract head pose (pitch, yaw, roll) in degrees."""
+        try:
+            # Get 2D landmark positions
+            pts_2d = np.array([
+                [lms[i].x * w, lms[i].y * h] for i in self.POSE_LANDMARKS
+            ], dtype=np.float64)
+
+            cam_matrix = self._get_cam_matrix(w, h)
+
+            # Solve PnP to get rotation and translation vectors
+            success, rot_vec, _ = cv2.solvePnP(
+                self.FACE_3D, pts_2d, cam_matrix, self._dist_coeffs,
+                flags=cv2.SOLVEPNP_ITERATIVE
+            )
+
+            if not success:
+                return np.array([0.0, 0.0, 0.0])
+
+            # Convert rotation vector to rotation matrix
+            rot_mat, _ = cv2.Rodrigues(rot_vec)
+
+            # Get Euler angles from rotation matrix
+            # Using decomposition that gives pitch, yaw, roll
+            sy = math.sqrt(rot_mat[0, 0] ** 2 + rot_mat[1, 0] ** 2)
+            singular = sy < 1e-6
+
+            if not singular:
+                pitch = math.atan2(rot_mat[2, 1], rot_mat[2, 2])
+                yaw = math.atan2(-rot_mat[2, 0], sy)
+                roll = math.atan2(rot_mat[1, 0], rot_mat[0, 0])
+            else:
+                pitch = math.atan2(-rot_mat[1, 2], rot_mat[1, 1])
+                yaw = math.atan2(-rot_mat[2, 0], sy)
+                roll = 0
+
+            # Convert to degrees and normalize
+            return np.array([
+                math.degrees(pitch) / 45.0,  # Normalize to ~[-1, 1] range
+                math.degrees(yaw) / 45.0,
+                math.degrees(roll) / 45.0
+            ])
+        except Exception:
+            return np.array([0.0, 0.0, 0.0])
 
     def _ear(self, lms, eye_indices, w, h):
         """Calculate Eye Aspect Ratio for blink detection."""
@@ -167,15 +242,33 @@ class GazeFeatureExtractor:
         return avg_ear < self.EAR_THRESHOLD
 
     def extract(self, lms, w, h):
+        """Extract gaze features including head pose compensation."""
         try:
             def p(i): return np.array([lms[i].x * w, lms[i].y * h])
             def norm(iris, c0, c1):
                 ctr = (p(c0) + p(c1)) / 2.0
                 return (iris - ctr) / (np.linalg.norm(p(c1)-p(c0)) / 2.0 + 1e-6)
+
             nl = norm(p(self.L_IRIS), *self.L_CORNERS)
             nr = norm(p(self.R_IRIS), *self.R_CORNERS)
-            return np.array([nl[0],nl[1],nr[0],nr[1],
-                             nl[0]**2,nl[1]**2,nr[0]**2,nr[1]**2], float)
+
+            # Get head pose (pitch, yaw, roll)
+            pose = self.get_head_pose(lms, w, h)
+
+            # Feature vector: iris positions + squared terms + head pose + cross terms
+            return np.array([
+                # Iris positions (4)
+                nl[0], nl[1], nr[0], nr[1],
+                # Squared terms (4)
+                nl[0]**2, nl[1]**2, nr[0]**2, nr[1]**2,
+                # Head pose (3)
+                pose[0], pose[1], pose[2],
+                # Iris-pose cross terms (6) - these help compensate for head movement
+                nl[0] * pose[1], nl[1] * pose[0],  # left iris × yaw/pitch
+                nr[0] * pose[1], nr[1] * pose[0],  # right iris × yaw/pitch
+                (nl[0] + nr[0]) * pose[1] / 2,     # avg horizontal × yaw
+                (nl[1] + nr[1]) * pose[0] / 2,     # avg vertical × pitch
+            ], dtype=float)
         except Exception:
             return None
 
@@ -185,27 +278,57 @@ class GazeFeatureExtractor:
 
 
 # ──────────────────────────────────────────────────────────────
-#  5.  Polynomial Regression Gaze Model
+#  5.  Polynomial Regression Gaze Model (with head pose support)
 # ──────────────────────────────────────────────────────────────
 class GazeRegressionModel:
-    def __init__(self): self.Wx = self.Wy = None; self.fitted = False
+    def __init__(self):
+        self.Wx = self.Wy = None
+        self.fitted = False
 
     def _design(self, F):
+        """Build design matrix from features.
+
+        Features expected (17 total):
+        0-3: iris positions (nl_x, nl_y, nr_x, nr_y)
+        4-7: squared terms
+        8-10: head pose (pitch, yaw, roll)
+        11-16: iris-pose cross terms
+        """
         N = F.shape[0]
-        cross = np.column_stack([F[:,0]*F[:,1], F[:,2]*F[:,3],
-                                  F[:,0]*F[:,2], F[:,1]*F[:,3], F[:,0]*F[:,3]])
-        return np.hstack([np.ones((N,1)), F, cross])
+        n_feat = F.shape[1]
+
+        # Start with bias and all features
+        design = [np.ones((N, 1)), F]
+
+        # Add key cross terms for iris positions
+        if n_feat >= 4:
+            iris_cross = np.column_stack([
+                F[:, 0] * F[:, 1],   # left iris x*y
+                F[:, 2] * F[:, 3],   # right iris x*y
+                F[:, 0] * F[:, 2],   # left x * right x
+                F[:, 1] * F[:, 3],   # left y * right y
+            ])
+            design.append(iris_cross)
+
+        return np.hstack(design)
 
     def fit(self, F, T):
         A = self._design(F)
-        self.Wx,*_ = np.linalg.lstsq(A, T[:,0], rcond=None)
-        self.Wy,*_ = np.linalg.lstsq(A, T[:,1], rcond=None)
+        # Use ridge regression for better stability with more features
+        ridge = 1e-4
+        AtA = A.T @ A + ridge * np.eye(A.shape[1])
+        AtT_x = A.T @ T[:, 0]
+        AtT_y = A.T @ T[:, 1]
+        self.Wx = np.linalg.solve(AtA, AtT_x)
+        self.Wy = np.linalg.solve(AtA, AtT_y)
         self.fitted = True
+        print(f"[Calibration] Model fitted with {F.shape[1]} features, {A.shape[1]} design columns")
 
     def predict(self, f):
-        if not self.fitted: return np.array([0.5, 0.5])
-        a = self._design(f.reshape(1,-1))
-        return np.clip([float(a@self.Wx), float(a@self.Wy)], 0, 1)
+        if not self.fitted:
+            return np.array([0.5, 0.5])
+        a = self._design(f.reshape(1, -1))
+        return np.clip([float(a @ self.Wx), float(a @ self.Wy)], 0, 1)
 
 
 # ──────────────────────────────────────────────────────────────
