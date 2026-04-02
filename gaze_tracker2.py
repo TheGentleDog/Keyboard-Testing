@@ -4,9 +4,7 @@ Gaze Tracker  –  EyeTrax-style fullscreen edition
 ==================================================
 •  Fullscreen 1920 × 1080 gaze canvas (pure black background)
 •  Camera PiP in the bottom-right corner
-•  Multiple calibration modes:
-   - Fixation-based: 5, 9, 16, or 25 points
-   - Hybrid: 5 fixation points + smooth pursuit paths (--hybrid)
+•  16-point calibration (also 5, 9, 25) with animated shrink-dot
 •  Polynomial regression gaze mapping with HEAD POSE compensation
 •  Kalman Filter  +  EMA hybrid smoother
 •  Blink detection (pauses tracking during blinks)
@@ -56,21 +54,6 @@ CALIB_5 = [
     (0.50, 0.50),
     (0.10, 0.10), (0.90, 0.10),
     (0.10, 0.90), (0.90, 0.90),
-]
-
-# Smooth pursuit paths for hybrid calibration
-# Each path is a list of (start, end) with intermediate sampling
-PURSUIT_PATHS = [
-    # From center to corners
-    ((0.50, 0.50), (0.10, 0.10)),
-    ((0.10, 0.10), (0.90, 0.10)),
-    ((0.90, 0.10), (0.90, 0.90)),
-    ((0.90, 0.90), (0.10, 0.90)),
-    ((0.10, 0.90), (0.50, 0.50)),
-    # Horizontal sweep
-    ((0.10, 0.50), (0.90, 0.50)),
-    # Vertical sweep
-    ((0.50, 0.10), (0.50, 0.90)),
 ]
 
 # Colour palette (BGR)
@@ -403,152 +386,6 @@ class CalibrationManager:
 
 
 # ──────────────────────────────────────────────────────────────
-#  6b. Hybrid Calibration Manager (Fixation + Smooth Pursuit)
-# ──────────────────────────────────────────────────────────────
-class HybridCalibrationManager:
-    """
-    Hybrid calibration: fixation points + smooth pursuit paths.
-    Phase 1: Fixation at 5 anchor points (corners + center)
-    Phase 2: Smooth pursuit along paths connecting screen regions
-    """
-    HOLD = 15           # frames to stabilize before collecting fixation
-    FIX_SAMPLES = 30    # samples per fixation point
-    PURSUIT_SPEED = 3.0 # seconds per pursuit path
-    PURSUIT_FPS = 30    # approximate frames per second
-
-    def __init__(self):
-        # Fixation anchors: center first, then corners
-        self.fix_pts = [
-            (0.50, 0.50),  # center
-            (0.12, 0.12), (0.88, 0.12),  # top corners
-            (0.12, 0.88), (0.88, 0.88),  # bottom corners
-        ]
-        self.pursuit_paths = PURSUIT_PATHS
-
-        # State
-        self.phase = 'fixation'  # 'fixation' or 'pursuit'
-        self.fix_idx = 0
-        self.pursuit_idx = 0
-        self.feats = []
-        self.tgts = []
-        self.done = False
-        self.model = GazeRegressionModel()
-
-        # Fixation state
-        self._fp = 0
-        self._fix_buf = []
-
-        # Pursuit state
-        self._pursuit_start_time = None
-        self._pursuit_t = 0.0
-
-    @property
-    def current_target(self):
-        """Returns current (x, y) in normalized coords [0,1]."""
-        if self.phase == 'fixation':
-            return self.fix_pts[self.fix_idx]
-        else:
-            # Interpolate along pursuit path
-            start, end = self.pursuit_paths[self.pursuit_idx]
-            t = self._pursuit_t
-            return (
-                start[0] + (end[0] - start[0]) * t,
-                start[1] + (end[1] - start[1]) * t
-            )
-
-    @property
-    def target_px(self):
-        fx, fy = self.current_target
-        return int(fx * SCREEN_W), int(fy * SCREEN_H)
-
-    def add_sample(self, feat):
-        """Add a gaze feature sample at the current target position."""
-        if self.done:
-            return
-
-        if self.phase == 'fixation':
-            self._add_fixation_sample(feat)
-        else:
-            self._add_pursuit_sample(feat)
-
-    def _add_fixation_sample(self, feat):
-        self._fp += 1
-        if self._fp <= self.HOLD:
-            return  # Stabilizing
-
-        tx, ty = self.fix_pts[self.fix_idx]
-        self._fix_buf.append(feat)
-        self.feats.append(feat)
-        self.tgts.append([tx, ty])
-
-        if len(self._fix_buf) >= self.FIX_SAMPLES:
-            # Move to next fixation point
-            self._fix_buf = []
-            self._fp = 0
-            self.fix_idx += 1
-
-            if self.fix_idx >= len(self.fix_pts):
-                # Switch to pursuit phase
-                self.phase = 'pursuit'
-                self._pursuit_start_time = time.time()
-                print(f"[Calibration] Fixation complete ({len(self.feats)} samples), starting smooth pursuit...")
-
-    def _add_pursuit_sample(self, feat):
-        if self._pursuit_start_time is None:
-            self._pursuit_start_time = time.time()
-
-        # Update pursuit progress
-        elapsed = time.time() - self._pursuit_start_time
-        self._pursuit_t = min(elapsed / self.PURSUIT_SPEED, 1.0)
-
-        # Sample at current interpolated position
-        tx, ty = self.current_target
-        self.feats.append(feat)
-        self.tgts.append([tx, ty])
-
-        if self._pursuit_t >= 1.0:
-            # Path complete, move to next
-            self.pursuit_idx += 1
-            self._pursuit_start_time = time.time()
-            self._pursuit_t = 0.0
-
-            if self.pursuit_idx >= len(self.pursuit_paths):
-                # All done!
-                self.model.fit(np.array(self.feats), np.array(self.tgts))
-                print(f"[Calibration] Hybrid complete — {len(self.feats)} total samples "
-                      f"({len(self.fix_pts)} fixation + {len(self.pursuit_paths)} pursuit paths)")
-                self.done = True
-
-    def progress(self):
-        """Returns overall progress 0.0 to 1.0."""
-        fix_total = len(self.fix_pts) * self.FIX_SAMPLES
-        pursuit_total = len(self.pursuit_paths)  # Each path = 1 unit
-
-        if self.phase == 'fixation':
-            fix_done = self.fix_idx * self.FIX_SAMPLES + max(0, self._fp - self.HOLD)
-            return (fix_done / fix_total) * 0.5  # Fixation = first 50%
-        else:
-            pursuit_done = self.pursuit_idx + self._pursuit_t
-            return 0.5 + (pursuit_done / pursuit_total) * 0.5  # Pursuit = second 50%
-
-    def dot_state(self):
-        """Returns (phase_name, progress) for rendering."""
-        if self.phase == 'fixation':
-            if self._fp <= self.HOLD:
-                return 'hold', self._fp / self.HOLD
-            return 'collect', len(self._fix_buf) / self.FIX_SAMPLES
-        else:
-            return 'pursuit', self._pursuit_t
-
-    def get_status_text(self):
-        """Get descriptive status for UI."""
-        if self.phase == 'fixation':
-            return f"Fixation {self.fix_idx + 1}/{len(self.fix_pts)}"
-        else:
-            return f"Pursuit {self.pursuit_idx + 1}/{len(self.pursuit_paths)}"
-
-
-# ──────────────────────────────────────────────────────────────
 #  Drawing helpers
 # ──────────────────────────────────────────────────────────────
 def lerp_color(c1, c2, t):
@@ -581,37 +418,6 @@ def draw_calib_dot(canvas, cx, cy, phase, t, R=32):
 def draw_crosshair(canvas, cx, cy, size=14, color=(55,55,55)):
     cv2.line(canvas, (cx-size,cy), (cx+size,cy), color, 1, cv2.LINE_AA)
     cv2.line(canvas, (cx,cy-size), (cx,cy+size), color, 1, cv2.LINE_AA)
-
-def draw_pursuit_dot(canvas, cx, cy, t, R=24):
-    """Draw a smooth pursuit target with motion trail."""
-    # Outer glow - intensity based on progress t
-    pulse = 0.5 + 0.5 * math.sin(time.time() * 10)
-    glow_r = int(R + 8 + 4 * pulse)
-    glow_intensity = int(40 + 40 * t)  # Gets brighter as path progresses
-    cv2.circle(canvas, (cx, cy), glow_r, (glow_intensity, 80 + int(40*t), glow_intensity), 2, cv2.LINE_AA)
-
-    # Main dot (bright, easy to follow)
-    cv2.circle(canvas, (cx, cy), R, (0, 255, 100), -1, cv2.LINE_AA)
-    cv2.circle(canvas, (cx, cy), R, (100, 255, 150), 2, cv2.LINE_AA)
-
-    # Inner highlight
-    cv2.circle(canvas, (cx, cy), 8, (200, 255, 220), -1, cv2.LINE_AA)
-    cv2.circle(canvas, (cx, cy), 3, (255, 255, 255), -1, cv2.LINE_AA)
-
-def draw_pursuit_path_preview(canvas, paths, current_idx):
-    """Draw faded preview of pursuit paths."""
-    for i, (start, end) in enumerate(paths):
-        sx, sy = int(start[0] * SCREEN_W), int(start[1] * SCREEN_H)
-        ex, ey = int(end[0] * SCREEN_W), int(end[1] * SCREEN_H)
-        if i < current_idx:
-            # Completed path
-            cv2.line(canvas, (sx, sy), (ex, ey), (0, 80, 40), 1, cv2.LINE_AA)
-        elif i == current_idx:
-            # Current path - brighter
-            cv2.line(canvas, (sx, sy), (ex, ey), (0, 150, 80), 2, cv2.LINE_AA)
-        else:
-            # Future path - dim
-            cv2.line(canvas, (sx, sy), (ex, ey), (30, 40, 30), 1, cv2.LINE_AA)
 
 def draw_gaze_cursor(canvas, gx, gy, history):
     n = len(history)
@@ -650,11 +456,10 @@ class GazeTrackerApp:
     WIN = "GazeTracker"
 
     def __init__(self, camera_id=0, num_points=16, ema_alpha=0.3,
-                pnoise=5e-3, mnoise=8.0, spp=60, hybrid=False):
+                pnoise=5e-3, mnoise=8.0, spp=60):
         self.cam_id     = camera_id
         self.num_points = num_points
         self.spp        = spp
-        self.hybrid     = hybrid
 
         self.mesh = mp.solutions.face_mesh.FaceMesh(
             max_num_faces=1, refine_landmarks=True,
@@ -672,10 +477,7 @@ class GazeTrackerApp:
         self.canvas = np.zeros((SCREEN_H, SCREEN_W, 3), np.uint8)
 
     def _new_calib(self):
-        if self.hybrid:
-            self.calib = HybridCalibrationManager()
-        else:
-            self.calib = CalibrationManager(self.num_points, self.spp)
+        self.calib = CalibrationManager(self.num_points, self.spp)
         self.smoother.reset(); self.hist.clear()
 
     def _fps(self):
@@ -720,64 +522,6 @@ class GazeTrackerApp:
 
         if self._pip: overlay_pip(cv, cam)
         # Only add calibration samples when not blinking
-        if feat is not None and not is_blinking:
-            self.calib.add_sample(feat)
-
-    # ── hybrid calibration render ────────────────────────────────
-    def _render_hybrid_calib(self, cam, feat, lms=None):
-        cv = self.canvas; cv[:] = C_BG
-        draw_grid(cv)
-
-        # Skip blink frames
-        is_blinking = False
-        if lms is not None:
-            is_blinking = self.extractor.is_blinking(lms, cam.shape[1], cam.shape[0])
-
-        phase, t = self.calib.dot_state()
-        cx, cy = self.calib.target_px
-
-        if self.calib.phase == 'fixation':
-            # Draw fixation points
-            for i, (fx, fy) in enumerate(self.calib.fix_pts):
-                px, py = int(fx * SCREEN_W), int(fy * SCREEN_H)
-                if i < self.calib.fix_idx:
-                    # Completed
-                    cv2.circle(cv, (px, py), 12, C_ACCENT, 2, cv2.LINE_AA)
-                    cv2.line(cv, (px-5, py), (px-1, py+5), C_ACCENT, 2, cv2.LINE_AA)
-                    cv2.line(cv, (px-1, py+5), (px+6, py-4), C_ACCENT, 2, cv2.LINE_AA)
-                elif i > self.calib.fix_idx:
-                    # Future
-                    draw_crosshair(cv, px, py)
-            # Draw current fixation dot
-            draw_calib_dot(cv, cx, cy, phase, t)
-        else:
-            # Pursuit phase - show paths and moving dot
-            draw_pursuit_path_preview(cv, self.calib.pursuit_paths, self.calib.pursuit_idx)
-            draw_pursuit_dot(cv, cx, cy, t)
-
-        # Progress bar
-        prog = self.calib.progress()
-        bx = SCREEN_W // 2 - 300
-        by = SCREEN_H - 60
-        draw_bar(cv, prog, bx, by, 600, 16)
-
-        # Status text
-        status = self.calib.get_status_text()
-        label = f"Hybrid Calibration  ·  {status}   ({int(prog*100)}%)"
-        lw = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 1)[0][0]
-        txt(cv, label, (SCREEN_W // 2 - lw // 2, by - 12), scale=0.65, color=C_TEXT)
-
-        if self.calib.phase == 'fixation':
-            hint = "Keep your eyes on the dot  ·  H=pip  D=debug  Q=quit"
-        else:
-            hint = "Follow the moving dot smoothly  ·  H=pip  D=debug  Q=quit"
-        hw = cv2.getTextSize(hint, cv2.FONT_HERSHEY_SIMPLEX, 0.48, 1)[0][0]
-        txt(cv, hint, (SCREEN_W // 2 - hw // 2, SCREEN_H - 18), scale=0.48, color=(100, 100, 100))
-
-        if self._pip:
-            overlay_pip(cv, cam)
-
-        # Collect samples when not blinking
         if feat is not None and not is_blinking:
             self.calib.add_sample(feat)
 
@@ -840,8 +584,7 @@ class GazeTrackerApp:
         if not cap.isOpened():
             print(f"[Error] Cannot open camera {self.cam_id}"); return
 
-        calib_mode = "hybrid (fixation + pursuit)" if self.hybrid else f"{self.num_points}-point"
-        print(f"[Info] Fullscreen 1920×1080  |  {calib_mode} calibration")
+        print(f"[Info] Fullscreen 1920×1080  |  {self.num_points}-point calibration")
         print("[Info] Q=quit  R=recalibrate  H=pip  D=debug")
         self._new_calib()
 
@@ -863,10 +606,7 @@ class GazeTrackerApp:
             fps = self._fps()
 
             if not self.calib.done:
-                if self.hybrid:
-                    self._render_hybrid_calib(cam, feat, lms)
-                else:
-                    self._render_calib(cam, feat, lms)
+                self._render_calib(cam, feat, lms)
                 if self.calib.done:
                     print("[Info] Calibration done — tracking active.")
             else:
@@ -895,8 +635,6 @@ if __name__ == "__main__":
     ap.add_argument("--ema",     type=float, default=0.30)
     ap.add_argument("--pnoise",  type=float, default=5e-3)
     ap.add_argument("--mnoise",  type=float, default=8.0)
-    ap.add_argument("--hybrid",  action="store_true",
-                    help="Use hybrid calibration (fixation + smooth pursuit)")
     args = ap.parse_args()
 
     GazeTrackerApp(
@@ -906,5 +644,4 @@ if __name__ == "__main__":
         pnoise     = args.pnoise,
         mnoise     = args.mnoise,
         spp        = args.samples,
-        hybrid     = args.hybrid,
     ).run()
