@@ -65,21 +65,31 @@ def _fetch_pairs():
 
 
 # ─────────────────────────────────────────────
-# RULE EXTRACTION
+# RULE EXTRACTION WITH LIKELIHOOD SCORES
 # ─────────────────────────────────────────────
 def _extract_rules(pairs):
     """
-    Derive substitution rules from the word pairs using character-level
-    alignment — mirrors the rule extraction described in Flores et al. (2022).
+    Derive substitution rules with likelihood scores from word pairs using
+    character-level alignment — mirrors the rule extraction and probability
+    computation described in Flores et al. (2022) Equations 1 and 2.
+
+    The probability of a rule a → b is defined as:
+        P(a → b) = count(a → b) / sum of all counts(a → *)
+    (Flores et al., 2022, Eq. 1)
+
+    The likelihood score of a candidate word is the product of the
+    probabilities of all rules used to generate it:
+        score(candidate) = ∏ P(rule_i)
+    (Flores et al., 2022, Eq. 2)
     """
-    word_rules = {}
-    char_rules  = defaultdict(set)
+    word_rules   = {}
+    char_counts  = defaultdict(lambda: defaultdict(int))
 
     for short, full in pairs:
         # whole-word rule — direct abbreviation mapping
         word_rules[short] = full
 
-        # character-level alignment
+        # character-level alignment — count substitution occurrences
         i, j = 0, 0
         while i < len(short) and j < len(full):
             if short[i] == full[j]:
@@ -91,17 +101,27 @@ def _extract_rules(pairs):
                     if (s_sub and f_sub and s_sub != f_sub
                             and all(c.isalnum() for c in s_sub)
                             and all(c.isalpha() for c in f_sub)):
-                        char_rules[s_sub].add(f_sub)
+                        char_counts[s_sub][f_sub] += 1
             i += 1; j += 1
 
-    # keep only compact, reliable char rules
-    clean_char = {
-        k: list(v)
-        for k, v in char_rules.items()
-        if len(k) <= 2 and len(v) <= 10
-    }
+    # Compute rule probabilities — Flores et al. Eq. 1
+    # P(a → b) = count(a → b) / total count of all rules starting with a
+    char_rules = {}
+    for src, targets in char_counts.items():
+        if len(src) > 2:
+            continue
+        total = sum(targets.values())
+        if total == 0:
+            continue
+        probs = {
+            tgt: round(count / total, 4)
+            for tgt, count in targets.items()
+        }
+        # keep only compact rules with a reasonable number of expansions
+        if len(probs) <= 10:
+            char_rules[src] = probs
 
-    return word_rules, clean_char
+    return word_rules, char_rules
 
 
 # ─────────────────────────────────────────────
@@ -129,7 +149,12 @@ def generate(output_file: str = OUTPUT_FILE):
             "source":       "Flores et al. (2022) — efficient-spelling-normalization-filipino",
             "github":       "https://github.com/ljyflores/efficient-spelling-normalization-filipino",
             "pairs_used":   len(pairs),
-            "description":  "Substitution rules derived from the original Flores et al. dataset",
+            "description":  (
+                "Substitution rules derived from the original Flores et al. dataset. "
+                "char_rules values are probability dicts {replacement: P(a→b)} "
+                "computed via Flores et al. Eq. 1. Candidate likelihood scores "
+                "are the product of rule probabilities per Flores et al. Eq. 2."
+            ),
             "last_updated": str(date.today()),
         },
         "word_rules": word_rules,
