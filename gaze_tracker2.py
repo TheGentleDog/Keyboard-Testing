@@ -1,10 +1,11 @@
+# hi whats up
 """
 Gaze Tracker  –  EyeTrax-style fullscreen edition
 ==================================================
 •  Fullscreen 1920 × 1080 gaze canvas (pure black background)
 •  Camera PiP in the bottom-right corner
-•  9-point calibration (fallback: 5-point) with animated shrink-dot
-•  Polynomial regression gaze mapping
+•  16-point calibration (also 5, 9, 25) with animated shrink-dot
+•  Linear regression gaze mapping
 •  Kalman Filter  +  EMA hybrid smoother
 •  Animated gaze cursor with fade trail
 
@@ -33,6 +34,16 @@ import argparse
 # ──────────────────────────────────────────────────────────────
 SCREEN_W, SCREEN_H = 1920, 1080
 
+CALIB_25 = [
+    (x, y)
+    for y in [0.08, 0.29, 0.50, 0.71, 0.92]
+    for x in [0.08, 0.29, 0.50, 0.71, 0.92]
+]
+CALIB_16 = [
+    (x, y)
+    for y in [0.12, 0.37, 0.63, 0.88]
+    for x in [0.12, 0.37, 0.63, 0.88]
+]
 CALIB_9 = [
     (0.10, 0.10), (0.50, 0.10), (0.90, 0.10),
     (0.10, 0.50), (0.50, 0.50), (0.90, 0.50),
@@ -119,13 +130,41 @@ class HybridSmoother:
 
 
 # ──────────────────────────────────────────────────────────────
-#  4.  Gaze Feature Extractor
+#  4.  Gaze Feature Extractor (with blink detection)
 # ──────────────────────────────────────────────────────────────
 class GazeFeatureExtractor:
     L_CORNERS = [33,  133]
     R_CORNERS = [362, 263]
     L_IRIS    = 468
     R_IRIS    = 473
+
+    # Eye landmarks for EAR (Eye Aspect Ratio) blink detection
+    # Left eye: outer corner, upper1, upper2, inner corner, lower2, lower1
+    L_EYE = [33, 160, 158, 133, 153, 144]
+    # Right eye: outer corner, upper1, upper2, inner corner, lower2, lower1
+    R_EYE = [362, 385, 387, 263, 380, 373]
+
+    EAR_THRESHOLD = 0.20  # Below this = blink detected
+
+    def _ear(self, lms, eye_indices, w, h):
+        """Calculate Eye Aspect Ratio for blink detection."""
+        def p(i): return np.array([lms[i].x * w, lms[i].y * h])
+        try:
+            pts = [p(i) for i in eye_indices]
+            # EAR = (||p1-p5|| + ||p2-p4||) / (2 * ||p0-p3||)
+            vertical1 = np.linalg.norm(pts[1] - pts[5])
+            vertical2 = np.linalg.norm(pts[2] - pts[4])
+            horizontal = np.linalg.norm(pts[0] - pts[3])
+            return (vertical1 + vertical2) / (2.0 * horizontal + 1e-6)
+        except:
+            return 1.0  # Assume open if error
+
+    def is_blinking(self, lms, w, h):
+        """Returns True if either eye is blinking."""
+        left_ear = self._ear(lms, self.L_EYE, w, h)
+        right_ear = self._ear(lms, self.R_EYE, w, h)
+        avg_ear = (left_ear + right_ear) / 2.0
+        return avg_ear < self.EAR_THRESHOLD
 
     def extract(self, lms, w, h):
         try:
@@ -135,8 +174,7 @@ class GazeFeatureExtractor:
                 return (iris - ctr) / (np.linalg.norm(p(c1)-p(c0)) / 2.0 + 1e-6)
             nl = norm(p(self.L_IRIS), *self.L_CORNERS)
             nr = norm(p(self.R_IRIS), *self.R_CORNERS)
-            return np.array([nl[0],nl[1],nr[0],nr[1],
-                             nl[0]**2,nl[1]**2,nr[0]**2,nr[1]**2], float)
+            return np.array([nl[0], nl[1], nr[0], nr[1]], float)
         except Exception:
             return None
 
@@ -146,16 +184,14 @@ class GazeFeatureExtractor:
 
 
 # ──────────────────────────────────────────────────────────────
-#  5.  Polynomial Regression Gaze Model
+#  5.  Linear Regression Gaze Model
 # ──────────────────────────────────────────────────────────────
 class GazeRegressionModel:
     def __init__(self): self.Wx = self.Wy = None; self.fitted = False
 
     def _design(self, F):
         N = F.shape[0]
-        cross = np.column_stack([F[:,0]*F[:,1], F[:,2]*F[:,3],
-                                  F[:,0]*F[:,2], F[:,1]*F[:,3], F[:,0]*F[:,3]])
-        return np.hstack([np.ones((N,1)), F, cross])
+        return np.hstack([np.ones((N, 1)), F])
 
     def fit(self, F, T):
         A = self._design(F)
@@ -176,8 +212,15 @@ class CalibrationManager:
     HOLD   = 20   # stabilisation frames before collecting
     SHRINK = 25   # collection animation frames
 
-    def __init__(self, use_9=True, spp=30):
-        self.pts   = CALIB_9 if use_9 else CALIB_5
+    def __init__(self, num_points=16, spp=60):
+        if num_points == 25:
+            self.pts = CALIB_25
+        elif num_points == 16:
+            self.pts = CALIB_16
+        elif num_points == 9:
+            self.pts = CALIB_9
+        else:
+            self.pts = CALIB_5
         self.n     = len(self.pts)
         self.spp   = spp
         self.idx   = 0
@@ -286,11 +329,11 @@ def overlay_pip(canvas, cam_frame, pip_w=320, pip_h=240):
 class GazeTrackerApp:
     WIN = "GazeTracker"
 
-    def __init__(self, camera_id=0, use_9=True, ema_alpha=0.3,
-                pnoise=5e-3, mnoise=8.0, spp=30):
-        self.cam_id  = camera_id
-        self.use_9   = use_9
-        self.spp     = spp
+    def __init__(self, camera_id=0, num_points=16, ema_alpha=0.3,
+                pnoise=5e-3, mnoise=8.0, spp=60):
+        self.cam_id     = camera_id
+        self.num_points = num_points
+        self.spp        = spp
 
         self.mesh = mp.solutions.face_mesh.FaceMesh(
             max_num_faces=1, refine_landmarks=True,
@@ -303,10 +346,12 @@ class GazeTrackerApp:
         self._fpsq  = collections.deque(maxlen=30)
         self._pip   = True
         self._dbg   = False
+        self._blink = False  # blink state indicator
+        self._last_gaze = (SCREEN_W // 2, SCREEN_H // 2)  # last known good gaze
         self.canvas = np.zeros((SCREEN_H, SCREEN_W, 3), np.uint8)
 
     def _new_calib(self):
-        self.calib = CalibrationManager(self.use_9, self.spp)
+        self.calib = CalibrationManager(self.num_points, self.spp)
         self.smoother.reset(); self.hist.clear()
 
     def _fps(self):
@@ -314,9 +359,14 @@ class GazeTrackerApp:
         return (len(self._fpsq)-1)/(self._fpsq[-1]-self._fpsq[0]+1e-9) if len(self._fpsq)>1 else 0
 
     # ── calibration render ──────────────────────────────────────
-    def _render_calib(self, cam, feat):
+    def _render_calib(self, cam, feat, lms=None):
         cv = self.canvas; cv[:] = C_BG
         draw_grid(cv)
+
+        # Skip blink frames during calibration
+        is_blinking = False
+        if lms is not None:
+            is_blinking = self.extractor.is_blinking(lms, cam.shape[1], cam.shape[0])
 
         for i,(fx,fy) in enumerate(self.calib.pts):
             px,py = int(fx*SCREEN_W), int(fy*SCREEN_H)
@@ -345,26 +395,39 @@ class GazeTrackerApp:
         txt(cv, hint, (SCREEN_W//2 - hw//2, SCREEN_H-18), scale=0.48, color=(100,100,100))
 
         if self._pip: overlay_pip(cv, cam)
-        if feat is not None: self.calib.add_sample(feat)
+        # Only add calibration samples when not blinking
+        if feat is not None and not is_blinking:
+            self.calib.add_sample(feat)
 
     # ── tracking render ─────────────────────────────────────────
-    def _render_track(self, cam, feat, fps):
+    def _render_track(self, cam, feat, lms, fps):
         cv = self.canvas; cv[:] = C_BG
         draw_grid(cv)
 
-        if feat is not None:
+        # Check for blink - if blinking, skip gaze update and use last position
+        if lms is not None:
+            self._blink = self.extractor.is_blinking(lms, cam.shape[1], cam.shape[0])
+
+        if feat is not None and not self._blink:
             raw = self.calib.model.predict(feat)
             smo = self.smoother.update(raw)
             gx  = int(np.clip(smo[0]*SCREEN_W,  0, SCREEN_W-1))
             gy  = int(np.clip(smo[1]*SCREEN_H, 0, SCREEN_H-1))
-            self.hist.append((gx,gy))
+            self._last_gaze = (gx, gy)
+            self.hist.append((gx, gy))
+
+        # Always draw cursor at last known position
+        gx, gy = self._last_gaze
+        if feat is not None or self._blink:
             draw_gaze_cursor(cv, gx, gy, self.hist)
             # coordinate badge
             badge = f"  {gx} x {gy}  "
+            if self._blink:
+                badge = f"  {gx} x {gy}  [BLINK]"
             bw = cv2.getTextSize(badge, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)[0][0]
             bx = min(gx+22, SCREEN_W-bw-10); by = max(gy-14, 20)
             cv2.rectangle(cv,(bx-4,by-18),(bx+bw+4,by+5),(22,22,22),-1)
-            txt(cv, badge, (bx,by), scale=0.55, color=C_ACCENT)
+            txt(cv, badge, (bx,by), scale=0.55, color=C_WARN if self._blink else C_ACCENT)
         else:
             msg = "No face detected — move into frame"
             mw = cv2.getTextSize(msg, cv2.FONT_HERSHEY_SIMPLEX, 1.0, 2)[0][0]
@@ -395,7 +458,7 @@ class GazeTrackerApp:
         if not cap.isOpened():
             print(f"[Error] Cannot open camera {self.cam_id}"); return
 
-        print(f"[Info] Fullscreen 1920×1080  |  {'9' if self.use_9 else '5'}-point calibration")
+        print(f"[Info] Fullscreen 1920×1080  |  {self.num_points}-point calibration")
         print("[Info] Q=quit  R=recalibrate  H=pip  D=debug")
         self._new_calib()
 
@@ -417,11 +480,11 @@ class GazeTrackerApp:
             fps = self._fps()
 
             if not self.calib.done:
-                self._render_calib(cam, feat)
+                self._render_calib(cam, feat, lms)
                 if self.calib.done:
                     print("[Info] Calibration done — tracking active.")
             else:
-                self._render_track(cam, feat, fps)
+                self._render_track(cam, feat, lms, fps)
 
             cv2.imshow(self.WIN, self.canvas)
 
@@ -441,18 +504,18 @@ class GazeTrackerApp:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Fullscreen 1920×1080 MediaPipe Gaze Tracker")
     ap.add_argument("--camera",  type=int,   default=0)
-    ap.add_argument("--points",  type=int,   default=9, choices=[5,9])
-    ap.add_argument("--samples", type=int,   default=30)
+    ap.add_argument("--points",  type=int,   default=16, choices=[5, 9, 16, 25])
+    ap.add_argument("--samples", type=int,   default=60)
     ap.add_argument("--ema",     type=float, default=0.30)
     ap.add_argument("--pnoise",  type=float, default=5e-3)
     ap.add_argument("--mnoise",  type=float, default=8.0)
     args = ap.parse_args()
 
     GazeTrackerApp(
-        camera_id = args.camera,
-        use_9     = (args.points == 9),
-        ema_alpha = args.ema,
-        pnoise    = args.pnoise,
-        mnoise    = args.mnoise,
-        spp       = args.samples,
+        camera_id  = args.camera,
+        num_points = args.points,
+        ema_alpha  = args.ema,
+        pnoise     = args.pnoise,
+        mnoise     = args.mnoise,
+        spp        = args.samples,
     ).run()
