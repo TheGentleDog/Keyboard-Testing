@@ -5,7 +5,7 @@ Gaze Tracker  –  EyeTrax-style fullscreen edition
 •  Fullscreen 1920 × 1080 gaze canvas (pure black background)
 •  Camera PiP in the bottom-right corner
 •  16-point calibration (also 5, 9, 25) with animated shrink-dot
-•  Polynomial regression gaze mapping
+•  Linear regression gaze mapping
 •  Kalman Filter  +  EMA hybrid smoother
 •  Animated gaze cursor with fade trail
 
@@ -174,8 +174,7 @@ class GazeFeatureExtractor:
                 return (iris - ctr) / (np.linalg.norm(p(c1)-p(c0)) / 2.0 + 1e-6)
             nl = norm(p(self.L_IRIS), *self.L_CORNERS)
             nr = norm(p(self.R_IRIS), *self.R_CORNERS)
-            return np.array([nl[0],nl[1],nr[0],nr[1],
-                             nl[0]**2,nl[1]**2,nr[0]**2,nr[1]**2], float)
+            return np.array([nl[0], nl[1], nr[0], nr[1]], float)
         except Exception:
             return None
 
@@ -185,16 +184,14 @@ class GazeFeatureExtractor:
 
 
 # ──────────────────────────────────────────────────────────────
-#  5.  Polynomial Regression Gaze Model
+#  5.  Linear Regression Gaze Model
 # ──────────────────────────────────────────────────────────────
 class GazeRegressionModel:
     def __init__(self): self.Wx = self.Wy = None; self.fitted = False
 
     def _design(self, F):
         N = F.shape[0]
-        cross = np.column_stack([F[:,0]*F[:,1], F[:,2]*F[:,3],
-                                  F[:,0]*F[:,2], F[:,1]*F[:,3], F[:,0]*F[:,3]])
-        return np.hstack([np.ones((N,1)), F, cross])
+        return np.hstack([np.ones((N, 1)), F])
 
     def fit(self, F, T):
         A = self._design(F)
