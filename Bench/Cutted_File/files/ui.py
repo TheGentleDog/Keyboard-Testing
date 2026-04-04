@@ -1,13 +1,18 @@
 # =============================================================================
-# ui.py — FilipinoKeyboard UI (display, keyboard layout, popup, settings)
+# ui.py — FilipinoKeyboard UI (display, keyboard layout, predictions, settings)
 # =============================================================================
 
+import json
+import os
 import tkinter as tk
 from tkinter import ttk
 
 import config
 from dwell import DwellMixin
 from model import ngram_model, get_context_words
+
+PREDEFINED_FILE      = "predefined_sentences.json"
+PREDEFINED_THRESHOLD = 3   # times spoken before auto-saving
 
 
 class FilipinoKeyboard(tk.Tk, DwellMixin):
@@ -19,10 +24,6 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             "input_bg":         "#f9f9f9",
             "text_fg":          "black",
             "suggestion_fg":    "gray",
-            "popup_bg":         "#fff9e6",
-            "popup_border":     "#ffcc00",
-            "popup_top_bg":     "#d4edda",
-            "popup_top_fg":     "#155724",
             "button_bg":        "#e0e0e0",
             "button_fg":        "black",
             "button_active_bg": "#d0d0d0",
@@ -30,67 +31,146 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             "dwell_bg":         "#c8f0d8",
         },
         "dark": {
-            "bg":               "#36393f",
-            "output_bg":        "#2f3136",
-            "input_bg":         "#40444b",
+            "bg":               "#1e1f22",
+            "output_bg":        "#535353",
+            "input_bg":         "#535353",
             "text_fg":          "#dcddde",
             "suggestion_fg":    "#8e9297",
-            "popup_bg":         "#202225",
-            "popup_border":     "#5865f2",
-            "popup_top_bg":     "#1e3a27",
-            "popup_top_fg":     "#88ffaa",
-            "button_bg":        "#4f545c",
+            # letter keys + prediction bar
+            "button_bg":        "#282828",
             "button_fg":        "#ffffff",
             "button_active_bg": "#5865f2",
+            # function row (arrows, space, predefined, tts)
+            "funckey_bg":       "#171719",
+            "funckey_fg":       "#ffffff",
+            "funckey_active_bg":"#5865f2",
+            # panic button
+            "panic_bg":         "#660002",
             "dwell_bar":        "#55ff88",
             "dwell_bg":         "#1a3a28",
         },
     }
 
+    # ── Override dwell flash to restore correct per-button colour ─────────────
+    def _dwell_flash(self, btn):
+        theme = self.themes[self.current_theme]
+        func_keys = (self.keyboard_buttons[:5] if hasattr(self, 'keyboard_buttons') else []) + \
+                    (self.predefined_func_buttons if hasattr(self, 'predefined_func_buttons') else [])
+        if hasattr(self, 'panic_btn') and btn is self.panic_btn:
+            restore_bg = theme.get("panic_bg", "#8b0000")
+            restore_fg = "white"
+        elif btn in func_keys:
+            restore_bg = theme.get("funckey_bg", theme["button_bg"])
+            restore_fg = theme.get("funckey_fg", theme["button_fg"])
+        else:
+            restore_bg = theme["button_bg"]
+            restore_fg = theme["button_fg"]
+        try:
+            btn.config(bg="#00cc44", fg="#ffffff")
+            btn.after(200, lambda: btn.config(bg=restore_bg, fg=restore_fg))
+        except Exception:
+            pass
+
+    # ── macOS-compatible button override ──────────────────────────────────────
+    def _make_dwell_btn(self, parent, command, **kwargs):
+        """
+        Override DwellMixin._make_dwell_btn to use tk.Label instead of
+        tk.Button so that bg colours render correctly on macOS (Tkinter
+        buttons ignore bg on macOS due to native rendering).
+        """
+        # Strip args that are Button-only
+        kwargs.pop('command', None)
+        relief = kwargs.pop('relief', 'flat')
+        bd     = kwargs.pop('bd', 1)
+
+        lbl = tk.Label(parent, relief=relief, bd=bd, **kwargs)
+        lbl.bind('<Button-1>', lambda _e, c=command: c())
+        self._dwell_register(lbl, command)
+        return lbl
+
     def __init__(self):
         super().__init__()
-        self.title("Filipino Keyboard - Live Autocomplete (Gaze-Based)")
+        self.title("Filipino Keyboard - Gaze-Based")
         self.attributes('-fullscreen', True)
         self.bind('<Escape>', lambda e: self.attributes('-fullscreen', False))
+        self.bind('<s>', lambda e: self.show_settings())   # caretaker shortcut
 
-        self.current_theme           = "light"
+        self.current_theme           = "dark"
         self.themes                  = self.THEMES
         self.current_completion      = ""
         self.alternative_suggestions = []
         self.current_input           = ""
         self.output_words            = []
         self.output_cursor           = -1
-        self.alt_popup               = None
-        self.shortcut_dialog         = None   # tracks open shortcut dialog
+        self._in_predefined_mode     = False
+        self.predefined_func_buttons = []   # function row in predefined panel
 
         self._dwell_init()
+        self._load_sentence_counts()
         self._create_widgets()
 
     # =========================================================================
     # WIDGET SETUP
     # =========================================================================
     def _create_widgets(self):
-        self.output_display = tk.Text(self, wrap="word", font=("Segoe UI", 18), height=2)
-        self.output_display.pack(fill="x", padx=5, pady=(5, 3))
-        self.output_display.config(state="disabled")
+        theme = self.themes[self.current_theme]
 
-        self.input_display = tk.Text(self, wrap="word", font=("Segoe UI", 16), height=1)
-        self.input_display.pack(fill="x", padx=5, pady=3)
+        # ── Top area: text displays + PANIC BUTTON ────────────────────────────
+        top_frame = tk.Frame(self, bg=theme["bg"])
+        top_frame.pack(fill="x", padx=5, pady=(5, 3))
+
+        displays = tk.Frame(top_frame, bg=theme["bg"])
+        displays.pack(side="left", fill="both", expand=True)
+
+        self.input_display = tk.Text(
+            displays, wrap="word", font=("Segoe UI", 18), height=2
+        )
+        self.input_display.pack(fill="both", expand=True)
         self.input_display.config(state="disabled")
 
-        self.predictive_container = ttk.Frame(self)
+        panic_bg = theme.get("panic_bg", "#8b0000")
+        self.panic_btn = self._make_dwell_btn(
+            top_frame, self.panic,
+            text="PANIC\nBUTTON",
+            font=("Segoe UI", 14, "bold"),
+            bg=panic_bg, fg="white",
+            relief="raised", bd=2, cursor="hand2", width=10,
+        )
+        self.panic_btn.pack(side="right", fill="y", padx=(8, 0))
+
+        # ── Prediction bar ────────────────────────────────────────────────────
+        self.predictive_container = tk.Frame(self, bg=theme["bg"])
         self.predictive_container.pack(fill="x", padx=5, pady=3)
 
-        keyboard_frame = tk.Frame(self, bg=self.themes[self.current_theme]["bg"])
-        keyboard_frame.pack(fill="both", expand=True, padx=5, pady=(3, 5))
-        self._create_keyboard(keyboard_frame)
-
+        # ── Status bar (pack first with side=bottom so it anchors correctly) ───
         self.status_bar = ttk.Label(
             self,
-            text="Type → SPACE to add word → ENTER to speak & clear | ◄► navigate words",
-            relief="sunken", anchor="w", font=("Segoe UI", 8)
+            text="Gaze-based keyboard ready | S = Settings (caretaker)",
+            relief="sunken", anchor="w", font=("Segoe UI", 8),
         )
         self.status_bar.pack(fill="x", side="bottom")
+
+        # ── Shared content area — keyboard and predefined panel swap here ──────
+        self.content_area = tk.Frame(self, bg=theme["bg"])
+        self.content_area.pack(fill="both", expand=True, padx=5, pady=(3, 5))
+
+        # Main grid: row 0 = func row, rows 1-3 = letters (all equal weight)
+        self.main_grid = tk.Frame(self.content_area, bg=theme["bg"])
+        self.main_grid.pack(fill="both", expand=True)
+        for i in range(4):
+            self.main_grid.grid_rowconfigure(i, weight=1, uniform="row")
+        self.main_grid.grid_columnconfigure(0, weight=1)
+
+        # Row 0: func row (always visible)
+        self.func_row_frame = tk.Frame(self.main_grid, bg=theme["bg"])
+        self.func_row_frame.grid(row=0, column=0, sticky="nsew", padx=1, pady=1)
+        self._create_func_row(self.func_row_frame)
+
+        # Rows 1-3: swappable area
+        self.letters_frame    = tk.Frame(self.main_grid, bg=theme["bg"])
+        self.predefined_frame = tk.Frame(self.main_grid, bg=theme["bg"])
+        self.letters_frame.grid(row=1, column=0, rowspan=3, sticky="nsew")
+        self._create_letter_rows(self.letters_frame)
 
         self.apply_theme()
         self.update_display()
@@ -99,74 +179,204 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     # =========================================================================
     # KEYBOARD LAYOUT
     # =========================================================================
-    def _create_keyboard(self, parent):
-        self.keyboard_buttons = []
+    def _create_func_row(self, parent):
+        """Always-visible function row: ◄ ► SPACE Predefined 🔊"""
+        theme    = self.themes[self.current_theme]
+        func_bg  = theme.get("funckey_bg", theme["button_bg"])
+        func_fg  = theme.get("funckey_fg", theme["button_fg"])
+        func_abg = theme.get("funckey_active_bg", theme["button_active_bg"])
+
+        self.keyboard_buttons = []   # func row occupies indices 0-4
+
+        for w in parent.winfo_children():
+            w.destroy()
+
+        parent.grid_rowconfigure(0, weight=1)
+        for col, w in enumerate([1, 1, 5, 3, 1]):
+            parent.grid_columnconfigure(col, weight=w, uniform="fcol")
+
+        for col, (text, cmd, fsize) in enumerate([
+            ("◄",                    self.move_word_left,      20),
+            ("►",                    self.move_word_right,     20),
+            ("⎵",                    self.finalize_word,       22),
+            ("Predefined\nSentence", self.predefined_sentence, 13),
+            ("🔊",                   self.enter,               22),
+        ]):
+            btn = self._make_dwell_btn(
+                parent, cmd,
+                text=text, font=("Segoe UI", fsize, "bold"),
+                bg=func_bg, fg=func_fg,
+                activebackground=func_abg, activeforeground=func_fg,
+                relief="raised", bd=1, cursor="hand2",
+            )
+            btn.grid(row=0, column=col, sticky="nsew", padx=1)
+            self.keyboard_buttons.append(btn)
+
+    def _create_letter_rows(self, parent):
+        """Q-P / A-⌫ / Z-Clear all rows."""
         theme = self.themes[self.current_theme]
+
+        def btn_kw(**extra):
+            return dict(
+                bg=theme["button_bg"], fg=theme["button_fg"],
+                relief="raised", bd=1, cursor="hand2",
+                **extra,
+            )
 
         main = tk.Frame(parent, bg=theme["bg"])
         main.pack(fill="both", expand=True)
-        for i in range(5):
+        for i in range(3):
             main.grid_rowconfigure(i, weight=1, uniform="row")
         main.grid_columnconfigure(0, weight=1)
 
-        # Row 0: ◄  CLEAR ALL  SETTINGS  ►
-        row0 = tk.Frame(main, bg=theme["bg"])
-        row0.grid(row=0, column=0, sticky="nsew", padx=1, pady=1)
-        row0.grid_rowconfigure(0, weight=1)
-        for col, w in enumerate([1, 3, 3, 1]):
-            row0.grid_columnconfigure(col, weight=w, uniform="func")
-        for col, (text, cmd) in enumerate([
-            ("◄",         self.move_word_left),
-            ("CLEAR ALL", self.clear_all),
-            ("⚙ SETTINGS",self.show_settings),
-            ("►",         self.move_word_right),
-        ]):
-            btn = self._make_dwell_btn(
-                row0, cmd, text=text,
-                font=("Segoe UI", 20 if col in (0, 3) else 16, "bold"),
-                relief="raised", bd=1, cursor="hand2"
-            )
-            btn.grid(row=0, column=col, sticky="nsew")
-            self.keyboard_buttons.append(btn)
-
-        # Rows 1-3: letter keys
-        for row_idx, chars in enumerate(["qwertyuiop", "asdfghjkl", "zxcvbnm"], start=1):
+        for row_idx, chars in enumerate(["qwertyuiop", "asdfghjkl", "zxcvbnm"]):
             row = tk.Frame(main, bg=theme["bg"])
             row.grid(row=row_idx, column=0, sticky="nsew", padx=1, pady=1)
             row.grid_rowconfigure(0, weight=1)
+
             for i, ch in enumerate(chars):
                 row.grid_columnconfigure(i, weight=1, uniform="key")
                 btn = self._make_dwell_btn(
                     row, lambda c=ch: self.insert_char(c),
                     text=ch.upper(), font=("Segoe UI", 22, "bold"),
-                    relief="raised", bd=1, cursor="hand2"
+                    **btn_kw(),
                 )
-                btn.grid(row=0, column=i, sticky="nsew")
+                btn.grid(row=0, column=i, sticky="nsew", padx=1)
                 self.keyboard_buttons.append(btn)
-            # Backspace on row 3
-            if row_idx == 3:
-                row.grid_columnconfigure(7, weight=2, uniform="key")
+
+            if row_idx == 1:   # asdfghjkl → ⌫
+                row.grid_columnconfigure(9, weight=1, uniform="key")
                 bs = self._make_dwell_btn(
-                    row, self.backspace, text="⌫",
-                    font=("Segoe UI", 26, "bold"), relief="raised", bd=1, cursor="hand2"
+                    row, self.backspace,
+                    text="⌫", font=("Segoe UI", 26, "bold"),
+                    **btn_kw(),
                 )
-                bs.grid(row=0, column=7, sticky="nsew")
+                bs.grid(row=0, column=9, sticky="nsew", padx=1)
                 self.keyboard_buttons.append(bs)
 
-        # Row 4: SPACE + ENTER
-        row4 = tk.Frame(main, bg=theme["bg"])
-        row4.grid(row=4, column=0, sticky="nsew", padx=1, pady=1)
-        row4.grid_rowconfigure(0, weight=1)
-        row4.grid_columnconfigure(0, weight=85, uniform="bottom")
-        row4.grid_columnconfigure(1, weight=15, uniform="bottom")
-        sp = self._make_dwell_btn(row4, self.finalize_word, text="SPACE",
-                                  font=("Segoe UI", 22, "bold"), relief="raised", bd=1, cursor="hand2")
-        sp.grid(row=0, column=0, sticky="nsew")
-        self.keyboard_buttons.append(sp)
-        en = self._make_dwell_btn(row4, self.enter, text="↵",
-                                  font=("Segoe UI", 26, "bold"), relief="raised", bd=1, cursor="hand2")
-        en.grid(row=0, column=1, sticky="nsew")
-        self.keyboard_buttons.append(en)
+            if row_idx == 2:   # zxcvbnm → Clear all
+                row.grid_columnconfigure(7, weight=3, uniform="key")
+                ca = self._make_dwell_btn(
+                    row, self.clear_all,
+                    text="Clear all", font=("Segoe UI", 16, "bold"),
+                    **btn_kw(),
+                )
+                ca.grid(row=0, column=7, sticky="nsew", padx=1)
+                self.keyboard_buttons.append(ca)
+
+    # =========================================================================
+    # PREDEFINED SENTENCE PANEL
+    # =========================================================================
+    def _unregister_predefined_buttons(self):
+        """Remove destroyed predefined panel buttons from the dwell engine."""
+        for btn in list(self.predefined_func_buttons):
+            bid = id(btn)
+            self.dwell_btn_meta.pop(bid, None)
+            self.dwell_hover_ms.pop(bid, None)
+            self.dwell_overlays.pop(bid, None)
+        self.predefined_func_buttons = []
+        # Also purge any other registered buttons whose widget no longer exists
+        for bid in list(self.dwell_btn_meta.keys()):
+            widget, _ = self.dwell_btn_meta[bid]
+            try:
+                if not widget.winfo_exists():
+                    self.dwell_btn_meta.pop(bid, None)
+                    self.dwell_hover_ms.pop(bid, None)
+                    self.dwell_overlays.pop(bid, None)
+            except Exception:
+                self.dwell_btn_meta.pop(bid, None)
+                self.dwell_hover_ms.pop(bid, None)
+                self.dwell_overlays.pop(bid, None)
+
+    def _create_predefined_panel(self, parent):
+        """Build the predefined sentence view inside parent frame."""
+        theme = self.themes[self.current_theme]
+
+        # Destroy old contents and unregister their dwell entries
+        self._unregister_predefined_buttons()
+        for w in parent.winfo_children():
+            w.destroy()
+
+        # ── Sentence buttons ──────────────────────────────────────────────────
+        sentences = self._get_predefined_sentences()
+        content   = tk.Frame(parent, bg=theme["bg"])
+        content.pack(fill="both", expand=True, padx=1, pady=1)
+
+        if not sentences:
+            tk.Label(
+                content,
+                text="No predefined sentences yet.\nSpeak a sentence 3× to auto-save it.",
+                font=("Segoe UI", 18), bg=theme["bg"], fg=theme["suggestion_fg"],
+                justify="center",
+            ).pack(expand=True)
+            return
+
+        COLS = 3
+        row_frame = None
+        for idx, sentence in enumerate(sentences):
+            if idx % COLS == 0:
+                row_frame = tk.Frame(content, bg=theme["bg"])
+                row_frame.pack(fill="both", expand=True, pady=2)
+                for c in range(COLS):
+                    row_frame.grid_columnconfigure(c, weight=1, uniform="sc")
+                row_frame.grid_rowconfigure(0, weight=1)
+            col = idx % COLS
+            btn = self._make_dwell_btn(
+                row_frame,
+                lambda s=sentence: self._speak_predefined(s),
+                text=sentence,
+                font=("Segoe UI", 16, "bold"),
+                bg=theme["button_bg"], fg=theme["button_fg"],
+                relief="raised", bd=1, cursor="hand2",
+                wraplength=380,
+            )
+            btn.grid(row=0, column=col, sticky="nsew", padx=4)
+
+    def _speak_predefined(self, sentence):
+        """Load a predefined sentence into the output and clear input."""
+        self.output_words  = sentence.split()
+        self.output_cursor = -1
+        self.current_input = ""
+        self.update_display()
+        self.predefined_sentence()   # switch back to keyboard
+        self.status_bar.config(text=f"Loaded: '{sentence}'")
+
+    def predefined_sentence(self):
+        """Toggle between letter keys and predefined sentence panel."""
+        if self._in_predefined_mode:
+            self.predefined_frame.grid_remove()
+            self.letters_frame.grid(row=1, column=0, rowspan=3, sticky="nsew")
+            self._in_predefined_mode = False
+            self._dwell_reset_all()
+            self.status_bar.config(text="Keyboard mode")
+        else:
+            self.letters_frame.grid_remove()
+            self._create_predefined_panel(self.predefined_frame)
+            self.predefined_frame.grid(row=1, column=0, rowspan=3, sticky="nsew")
+            self._in_predefined_mode = True
+            self._dwell_reset_all()
+            self.status_bar.config(text="Predefined sentences")
+
+    # ── Sentence count tracking ───────────────────────────────────────────────
+    def _load_sentence_counts(self):
+        if os.path.exists(PREDEFINED_FILE):
+            try:
+                with open(PREDEFINED_FILE, "r", encoding="utf-8") as f:
+                    self.sentence_counts = json.load(f)
+                return
+            except Exception:
+                pass
+        self.sentence_counts = {}
+
+    def _save_sentence_counts(self):
+        try:
+            with open(PREDEFINED_FILE, "w", encoding="utf-8") as f:
+                json.dump(self.sentence_counts, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"⚠ Could not save predefined sentences: {e}")
+
+    def _get_predefined_sentences(self):
+        return [s for s, c in self.sentence_counts.items() if c >= PREDEFINED_THRESHOLD]
 
     # =========================================================================
     # DISPLAY
@@ -176,10 +386,9 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
 
         # Fetch suggestions
         if self.current_input:
-            ctx_words = self.output_words[:self.output_cursor] if self.output_cursor != -1 else self.output_words
-            context   = get_context_words(" ".join(ctx_words), n=2)
+            ctx_words   = self.output_words[:self.output_cursor] if self.output_cursor != -1 else self.output_words
+            context     = get_context_words(" ".join(ctx_words), n=2)
             suggestions = ngram_model.get_completion_suggestions(self.current_input, context, max_results=5)
-            print(f"🔍 Input: '{self.current_input}' → Suggestions: {suggestions}")
             if suggestions:
                 self.current_completion      = suggestions[0]
                 self.alternative_suggestions = suggestions[1:5]
@@ -190,39 +399,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             self.current_completion      = ""
             self.alternative_suggestions = []
 
-        # Output display
-        self.output_display.config(state="normal")
-        self.output_display.delete("1.0", "end")
-        for i, word in enumerate(self.output_words):
-            is_cursor = (i == self.output_cursor)
-            if is_cursor and self.current_input:
-                self.output_display.insert("end", self.current_completion or self.current_input, "highlighted_word")
-            elif is_cursor:
-                self.output_display.insert("end", word, "highlighted_word")
-            else:
-                self.output_display.insert("end", word, "normal")
-            if i < len(self.output_words) - 1:
-                self.output_display.insert("end", " ")
-        if self.output_cursor == -1 or self.output_cursor >= len(self.output_words):
-            if self.output_words:
-                self.output_display.insert("end", " ")
-            if self.current_input:
-                typed = self.current_input
-                completion_rest = (self.current_completion[len(typed):]
-                                   if self.current_completion.startswith(typed) else "")
-                self.output_display.insert("end", typed, "input")
-                if completion_rest:
-                    self.output_display.insert("end", completion_rest, "suggestion")
-        self.output_display.tag_config("cursor",           foreground="red",              font=("Segoe UI", 18, "bold"))
-        self.output_display.tag_config("normal",           foreground=theme["text_fg"])
-        self.output_display.tag_config("typing",           foreground=theme["text_fg"])
-        self.output_display.tag_config("suggestion",       foreground=theme["suggestion_fg"])
-        self.output_display.tag_config("input",            foreground=theme["text_fg"])
-        self.output_display.tag_config("highlighted_word", foreground=theme["text_fg"],
-                                       background="#ffe066" if self.current_theme == "light" else "#5865f2")
-        self.output_display.config(state="disabled")
-
-        # Input display
+        # ── Input display ─────────────────────────────────────────────────────
         self.input_display.config(state="normal")
         self.input_display.delete("1.0", "end")
         for i, word in enumerate(self.output_words):
@@ -248,209 +425,13 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                 self.input_display.insert("end", "|", "cursor")
             else:
                 self.input_display.insert("end", "|", "cursor")
-        self.input_display.tag_config("cursor",      foreground="red",   font=("Segoe UI", 16, "bold"))
-        self.input_display.tag_config("highlighted",  foreground=theme["text_fg"], background="yellow")
-        self.input_display.tag_config("editing",      foreground=theme["text_fg"])
-        self.input_display.tag_config("normal",       foreground=theme["text_fg"])
+        self.input_display.tag_config("cursor",      foreground="red",             font=("Segoe UI", 32, "bold"))
+        self.input_display.tag_config("highlighted",  foreground=theme["text_fg"],  background="yellow", font=("Segoe UI", 32))
+        self.input_display.tag_config("editing",      foreground=theme["text_fg"],  font=("Segoe UI", 32))
+        self.input_display.tag_config("normal",       foreground=theme["text_fg"],  font=("Segoe UI", 32))
         self.input_display.config(state="disabled")
 
-        # Popup & predictions
-        if self.current_input and self.alternative_suggestions:
-            self.show_alternative_popup()
-        else:
-            self.close_popup()
         self.update_predictions()
-
-    # =========================================================================
-    # POPUP
-    # =========================================================================
-    def show_alternative_popup(self):
-        if self.alt_popup:
-            self.alt_popup.destroy()
-            self.alt_popup = None
-        if not self.alternative_suggestions:
-            return
-        theme = self.themes[self.current_theme]
-        self.alt_popup = tk.Toplevel(self)
-        self.alt_popup.overrideredirect(True)
-        self.alt_popup.attributes('-topmost', True)
-        border = tk.Frame(self.alt_popup, bg=theme["popup_border"])
-        border.pack(fill="both", expand=True)
-        inner = tk.Frame(border, bg=theme["popup_bg"])
-        inner.pack(fill="both", expand=True, padx=2, pady=2)
-        all_words = [self.current_completion] + list(self.alternative_suggestions[:4])
-        for idx, word in enumerate(all_words):
-            is_top = (idx == 0)
-            btn = tk.Button(
-                inner, text=word,
-                command=lambda w=word: self.apply_alternative_from_popup(w),
-                font=("Segoe UI", 20, "bold") if is_top else ("Segoe UI", 18),
-                relief="flat", bd=0, padx=20, pady=18, cursor="hand2",
-                bg=theme["popup_top_bg"] if is_top else theme["popup_bg"],
-                fg=theme["popup_top_fg"] if is_top else theme["text_fg"],
-                activebackground=theme["button_active_bg"],
-                activeforeground=theme["button_fg"],
-            )
-            btn.pack(side="left", fill="y")
-            tk.Frame(inner, bg=theme["popup_border"], width=1).pack(side="left", fill="y")
-
-        # ＋ button — always shown so users can add or redefine shortcuts freely
-        add_btn = tk.Button(
-            inner, text="＋",
-            command=lambda: self._open_shortcut_dialog(self.current_input),
-            font=("Segoe UI", 20, "bold"),
-            relief="flat", bd=0, padx=20, pady=18, cursor="hand2",
-            bg=theme["popup_bg"], fg="#4caf50",
-            activebackground=theme["button_active_bg"],
-            activeforeground="#4caf50",
-        )
-        add_btn.pack(side="left", fill="y")
-        self.alt_popup.update_idletasks()
-        self._position_popup()
-        self.alt_popup.after(8000, self.close_popup)
-
-    def _position_popup(self):
-        if not self.alt_popup:
-            return
-        try:
-            self.output_display.update_idletasks()
-            char_offset = sum(len(w) + 1 for i, w in enumerate(self.output_words)
-                              if not (i == self.output_cursor and self.current_input))
-            start_idx = f"1.{char_offset}"
-            end_idx   = f"1.{char_offset + len(self.current_completion)}"
-            bbox_end   = self.output_display.bbox(end_idx)
-            bbox_start = self.output_display.bbox(start_idx)
-            wx, wy     = self.output_display.winfo_rootx(), self.output_display.winfo_rooty()
-            pw, ph     = self.alt_popup.winfo_width(), self.alt_popup.winfo_height()
-            sw, sh     = self.winfo_screenwidth(), self.winfo_screenheight()
-            if bbox_end:
-                ex, ey, ew, eh = bbox_end
-                x, y = wx + ex + ew + 6, wy + ey + eh + 4
-            elif bbox_start:
-                sx, sy, sw2, sh2 = bbox_start
-                x, y = wx + sx, wy + sy + sh2 + 4
-            else:
-                x, y = wx + 20, wy + self.output_display.winfo_height() + 4
-            x = max(10, min(x, sw - pw - 10))
-            y = max(0,  min(y, sh - ph - 10))
-            self.alt_popup.geometry(f"+{x}+{y}")
-        except Exception as e:
-            print(f"⚠ Popup positioning error: {e}")
-
-    def _open_shortcut_dialog(self, prefix):
-        """
-        Opens a small banner at the top of the screen showing the shortcut
-        prompt and a live display of what the user is typing.
-        The MAIN keyboard below remains fully active — insert_char() and
-        backspace() redirect their input here while the dialog is open.
-        SAVE / CANCEL are dwell buttons so the user never needs a physical key.
-        """
-        if self.shortcut_dialog and self.shortcut_dialog.winfo_exists():
-            return
-        self.close_popup()
-
-        # Store the prefix so insert_char / backspace can reference it
-        self._shortcut_prefix       = prefix
-        self._shortcut_expansion_var = tk.StringVar()
-
-        theme  = self.themes[self.current_theme]
-
-        # Use a Toplevel pinned to the top of the screen, non-blocking
-        # (no grab_set) so the main keyboard stays clickable/dwellable
-        dialog = tk.Toplevel(self)
-        dialog.title("")
-        dialog.overrideredirect(True)
-        dialog.attributes('-topmost', True)
-        self.shortcut_dialog = dialog
-
-        # ── Banner frame ──────────────────────────────────────────────────────
-        border = tk.Frame(dialog, bg=theme["popup_border"], bd=0)
-        border.pack(fill="both", expand=True)
-        inner  = tk.Frame(border, bg=theme["popup_bg"], padx=16, pady=10)
-        inner.pack(fill="both", expand=True, padx=2, pady=2)
-
-        tk.Label(
-            inner,
-            text=f'Use the keyboard to type what  "{prefix}"  means, then SAVE:',
-            font=("Segoe UI", 13),
-            bg=theme["popup_bg"], fg=theme["text_fg"],
-        ).pack(anchor="w", pady=(0, 6))
-
-        # Live expansion display
-        disp = tk.Label(
-            inner,
-            textvariable=self._shortcut_expansion_var,
-            font=("Segoe UI", 26, "bold"),
-            bg=theme["input_bg"], fg=theme["text_fg"],
-            relief="sunken", bd=2,
-            anchor="w", padx=10, width=20,
-        )
-        disp.pack(side="left", fill="y", padx=(0, 16))
-
-        # SAVE and CANCEL as dwell buttons so gaze works normally
-        def save_shortcut():
-            expansion = self._shortcut_expansion_var.get().strip().lower()
-            if not expansion:
-                self.status_bar.config(text="⚠ Type the full word first.")
-                return
-            if len(prefix) >= len(expansion):
-                self.status_bar.config(
-                    text=f"⚠ '{expansion}' must be longer than '{prefix}'."
-                )
-                return
-            ngram_model.learn_from_user_typing(prefix, expansion, force=True)
-            ngram_model.load_user_learning()   # reload so shortcut works immediately
-            self.status_bar.config(text=f"✓ Shortcut saved: '{prefix}' → '{expansion}'")
-            self._close_shortcut_dialog()
-
-        def cancel():
-            self._close_shortcut_dialog()
-
-        save_btn = self._make_dwell_btn(
-            inner, save_shortcut,
-            text="✓ SAVE",
-            font=("Segoe UI", 14, "bold"),
-            bg="#4caf50", fg="white",
-            activebackground="#388e3c",
-            relief="raised", bd=2, cursor="hand2",
-            padx=20, pady=10,
-        )
-        save_btn.pack(side="left", padx=(0, 8))
-
-        cancel_btn = self._make_dwell_btn(
-            inner, cancel,
-            text="✗ CANCEL",
-            font=("Segoe UI", 14, "bold"),
-            bg=theme["button_bg"], fg=theme["button_fg"],
-            activebackground=theme["button_active_bg"],
-            relief="raised", bd=2, cursor="hand2",
-            padx=20, pady=10,
-        )
-        cancel_btn.pack(side="left")
-
-        # Pin to top-centre of screen
-        dialog.update_idletasks()
-        sw   = self.winfo_screenwidth()
-        dw   = dialog.winfo_width()
-        dialog.geometry(f"+{(sw - dw) // 2}+0")
-
-        self.status_bar.config(
-            text=f"Shortcut mode: type what '{prefix}' means, then SAVE"
-        )
-
-    def _close_shortcut_dialog(self):
-        """Tear down the shortcut dialog and restore normal keyboard input."""
-        if self.shortcut_dialog and self.shortcut_dialog.winfo_exists():
-            self.shortcut_dialog.destroy()
-        self.shortcut_dialog         = None
-        self._shortcut_prefix        = None
-        self._shortcut_expansion_var = None
-        self.status_bar.config(text="Ready")
-
-    def close_popup(self):
-        if self.alt_popup:
-            self.alt_popup.destroy()
-            self.alt_popup = None
 
     # =========================================================================
     # PREDICTIONS BAR
@@ -458,17 +439,37 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     def update_predictions(self):
         for w in self.predictive_container.winfo_children():
             w.destroy()
-        context     = get_context_words(" ".join(self.output_words), n=2)
-        predictions = ngram_model.get_next_word_suggestions(context, max_results=6)
-        for word in predictions:
-            btn = tk.Button(
-                self.predictive_container, text=word,
-                command=lambda w=word: self.apply_prediction(w),
-                font=("Segoe UI", 14, "bold"), relief="raised", bd=2, cursor="hand2"
+
+        if self.current_input:
+            # Completion mode — suggest completions for the partial word being typed
+            ctx_words = self.output_words[:self.output_cursor] if self.output_cursor != -1 else self.output_words
+            context   = get_context_words(" ".join(ctx_words), n=2)
+            words     = ngram_model.get_completion_suggestions(self.current_input, context, max_results=4)
+            handler   = self.apply_completion
+        else:
+            # Next-word mode — suggest likely following words
+            context = get_context_words(" ".join(self.output_words), n=2)
+            words   = ngram_model.get_next_word_suggestions(context, max_results=4)
+            handler = self.apply_prediction
+
+        theme = self.themes[self.current_theme]
+        for word in words:
+            btn = self._make_dwell_btn(
+                self.predictive_container,
+                lambda w=word: handler(w),
+                text=word,
+                font=("Segoe UI", 22, "bold"),
+                relief="raised", bd=2, cursor="hand2",
+                bg=theme["button_bg"], fg=theme["button_fg"],
             )
-            btn.pack(side="left", padx=3, ipadx=20, ipady=12, expand=True, fill="both")
+            btn.pack(side="left", padx=3, ipadx=20, ipady=30, expand=True, fill="both")
+
+    def apply_completion(self, word):
+        """User selected a completion suggestion while typing (before space)."""
+        self._commit_word(word)
 
     def apply_prediction(self, word):
+        """User selected a next-word prediction (after space has been pressed)."""
         context = get_context_words(" ".join(self.output_words), n=2)
         self.output_words.append(word)
         self.output_cursor = -1
@@ -479,14 +480,6 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     # =========================================================================
     # WORD COMMIT
     # =========================================================================
-    def apply_alternative_from_popup(self, word):
-        self.close_popup()
-        self._commit_word(word)
-
-    def apply_alternative(self, word):
-        self.close_popup()
-        self._commit_word(word)
-
     def _commit_word(self, word):
         ctx_words = self.output_words[:self.output_cursor] if self.output_cursor != -1 else self.output_words
         context   = get_context_words(" ".join(ctx_words), n=2)
@@ -511,24 +504,11 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     # INPUT HANDLERS
     # =========================================================================
     def insert_char(self, char):
-        # Redirect to shortcut dialog if it is open
-        if self.shortcut_dialog and self.shortcut_dialog.winfo_exists():
-            self._shortcut_expansion_var.set(
-                self._shortcut_expansion_var.get() + char
-            )
-            return
         self.current_input += char
         self.update_display()
         self.status_bar.config(text=f"Typing: '{self.current_input}'")
 
     def backspace(self):
-        # Redirect to shortcut dialog if it is open
-        if self.shortcut_dialog and self.shortcut_dialog.winfo_exists():
-            val = self._shortcut_expansion_var.get()
-            if val:
-                self._shortcut_expansion_var.set(val[:-1])
-            return
-        print(f"\n⌫ BACKSPACE: input='{self.current_input}' words={self.output_words} cursor={self.output_cursor}")
         if self.current_input:
             self.current_input           = self.current_input[:-1]
             self.current_completion      = ""
@@ -550,26 +530,37 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             self.status_bar.config(text="Nothing to delete")
 
     def finalize_word(self):
+        """SPACE — commits the literal typed input, never auto-completes."""
         if not self.current_input:
             self.status_bar.config(text="Nothing to finalize")
             return
-        self.close_popup()
-        word = self.current_completion if self.current_completion else self.current_input
-        print(f"\n🔹 FINALIZE: input='{self.current_input}' → '{word}'")
+        word = self.current_input   # always use exactly what was typed
         self._commit_word(word)
         self.status_bar.config(text=f"Added '{word}'")
 
     def enter(self):
+        """🔊 — finalize current input, speak (TTS placeholder), track count, then clear."""
         if self.current_input:
             self.finalize_word()
-        output_text = " ".join(self.output_words)
-        if output_text.strip():
-            print(f"🔊 TTS: {output_text.strip()}")
+        output_text = " ".join(self.output_words).strip()
+        if output_text:
+            print(f"🔊 TTS (not yet implemented): {output_text}")
+            # Track usage count — auto-save to predefined after threshold
+            self.sentence_counts[output_text] = self.sentence_counts.get(output_text, 0) + 1
+            self._save_sentence_counts()
+            count = self.sentence_counts[output_text]
+            if count == PREDEFINED_THRESHOLD:
+                self.status_bar.config(text=f"✓ Auto-saved to predefined: '{output_text}'")
+            else:
+                remaining = max(0, PREDEFINED_THRESHOLD - count)
+                suffix = f" ({remaining} more to auto-save)" if remaining > 0 else ""
+                self.status_bar.config(text=f"Spoken and cleared{suffix}")
+        else:
+            self.status_bar.config(text="Spoken and cleared")
         self.output_words  = []
         self.output_cursor = -1
         self.current_input = ""
         self.update_display()
-        self.status_bar.config(text="Spoken and cleared")
 
     def clear_all(self):
         self.output_words            = []
@@ -579,6 +570,11 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self.alternative_suggestions = []
         self.update_display()
         self.status_bar.config(text="All cleared")
+
+
+    def panic(self):
+        """Placeholder — panic button (to be implemented)."""
+        self.status_bar.config(text="PANIC — coming soon")
 
     # =========================================================================
     # NAVIGATION
@@ -593,7 +589,9 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             self.output_cursor -= 1
         self.current_input = ""
         self.update_display()
-        self.status_bar.config(text=f"Cursor at word {self.output_cursor + 1}: '{self.output_words[self.output_cursor]}'")
+        self.status_bar.config(
+            text=f"Cursor at word {self.output_cursor + 1}: '{self.output_words[self.output_cursor]}'"
+        )
 
     def move_word_right(self):
         if not self.output_words:
@@ -608,8 +606,10 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             self.output_cursor = -1
         self.current_input = ""
         self.update_display()
-        word_info = f"Cursor at word {self.output_cursor + 1}: '{self.output_words[self.output_cursor]}'" \
-                    if self.output_cursor != -1 else "Cursor at end — ready for new word"
+        word_info = (
+            f"Cursor at word {self.output_cursor + 1}: '{self.output_words[self.output_cursor]}'"
+            if self.output_cursor != -1 else "Cursor at end — ready for new word"
+        )
         self.status_bar.config(text=word_info)
 
     # =========================================================================
@@ -618,33 +618,43 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     def apply_theme(self):
         theme = self.themes[self.current_theme]
         self.configure(bg=theme["bg"])
-        self.output_display.config(bg=theme["output_bg"], fg=theme["text_fg"],
-                                   insertbackground=theme["text_fg"])
         self.input_display.config(bg=theme["input_bg"], fg=theme["text_fg"],
                                   insertbackground=theme["text_fg"])
-        self.output_display.tag_config("input",      foreground=theme["text_fg"])
-        self.output_display.tag_config("suggestion", foreground=theme["suggestion_fg"])
+        self.predictive_container.config(bg=theme["bg"])
+        panic_bg = theme.get("panic_bg", "#660002")
+        if hasattr(self, 'panic_btn'):
+            self.panic_btn.config(bg=panic_bg, fg="white")
+        # keyboard_buttons[0..4] are the function row; rest are letter keys
+        func_bg    = theme.get("funckey_bg",    theme["button_bg"])
+        func_fg    = theme.get("funckey_fg",    theme["button_fg"])
+        func_abg   = theme.get("funckey_active_bg", theme["button_active_bg"])
         if hasattr(self, 'keyboard_buttons'):
-            for btn in self.keyboard_buttons:
-                btn.config(bg=theme["button_bg"], fg=theme["button_fg"],
-                           activebackground=theme["button_active_bg"],
-                           activeforeground=theme["button_fg"])
-        if hasattr(self, 'predictive_container'):
-            for widget in self.predictive_container.winfo_children():
-                if isinstance(widget, tk.Button):
-                    widget.config(bg=theme["button_bg"], fg=theme["button_fg"],
-                                  activebackground=theme["button_active_bg"],
-                                  activeforeground=theme["button_fg"])
+            for i, btn in enumerate(self.keyboard_buttons):
+                if i < 5:   # function row
+                    btn.config(bg=func_bg, fg=func_fg,
+                               activebackground=func_abg, activeforeground=func_fg)
+                else:        # letter keys
+                    btn.config(bg=theme["button_bg"], fg=theme["button_fg"],
+                               activebackground=theme["button_active_bg"],
+                               activeforeground=theme["button_fg"])
+        for widget in self.predictive_container.winfo_children():
+            if isinstance(widget, tk.Button):
+                widget.config(
+                    bg=theme["button_bg"], fg=theme["button_fg"],
+                    activebackground=theme["button_active_bg"],
+                    activeforeground=theme["button_fg"],
+                )
 
     def change_theme(self, theme, settings_window=None):
         self.current_theme = theme
         self.apply_theme()
         if settings_window:
             settings_window.destroy()
+        self.update_display()
         self.status_bar.config(text=f"Theme changed to {theme.capitalize()} Mode")
 
     # =========================================================================
-    # SETTINGS PANEL
+    # SETTINGS PANEL  (caretaker opens via physical 'S' key)
     # =========================================================================
     def show_settings(self):
         win = tk.Toplevel(self)
@@ -663,7 +673,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         ttk.Button(btn_row, text="☀ Light Mode",
                    command=lambda: self.change_theme("light", win), width=18).pack(side="left", padx=(0, 10), ipady=8)
         ttk.Button(btn_row, text="🌙 Dark Mode",
-                   command=lambda: self.change_theme("dark", win),  width=18).pack(side="left", ipady=8)
+                   command=lambda: self.change_theme("dark",  win), width=18).pack(side="left", ipady=8)
         ttk.Label(tf, text=f"Current: {self.current_theme.capitalize()} Mode",
                   font=("Segoe UI", 9, "italic")).pack(anchor="w", pady=(8, 0))
 
