@@ -10,6 +10,8 @@ from tkinter import ttk
 import config
 from dwell import DwellMixin
 from model import ngram_model, get_context_words
+from tts import speak
+import panic_sound
 
 PREDEFINED_FILE      = "predefined_sentences.json"
 PREDEFINED_THRESHOLD = 3   # times spoken before auto-saving
@@ -54,7 +56,11 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     # ── Override dwell flash to restore correct per-button colour ─────────────
     def _dwell_flash(self, btn):
         theme = self.themes[self.current_theme]
-        func_keys = (self.keyboard_buttons[:5] if hasattr(self, 'keyboard_buttons') else []) + \
+        kb = self.keyboard_buttons if hasattr(self, 'keyboard_buttons') else []
+        special = []
+        if hasattr(self, '_backspace_btn'): special.append(self._backspace_btn)
+        if hasattr(self, '_clearall_btn'):  special.append(self._clearall_btn)
+        func_keys = kb[:5] + special + \
                     (self.predefined_func_buttons if hasattr(self, 'predefined_func_buttons') else [])
         if hasattr(self, 'panic_btn') and btn is self.panic_btn:
             restore_bg = theme.get("panic_bg", "#8b0000")
@@ -103,7 +109,8 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self.output_words            = []
         self.output_cursor           = -1
         self._in_predefined_mode     = False
-        self.predefined_func_buttons = []   # function row in predefined panel
+        self.predefined_func_buttons = []
+        self._panic_active           = False
 
         self._dwell_init()
         self._load_sentence_counts()
@@ -249,20 +256,26 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                 bs = self._make_dwell_btn(
                     row, self.backspace,
                     text="⌫", font=("Segoe UI", 26, "bold"),
-                    **btn_kw(),
+                    bg=theme.get("funckey_bg", theme["button_bg"]),
+                    fg=theme.get("funckey_fg", theme["button_fg"]),
+                    relief="raised", bd=1, cursor="hand2",
                 )
                 bs.grid(row=0, column=9, sticky="nsew", padx=1)
                 self.keyboard_buttons.append(bs)
+                self._backspace_btn = bs
 
             if row_idx == 2:   # zxcvbnm → Clear all
                 row.grid_columnconfigure(7, weight=3, uniform="key")
                 ca = self._make_dwell_btn(
                     row, self.clear_all,
                     text="Clear all", font=("Segoe UI", 16, "bold"),
-                    **btn_kw(),
+                    bg=theme.get("funckey_bg", theme["button_bg"]),
+                    fg=theme.get("funckey_fg", theme["button_fg"]),
+                    relief="raised", bd=1, cursor="hand2",
                 )
                 ca.grid(row=0, column=7, sticky="nsew", padx=1)
                 self.keyboard_buttons.append(ca)
+                self._clearall_btn = ca
 
     # =========================================================================
     # PREDEFINED SENTENCE PANEL
@@ -544,7 +557,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             self.finalize_word()
         output_text = " ".join(self.output_words).strip()
         if output_text:
-            print(f"🔊 TTS (not yet implemented): {output_text}")
+            speak(output_text)
             # Track usage count — auto-save to predefined after threshold
             self.sentence_counts[output_text] = self.sentence_counts.get(output_text, 0) + 1
             self._save_sentence_counts()
@@ -573,8 +586,17 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
 
 
     def panic(self):
-        """Placeholder — panic button (to be implemented)."""
-        self.status_bar.config(text="PANIC — coming soon")
+        """Toggle emergency alarm on/off."""
+        if self._panic_active:
+            panic_sound.stop()
+            self._panic_active = False
+            self.panic_btn.config(bg=self.themes[self.current_theme].get("panic_bg", "#660002"))
+            self.status_bar.config(text="Alarm stopped")
+        else:
+            panic_sound.start()
+            self._panic_active = True
+            self.panic_btn.config(bg="#ff0000")
+            self.status_bar.config(text="🚨 ALARM ACTIVE — press PANIC again to stop")
 
     # =========================================================================
     # NAVIGATION
@@ -628,12 +650,15 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         func_bg    = theme.get("funckey_bg",    theme["button_bg"])
         func_fg    = theme.get("funckey_fg",    theme["button_fg"])
         func_abg   = theme.get("funckey_active_bg", theme["button_active_bg"])
+        special = set()
+        if hasattr(self, '_backspace_btn'): special.add(id(self._backspace_btn))
+        if hasattr(self, '_clearall_btn'):  special.add(id(self._clearall_btn))
         if hasattr(self, 'keyboard_buttons'):
             for i, btn in enumerate(self.keyboard_buttons):
-                if i < 5:   # function row
+                if i < 5 or id(btn) in special:
                     btn.config(bg=func_bg, fg=func_fg,
                                activebackground=func_abg, activeforeground=func_fg)
-                else:        # letter keys
+                else:
                     btn.config(bg=theme["button_bg"], fg=theme["button_fg"],
                                activebackground=theme["button_active_bg"],
                                activeforeground=theme["button_fg"])

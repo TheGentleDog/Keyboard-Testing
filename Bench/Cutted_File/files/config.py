@@ -14,4 +14,4 @@ ENGLISH_DATASET_FILE  = "english_dataset.json"
 # Dwell engine settings
 DWELL_POLL_MS  = 50     # how often we update (ms)
 DWELL_ENABLED  = True   # can be toggled from Settings
-DWELL_MIN_MS   = 600    # ms of continuous hover required to fire
+DWELL_MIN_MS   = 1000   # ms of continuous hover required to fire

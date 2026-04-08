@@ -3,13 +3,17 @@
     "ta": "tayo",
     "n": "ngayon",
     "tayo": "tayong",
-    "u": "umuwi"
+    "u": "umuwi",
+    "o": "over",
+    "tta": "start"
   },
   "user_shortcut_usage": {
-    "ta": 7,
+    "ta": 8,
     "n": 1,
     "tayo": 1,
-    "u": 1
+    "u": 1,
+    "o": 1,
+    "tta": 1
   },
   "new_words": [],
   "word_usage_history": [
@@ -128,6 +132,80 @@
     ],
     [
       "cj",
+      []
+    ],
+    [
+      "over",
+      []
+    ],
+    [
+      "over",
+      []
+    ],
+    [
+      "over",
+      [
+        "over"
+      ]
+    ],
+    [
+      "here?",
+      [
+        "over",
+        "over"
+      ]
+    ],
+    [
+      "here?",
+      [
+        "over",
+        "over"
+      ]
+    ],
+    [
+      "na",
+      []
+    ],
+    [
+      "na",
+      []
+    ],
+    [
+      "siyang",
+      [
+        "na"
+      ]
+    ],
+    [
+      "to",
+      []
+    ],
+    [
+      "to",
+      []
+    ],
+    [
+      "to",
+      [
+        "to"
+      ]
+    ],
+    [
+      "work",
+      [
+        "to",
+        "to"
+      ]
+    ],
+    [
+      "work",
+      [
+        "to",
+        "to"
+      ]
+    ],
+    [
+      "start",
       []
     ]
   ]
