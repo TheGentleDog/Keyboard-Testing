@@ -508,10 +508,10 @@ class GazeTrackerApp:
                     if calib_done_event and not _calib_signalled:
                         # Enable mouse control automatically in integrated mode
                         self._mouse_ctrl = True
-                        # Shrink OpenCV window to small overlay (bottom-right)
+                        # Hide the OpenCV window — tracker keeps running in background
                         cv2.setWindowProperty(self.WIN, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
-                        cv2.resizeWindow(self.WIN, 320, 180)
-                        cv2.moveWindow(self.WIN, SCREEN_W - 340, SCREEN_H - 220)
+                        cv2.resizeWindow(self.WIN, 1, 1)
+                        cv2.moveWindow(self.WIN, -10, -10)
                         calib_done_event.set()
                         _calib_signalled = True
             else:
