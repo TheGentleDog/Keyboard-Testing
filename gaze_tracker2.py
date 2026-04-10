@@ -29,6 +29,15 @@ import collections
 import math
 import argparse
 
+try:
+    import pyautogui
+    pyautogui.FAILSAFE  = False   # don't crash if cursor hits screen corner
+    pyautogui.PAUSE     = 0       # no delay between calls
+    _PYAUTOGUI_OK = True
+except ImportError:
+    _PYAUTOGUI_OK = False
+    print("[Warn] pyautogui not installed — mouse control disabled. pip install pyautogui")
+
 # ──────────────────────────────────────────────────────────────
 #  Constants
 # ──────────────────────────────────────────────────────────────
@@ -344,8 +353,9 @@ class GazeTrackerApp:
 
         self.hist   = collections.deque(maxlen=50)
         self._fpsq  = collections.deque(maxlen=30)
-        self._pip   = True
-        self._dbg   = False
+        self._pip          = True
+        self._dbg          = False
+        self._mouse_ctrl   = False   # off by default — press X to enable
         self._blink = False  # blink state indicator
         self._last_gaze = (SCREEN_W // 2, SCREEN_H // 2)  # last known good gaze
         self.canvas = np.zeros((SCREEN_H, SCREEN_W, 3), np.uint8)
@@ -415,6 +425,8 @@ class GazeTrackerApp:
             gy  = int(np.clip(smo[1]*SCREEN_H, 0, SCREEN_H-1))
             self._last_gaze = (gx, gy)
             self.hist.append((gx, gy))
+            if self._mouse_ctrl and _PYAUTOGUI_OK:
+                pyautogui.moveTo(gx, gy)
 
         # Always draw cursor at last known position
         gx, gy = self._last_gaze
@@ -437,7 +449,8 @@ class GazeTrackerApp:
         cv2.rectangle(cv,(0,0),(SCREEN_W,38),(16,16,16),-1)
         txt(cv, "GazeTracker  1920x1080", (14,26), scale=0.62, color=C_ACCENT, thick=1)
         txt(cv, f"FPS {fps:.1f}", (SCREEN_W-110,26), scale=0.60, color=(150,255,150))
-        ctrl = "R=recalibrate   H=pip   D=debug   Q=quit"
+        mouse_state = "ON" if self._mouse_ctrl else "OFF"
+        ctrl = f"R=recalibrate   H=pip   D=debug   X=mouse({mouse_state})   Q=quit"
         cw = cv2.getTextSize(ctrl, cv2.FONT_HERSHEY_SIMPLEX, 0.48, 1)[0][0]
         txt(cv, ctrl, (SCREEN_W//2-cw//2, 26), scale=0.48, color=(110,110,110))
 
@@ -493,6 +506,10 @@ class GazeTrackerApp:
             elif key == ord('r'): print("[Info] Recalibrating…"); self._new_calib()
             elif key == ord('h'): self._pip = not self._pip
             elif key == ord('d'): self._dbg = not self._dbg
+            elif key == ord('x'):
+                self._mouse_ctrl = not self._mouse_ctrl
+                state = "ENABLED" if self._mouse_ctrl else "DISABLED"
+                print(f"[Info] Mouse control {state}")
 
         cap.release(); cv2.destroyAllWindows()
         print("[Info] Stopped.")
