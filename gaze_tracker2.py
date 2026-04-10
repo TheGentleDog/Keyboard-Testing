@@ -466,19 +466,28 @@ class GazeTrackerApp:
             cv2.circle(cam,(int(lms[idx].x*w),int(lms[idx].y*h)),3,(255,100,0),-1)
 
     # ── main loop ───────────────────────────────────────────────
-    def run(self):
+    def run(self, calib_done_event=None, stop_event=None):
+        """
+        calib_done_event : threading.Event — set when calibration completes
+        stop_event       : threading.Event — set externally to stop the loop
+        """
         cap = cv2.VideoCapture(self.cam_id)
         if not cap.isOpened():
             print(f"[Error] Cannot open camera {self.cam_id}"); return
 
         print(f"[Info] Fullscreen 1920×1080  |  {self.num_points}-point calibration")
-        print("[Info] Q=quit  R=recalibrate  H=pip  D=debug")
+        print("[Info] Q=quit  R=recalibrate  H=pip  D=debug  X=mouse ctrl")
         self._new_calib()
 
         cv2.namedWindow(self.WIN, cv2.WINDOW_NORMAL)
         cv2.setWindowProperty(self.WIN, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
+        _calib_signalled = False
+
         while True:
+            if stop_event and stop_event.is_set():
+                break
+
             ret, cam = cap.read()
             if not ret: break
             cam = cv2.flip(cam, 1)
@@ -496,6 +505,11 @@ class GazeTrackerApp:
                 self._render_calib(cam, feat, lms)
                 if self.calib.done:
                     print("[Info] Calibration done — tracking active.")
+                    if calib_done_event and not _calib_signalled:
+                        # Enable mouse control automatically in integrated mode
+                        self._mouse_ctrl = True
+                        calib_done_event.set()
+                        _calib_signalled = True
             else:
                 self._render_track(cam, feat, lms, fps)
 
