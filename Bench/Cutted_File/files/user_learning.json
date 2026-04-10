@@ -5,7 +5,8 @@
     "tayo": "tayong",
     "u": "umuwi",
     "o": "over",
-    "tta": "start"
+    "tta": "start",
+    "than": "thanks"
   },
   "user_shortcut_usage": {
     "ta": 8,
@@ -13,7 +14,8 @@
     "tayo": 1,
     "u": 1,
     "o": 1,
-    "tta": 1
+    "tta": 1,
+    "than": 1
   },
   "new_words": [],
   "word_usage_history": [
@@ -207,6 +209,20 @@
     [
       "start",
       []
+    ],
+    [
+      "tha",
+      []
+    ],
+    [
+      "na",
+      []
+    ],
+    [
+      "i",
+      [
+        "tha"
+      ]
     ]
   ]
 }

@@ -670,6 +670,15 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                     activeforeground=theme["button_fg"],
                 )
 
+    def _toggle_zoom(self, enabled):
+        config.DWELL_ZOOM = enabled
+        self.status_bar.config(text=f"Key zoom: {'ON' if enabled else 'OFF'}")
+
+    def _set_dwell_mode(self, mode):
+        config.DWELL_MODE = mode
+        self._dwell_reset_all()
+        self.status_bar.config(text=f"Dwell mode: {mode.capitalize()}")
+
     def change_theme(self, theme, settings_window=None):
         self.current_theme = theme
         self.apply_theme()
@@ -684,7 +693,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     def show_settings(self):
         win = tk.Toplevel(self)
         win.title("Settings")
-        win.geometry("420x380")
+        win.geometry("420x520")
         win.resizable(False, False)
         win.transient(self)
         win.grab_set()
@@ -701,6 +710,26 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                    command=lambda: self.change_theme("dark",  win), width=18).pack(side="left", ipady=8)
         ttk.Label(tf, text=f"Current: {self.current_theme.capitalize()} Mode",
                   font=("Segoe UI", 9, "italic")).pack(anchor="w", pady=(8, 0))
+
+        # Dwell Mode
+        mf = ttk.LabelFrame(win, text="Dwell Mode", padding=12)
+        mf.pack(fill="x", padx=20, pady=(0, 8))
+        mode_var = tk.StringVar(value=config.DWELL_MODE)
+        ttk.Radiobutton(
+            mf, text="Synchronous — accumulates across trial window, winner fires at end",
+            variable=mode_var, value="sync",
+            command=lambda: self._set_dwell_mode("sync"),
+        ).pack(anchor="w")
+        ttk.Radiobutton(
+            mf, text="Asynchronous — zoom-on-dwell, fires as soon as threshold is reached",
+            variable=mode_var, value="async",
+            command=lambda: self._set_dwell_mode("async"),
+        ).pack(anchor="w", pady=(4, 0))
+        ttk.Label(
+            mf,
+            text="Async mode works best with Key Zoom enabled.",
+            font=("Segoe UI", 8, "italic"), foreground="gray",
+        ).pack(anchor="w", pady=(6, 0))
 
         # Dwell
         df = ttk.LabelFrame(win, text="Hover Dwell Input", padding=12)
@@ -727,5 +756,56 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                    command=lambda: self._apply_min_hover(min_ms_var.get())).pack(anchor="e", pady=(8, 0))
         ttk.Label(df, text="Moving off a key resets its progress to zero.",
                   font=("Segoe UI", 8, "italic"), foreground="gray").pack(anchor="w", pady=(6, 0))
+
+        ttk.Label(df, text="Post-fire cooldown — pause after a key fires:",
+                  font=("Segoe UI", 9)).pack(anchor="w", pady=(10, 2))
+        cooldown_var   = tk.IntVar(value=config.DWELL_COOLDOWN_MS)
+        cooldown_row   = tk.Frame(df)
+        cooldown_row.pack(fill="x")
+        cooldown_label = ttk.Label(cooldown_row, text=f"{config.DWELL_COOLDOWN_MS} ms", width=7)
+        cooldown_label.pack(side="right")
+
+        def on_cooldown(val):
+            v = int(float(val) // 50) * 50
+            cooldown_label.config(text=f"{v} ms")
+            cooldown_var.set(v)
+            config.DWELL_COOLDOWN_MS = v
+
+        ttk.Scale(cooldown_row, from_=0, to=2000, orient="horizontal",
+                  variable=cooldown_var, command=on_cooldown).pack(
+                  side="left", fill="x", expand=True, padx=(0, 6))
+
+        # Zoom
+        zf = ttk.LabelFrame(win, text="Key Zoom (Gaze Stabiliser)", padding=12)
+        zf.pack(fill="x", padx=20, pady=8)
+        zoom_var = tk.BooleanVar(value=config.DWELL_ZOOM)
+        ttk.Checkbutton(
+            zf, text="Zoom hovered key as dwell accumulates",
+            variable=zoom_var,
+            command=lambda: self._toggle_zoom(zoom_var.get()),
+        ).pack(anchor="w")
+        ttk.Label(
+            zf,
+            text="Enlarges the key you're gazing at to widen its hit area.",
+            font=("Segoe UI", 8, "italic"), foreground="gray",
+        ).pack(anchor="w", pady=(4, 8))
+
+        ttk.Label(zf, text="Zoom start delay — how long to settle before zoom appears:",
+                  font=("Segoe UI", 9)).pack(anchor="w")
+        zoom_delay_var = tk.IntVar(value=config.DWELL_ZOOM_DELAY_MS)
+        zoom_delay_row = tk.Frame(zf)
+        zoom_delay_row.pack(fill="x", pady=(2, 0))
+        zoom_delay_label = ttk.Label(zoom_delay_row, text=f"{config.DWELL_ZOOM_DELAY_MS} ms", width=7)
+        zoom_delay_label.pack(side="right")
+
+        def on_zoom_delay(val):
+            v = int(float(val) // 50) * 50
+            zoom_delay_label.config(text=f"{v} ms")
+            zoom_delay_var.set(v)
+            config.DWELL_ZOOM_DELAY_MS = v
+
+        ttk.Scale(zoom_delay_row, from_=0, to=800, orient="horizontal",
+                  variable=zoom_delay_var, command=on_zoom_delay).pack(
+                  side="left", fill="x", expand=True, padx=(0, 6))
 
         ttk.Button(win, text="Close", command=win.destroy).pack(pady=(8, 12))
