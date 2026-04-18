@@ -54,7 +54,7 @@ class LauncherUI(tk.Tk):
         self.configure(bg=d["bg"])
 
         # ── Center window ─────────────────────────────────────────
-        W, H = 560, 620
+        W, H = 560, 700
         sw = self.winfo_screenwidth()
         sh = self.winfo_screenheight()
         self.geometry(f"{W}x{H}+{(sw-W)//2}+{(sh-H)//2}")
@@ -136,6 +136,23 @@ class LauncherUI(tk.Tk):
                       bg=d["card"], fg=d["text"], troughcolor=d["border"],
                       highlightthickness=0, command=lambda v: self._samples_lbl.config(text=v))
         sl.pack(side="left", fill="x", expand=True)
+
+        # ────────────────────────────────────────────────────────
+        #  DWELL MODE
+        # ────────────────────────────────────────────────────────
+        dwell = self._section(body, "DWELL MODE")
+        self._dwell_mode_var = tk.StringVar(value="sync")
+        dwell_frame = tk.Frame(dwell, bg=d["card"])
+        dwell_frame.pack(fill="x", pady=3)
+        tk.Label(dwell_frame, text="Selection mode", bg=d["card"], fg=d["text"],
+                 font=("Segoe UI", 11), anchor="w", width=22).pack(side="left")
+        for mode, label in [("sync", "Synchronous"), ("async", "Asynchronous")]:
+            rb = tk.Radiobutton(dwell_frame, text=label, variable=self._dwell_mode_var,
+                                value=mode, bg=d["card"], fg=d["text"],
+                                selectcolor=d["accent"], activebackground=d["card"],
+                                activeforeground=d["text"],
+                                font=("Segoe UI", 10))
+            rb.pack(side="left", padx=8)
 
         # ────────────────────────────────────────────────────────
         #  SMOOTHER
@@ -259,6 +276,7 @@ class LauncherUI(tk.Tk):
             "ema":     self._ema_var.get() if self._ema_on.get() else 1.0,
             "pnoise":  self._pnoise_var.get(),
             "mnoise":  self._mnoise_var.get(),
+            "dwell_mode": self._dwell_mode_var.get(),
         }
         self.destroy()
 
@@ -284,14 +302,18 @@ def main():
     print("=" * 60)
     print("  GAZE-BASED DIGITAL KEYBOARD")
     print(f"  Points: {cfg['points']}  |  Samples: {cfg['samples']}  |  "
-          f"EMA: {cfg['ema']:.2f}  |  Camera: {cfg['camera']}")
+          f"EMA: {cfg['ema']:.2f}  |  Camera: {cfg['camera']}  |  "
+          f"Dwell: {cfg['dwell_mode']}")
     print("=" * 60)
 
     # ── Deferred imports (avoid slowing down launcher) ────────────────────────
     from gaze_tracker2 import GazeTrackerApp
+    import config
     from model import ngram_model
     from generate_flores_rules import generate_if_missing as _ensure_flores
     from config import FILIPINO_DATASET_FILE, ENGLISH_DATASET_FILE, NGRAM_CACHE_FILE
+
+    config.DWELL_MODE = cfg["dwell_mode"]
 
     def _ensure_datasets():
         missing = []
@@ -324,6 +346,7 @@ def main():
     ngram_model.load_user_learning()
 
     stop_gaze = threading.Event()
+    gaze_thread = None
 
     # ── Build gaze tracker ────────────────────────────────────────────────────
     tracker = GazeTrackerApp(
@@ -344,12 +367,21 @@ def main():
     print("\n✓ Calibration complete — launching keyboard...\n")
 
     # ── Phase 2: Tracking in background thread (no OpenCV GUI) ───────────────
-    gaze_thread = threading.Thread(
-        target=tracker.track,
-        kwargs={"stop_event": stop_gaze},
-        daemon=True,
-    )
-    gaze_thread.start()
+    def start_tracking():
+        nonlocal gaze_thread
+        gaze_thread = threading.Thread(
+            target=tracker.track,
+            kwargs={"stop_event": stop_gaze},
+            daemon=True,
+        )
+        gaze_thread.start()
+
+    def stop_tracking():
+        stop_gaze.set()
+        if gaze_thread and gaze_thread.is_alive():
+            gaze_thread.join(timeout=2.0)
+
+    start_tracking()
 
     # ── Launch Tkinter keyboard on main thread ────────────────────────────────
     from ui import FilipinoKeyboard
@@ -357,14 +389,54 @@ def main():
     app = FilipinoKeyboard()
 
     def on_close():
-        stop_gaze.set()
+        stop_tracking()
         app.destroy()
 
+    def quit_session(_event=None):
+        """Q: close keyboard and stop gaze tracking from anywhere in Tk."""
+        on_close()
+        return "break"
+
+    def toggle_mouse_control(_event=None):
+        """X: pause/resume gaze-driven mouse movement without closing the app."""
+        tracker._mouse_ctrl = not tracker._mouse_ctrl
+        state = "ON" if tracker._mouse_ctrl else "OFF"
+        app.status_bar.config(text=f"Gaze mouse control {state}")
+        return "break"
+
+    def recalibrate(_event=None):
+        """
+        R: recalibrate while the keyboard is open.
+        Calibration must run on the main thread on macOS, so this callback stops
+        the tracking thread, opens calibration, then restarts tracking.
+        """
+        nonlocal stop_gaze
+        app.status_bar.config(text="Recalibrating gaze...")
+        app.update_idletasks()
+
+        stop_tracking()
+        stop_gaze = threading.Event()
+
+        ok = tracker.calibrate()
+        if ok:
+            start_tracking()
+            app.status_bar.config(text="Recalibration complete | gaze tracking active")
+        else:
+            app.status_bar.config(text="Recalibration cancelled | closing session")
+            on_close()
+        return "break"
+
     app.protocol("WM_DELETE_WINDOW", on_close)
+    app.bind_all("<KeyPress-q>", quit_session)
+    app.bind_all("<KeyPress-Q>", quit_session)
+    app.bind_all("<KeyPress-x>", toggle_mouse_control)
+    app.bind_all("<KeyPress-X>", toggle_mouse_control)
+    app.bind_all("<KeyPress-r>", recalibrate)
+    app.bind_all("<KeyPress-R>", recalibrate)
     app.mainloop()
 
     # Cleanup
-    stop_gaze.set()
+    stop_tracking()
     print("[Info] Application closed.")
 
 
