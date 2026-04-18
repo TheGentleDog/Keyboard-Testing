@@ -2,65 +2,316 @@
 # run.py — Single entry point for Gaze-Based Filipino Keyboard
 #
 # Flow:
-#   1. Gaze tracker starts (OpenCV, fullscreen calibration)
-#   2. Once calibration is done, mouse control is enabled automatically
-#   3. Tkinter keyboard launches on the main thread
-#   4. Gaze tracker keeps running in background, moving the mouse cursor
-#   5. Closing the keyboard also stops the gaze tracker
+#   1. Launcher UI — user picks calibration settings
+#   2. Gaze tracker starts (OpenCV, fullscreen calibration)
+#   3. Once calibration is done, mouse control is enabled automatically
+#   4. Tkinter keyboard launches on the main thread
+#   5. Gaze tracker keeps running in background, moving the mouse cursor
+#   6. Closing the keyboard also stops the gaze tracker
 # =============================================================================
 
 import sys
 import os
 import threading
+import tkinter as tk
+from tkinter import ttk
 
 # ── Make keyboard modules importable ─────────────────────────────────────────
 KEYBOARD_DIR = os.path.join(os.path.dirname(__file__), "Bench", "Cutted_File", "files")
 sys.path.insert(0, KEYBOARD_DIR)
 
-# ── Import gaze tracker ───────────────────────────────────────────────────────
-from gaze_tracker2 import GazeTrackerApp
-import argparse
 
-# ── Import keyboard bootstrap ─────────────────────────────────────────────────
-from model import ngram_model, get_context_words
-from generate_flores_rules import generate_if_missing as _ensure_flores
-from config import (
-    FILIPINO_DATASET_FILE,
-    ENGLISH_DATASET_FILE,
-    NGRAM_CACHE_FILE,
-)
+# =============================================================================
+#  Launcher UI
+# =============================================================================
+
+class LauncherUI(tk.Tk):
+    """
+    Dark-themed startup window.
+    User picks calibration & tracker settings, then clicks Start.
+    Returns settings via self.result (None if cancelled).
+    """
+
+    DARK = {
+        "bg":         "#1e1f22",
+        "panel":      "#2b2d31",
+        "card":       "#313338",
+        "accent":     "#5865f2",
+        "accent_hov": "#4752c4",
+        "text":       "#dcddde",
+        "subtext":    "#96989d",
+        "danger":     "#ed4245",
+        "border":     "#3f4147",
+    }
+
+    def __init__(self):
+        super().__init__()
+        self.result = None
+        d = self.DARK
+
+        self.title("Gaze Keyboard — Launcher")
+        self.resizable(False, False)
+        self.configure(bg=d["bg"])
+
+        # ── Center window ─────────────────────────────────────────
+        W, H = 560, 620
+        sw = self.winfo_screenwidth()
+        sh = self.winfo_screenheight()
+        self.geometry(f"{W}x{H}+{(sw-W)//2}+{(sh-H)//2}")
+
+        self._build(d)
+        self.lift()
+        self.focus_force()
+        self.attributes("-topmost", True)
+        self.after(200, lambda: self.attributes("-topmost", False))
+
+    def _section(self, parent, title):
+        """Returns a card frame with a section label."""
+        d = self.DARK
+        outer = tk.Frame(parent, bg=d["card"], bd=0, highlightbackground=d["border"],
+                         highlightthickness=1)
+        outer.pack(fill="x", padx=16, pady=(0, 10))
+        tk.Label(outer, text=title, bg=d["card"], fg=d["subtext"],
+                 font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=12, pady=(8, 2))
+        inner = tk.Frame(outer, bg=d["card"])
+        inner.pack(fill="x", padx=12, pady=(0, 10))
+        return inner
+
+    def _row(self, parent, label, widget_fn):
+        """Two-column row: label left, widget right."""
+        d = self.DARK
+        row = tk.Frame(parent, bg=d["card"])
+        row.pack(fill="x", pady=3)
+        tk.Label(row, text=label, bg=d["card"], fg=d["text"],
+                 font=("Segoe UI", 11), anchor="w", width=22).pack(side="left")
+        w = widget_fn(row)
+        w.pack(side="left", fill="x", expand=True)
+        return w
+
+    def _build(self, d):
+        # ── Header ───────────────────────────────────────────────
+        hdr = tk.Frame(self, bg=d["panel"])
+        hdr.pack(fill="x")
+        tk.Label(hdr, text="Gaze-Based Filipino Keyboard",
+                 bg=d["panel"], fg=d["text"],
+                 font=("Segoe UI", 15, "bold")).pack(pady=(18, 2))
+        tk.Label(hdr, text="Configure your session before starting",
+                 bg=d["panel"], fg=d["subtext"],
+                 font=("Segoe UI", 10)).pack(pady=(0, 16))
+
+        body = tk.Frame(self, bg=d["bg"])
+        body.pack(fill="both", expand=True, pady=8)
+
+        # ────────────────────────────────────────────────────────
+        #  CALIBRATION
+        # ────────────────────────────────────────────────────────
+        calib = self._section(body, "CALIBRATION")
+
+        # Calibration points
+        self._points_var = tk.IntVar(value=9)
+        pts_frame = tk.Frame(calib, bg=d["card"])
+        pts_frame.pack(fill="x", pady=3)
+        tk.Label(pts_frame, text="Grid points", bg=d["card"], fg=d["text"],
+                 font=("Segoe UI", 11), anchor="w", width=22).pack(side="left")
+        for pts, label in [(5, "5  (fast)"), (9, "9  (default)"),
+                           (16, "16  (precise)"), (25, "25  (max)")]:
+            rb = tk.Radiobutton(pts_frame, text=label, variable=self._points_var,
+                                value=pts, bg=d["card"], fg=d["text"],
+                                selectcolor=d["accent"], activebackground=d["card"],
+                                activeforeground=d["text"],
+                                font=("Segoe UI", 10))
+            rb.pack(side="left", padx=6)
+
+        # Samples per point
+        self._samples_var = tk.IntVar(value=60)
+        samples_frame = tk.Frame(calib, bg=d["card"])
+        samples_frame.pack(fill="x", pady=3)
+        tk.Label(samples_frame, text="Samples / point", bg=d["card"], fg=d["text"],
+                 font=("Segoe UI", 11), anchor="w", width=22).pack(side="left")
+        self._samples_lbl = tk.Label(samples_frame, text="60", bg=d["card"],
+                                     fg=d["accent"], font=("Segoe UI", 11, "bold"), width=4)
+        self._samples_lbl.pack(side="right", padx=(0, 8))
+        sl = tk.Scale(samples_frame, from_=20, to=120, orient="horizontal",
+                      variable=self._samples_var, showvalue=False,
+                      bg=d["card"], fg=d["text"], troughcolor=d["border"],
+                      highlightthickness=0, command=lambda v: self._samples_lbl.config(text=v))
+        sl.pack(side="left", fill="x", expand=True)
+
+        # ────────────────────────────────────────────────────────
+        #  SMOOTHER
+        # ────────────────────────────────────────────────────────
+        smooth = self._section(body, "SMOOTHER")
+
+        # EMA toggle
+        self._ema_on = tk.BooleanVar(value=True)
+        ema_frame = tk.Frame(smooth, bg=d["card"])
+        ema_frame.pack(fill="x", pady=3)
+        tk.Label(ema_frame, text="EMA smoother", bg=d["card"], fg=d["text"],
+                 font=("Segoe UI", 11), anchor="w", width=22).pack(side="left")
+        tk.Checkbutton(ema_frame, text="Enabled", variable=self._ema_on,
+                       bg=d["card"], fg=d["text"], selectcolor=d["accent"],
+                       activebackground=d["card"], activeforeground=d["text"],
+                       font=("Segoe UI", 10),
+                       command=self._toggle_ema).pack(side="left")
+
+        # EMA alpha
+        self._ema_var = tk.DoubleVar(value=0.15)
+        self._ema_frame = tk.Frame(smooth, bg=d["card"])
+        self._ema_frame.pack(fill="x", pady=3)
+        tk.Label(self._ema_frame, text="EMA alpha  (0–1)", bg=d["card"], fg=d["text"],
+                 font=("Segoe UI", 11), anchor="w", width=22).pack(side="left")
+        self._ema_lbl = tk.Label(self._ema_frame, text="0.15", bg=d["card"],
+                                 fg=d["accent"], font=("Segoe UI", 11, "bold"), width=5)
+        self._ema_lbl.pack(side="right", padx=(0, 8))
+        tk.Scale(self._ema_frame, from_=0.01, to=1.0, resolution=0.01,
+                 orient="horizontal", variable=self._ema_var, showvalue=False,
+                 bg=d["card"], fg=d["text"], troughcolor=d["border"],
+                 highlightthickness=0,
+                 command=lambda v: self._ema_lbl.config(text=f"{float(v):.2f}")
+                 ).pack(side="left", fill="x", expand=True)
+
+        # ────────────────────────────────────────────────────────
+        #  KALMAN FILTER
+        # ────────────────────────────────────────────────────────
+        kalman = self._section(body, "KALMAN FILTER")
+
+        # Process noise
+        self._pnoise_var = tk.DoubleVar(value=1e-3)
+        pn_frame = tk.Frame(kalman, bg=d["card"])
+        pn_frame.pack(fill="x", pady=3)
+        tk.Label(pn_frame, text="Process noise", bg=d["card"], fg=d["text"],
+                 font=("Segoe UI", 11), anchor="w", width=22).pack(side="left")
+        self._pnoise_lbl = tk.Label(pn_frame, text="0.001", bg=d["card"],
+                                    fg=d["accent"], font=("Segoe UI", 11, "bold"), width=6)
+        self._pnoise_lbl.pack(side="right", padx=(0, 8))
+        tk.Scale(pn_frame, from_=1e-4, to=0.1, resolution=1e-4,
+                 orient="horizontal", variable=self._pnoise_var, showvalue=False,
+                 bg=d["card"], fg=d["text"], troughcolor=d["border"],
+                 highlightthickness=0,
+                 command=lambda v: self._pnoise_lbl.config(text=f"{float(v):.4f}")
+                 ).pack(side="left", fill="x", expand=True)
+
+        # Measurement noise
+        self._mnoise_var = tk.DoubleVar(value=12.0)
+        mn_frame = tk.Frame(kalman, bg=d["card"])
+        mn_frame.pack(fill="x", pady=3)
+        tk.Label(mn_frame, text="Measurement noise", bg=d["card"], fg=d["text"],
+                 font=("Segoe UI", 11), anchor="w", width=22).pack(side="left")
+        self._mnoise_lbl = tk.Label(mn_frame, text="12.0", bg=d["card"],
+                                    fg=d["accent"], font=("Segoe UI", 11, "bold"), width=6)
+        self._mnoise_lbl.pack(side="right", padx=(0, 8))
+        tk.Scale(mn_frame, from_=1.0, to=50.0, resolution=0.5,
+                 orient="horizontal", variable=self._mnoise_var, showvalue=False,
+                 bg=d["card"], fg=d["text"], troughcolor=d["border"],
+                 highlightthickness=0,
+                 command=lambda v: self._mnoise_lbl.config(text=f"{float(v):.1f}")
+                 ).pack(side="left", fill="x", expand=True)
+
+        # ────────────────────────────────────────────────────────
+        #  CAMERA
+        # ────────────────────────────────────────────────────────
+        cam = self._section(body, "CAMERA")
+        self._camera_var = tk.IntVar(value=0)
+        cam_frame = tk.Frame(cam, bg=d["card"])
+        cam_frame.pack(fill="x", pady=3)
+        tk.Label(cam_frame, text="Camera index", bg=d["card"], fg=d["text"],
+                 font=("Segoe UI", 11), anchor="w", width=22).pack(side="left")
+        for idx, lbl in [(0, "0  (built-in)"), (1, "1  (external)"), (2, "2")]:
+            tk.Radiobutton(cam_frame, text=lbl, variable=self._camera_var,
+                           value=idx, bg=d["card"], fg=d["text"],
+                           selectcolor=d["accent"], activebackground=d["card"],
+                           activeforeground=d["text"],
+                           font=("Segoe UI", 10)).pack(side="left", padx=6)
+
+        # ────────────────────────────────────────────────────────
+        #  Buttons
+        # ────────────────────────────────────────────────────────
+        btn_row = tk.Frame(self, bg=d["bg"])
+        btn_row.pack(fill="x", padx=16, pady=(4, 16))
+
+        cancel_btn = tk.Label(btn_row, text="Cancel", bg=d["border"], fg=d["subtext"],
+                              font=("Segoe UI", 12), relief="flat", bd=0,
+                              padx=24, pady=10, cursor="hand2")
+        cancel_btn.pack(side="left")
+        cancel_btn.bind("<Button-1>", lambda _: self.destroy())
+
+        start_btn = tk.Label(btn_row, text="Start Session", bg=d["accent"], fg="#ffffff",
+                             font=("Segoe UI", 12, "bold"), relief="flat", bd=0,
+                             padx=24, pady=10, cursor="hand2")
+        start_btn.pack(side="right")
+        start_btn.bind("<Button-1>", self._on_start)
+        start_btn.bind("<Enter>", lambda _: start_btn.config(bg=d["accent_hov"]))
+        start_btn.bind("<Leave>", lambda _: start_btn.config(bg=d["accent"]))
+
+    def _toggle_ema(self):
+        state = "normal" if self._ema_on.get() else "disabled"
+        for child in self._ema_frame.winfo_children():
+            try:
+                child.config(state=state)
+            except Exception:
+                pass
+
+    def _on_start(self, _event=None):
+        self.result = {
+            "camera":  self._camera_var.get(),
+            "points":  self._points_var.get(),
+            "samples": self._samples_var.get(),
+            "ema":     self._ema_var.get() if self._ema_on.get() else 1.0,
+            "pnoise":  self._pnoise_var.get(),
+            "mnoise":  self._mnoise_var.get(),
+        }
+        self.destroy()
 
 
-def _ensure_datasets():
-    missing = []
-    if not os.path.exists(FILIPINO_DATASET_FILE):
-        missing.append(("Filipino", FILIPINO_DATASET_FILE, "generate_dataset"))
-    if not os.path.exists(ENGLISH_DATASET_FILE):
-        missing.append(("English", ENGLISH_DATASET_FILE, "generate_dataset_english"))
-    if not missing:
-        return
-    try:
-        import transformers  # noqa
-    except ImportError:
-        print("❌  'transformers' not installed. pip install transformers torch")
-        sys.exit(1)
-    for label, path, module_name in missing:
-        print(f"🚀  Generating {label} dataset...")
-        module = __import__(module_name)
-        module.generate(output_file=path)
-    if os.path.exists(NGRAM_CACHE_FILE):
-        os.remove(NGRAM_CACHE_FILE)
+# =============================================================================
+#  Helpers
+# =============================================================================
 
+# =============================================================================
+#  Main
+# =============================================================================
 
 def main():
-    ap = argparse.ArgumentParser(description="Gaze-Based Filipino Keyboard")
-    ap.add_argument("--camera",  type=int,   default=0)
-    ap.add_argument("--points",  type=int,   default=9,  choices=[5, 9, 16, 25])
-    ap.add_argument("--samples", type=int,   default=60)
-    ap.add_argument("--ema",     type=float, default=0.15)
-    ap.add_argument("--pnoise",  type=float, default=1e-3)
-    ap.add_argument("--mnoise",  type=float, default=12.0)
-    args = ap.parse_args()
+    # ── Show launcher UI ──────────────────────────────────────────────────────
+    launcher = LauncherUI()
+    launcher.mainloop()
+
+    if launcher.result is None:
+        print("[Info] Launcher cancelled.")
+        sys.exit(0)
+
+    cfg = launcher.result
+    print("=" * 60)
+    print("  GAZE-BASED DIGITAL KEYBOARD")
+    print(f"  Points: {cfg['points']}  |  Samples: {cfg['samples']}  |  "
+          f"EMA: {cfg['ema']:.2f}  |  Camera: {cfg['camera']}")
+    print("=" * 60)
+
+    # ── Deferred imports (avoid slowing down launcher) ────────────────────────
+    from gaze_tracker2 import GazeTrackerApp
+    from model import ngram_model
+    from generate_flores_rules import generate_if_missing as _ensure_flores
+    from config import FILIPINO_DATASET_FILE, ENGLISH_DATASET_FILE, NGRAM_CACHE_FILE
+
+    def _ensure_datasets():
+        missing = []
+        if not os.path.exists(FILIPINO_DATASET_FILE):
+            missing.append(("Filipino", FILIPINO_DATASET_FILE, "generate_dataset"))
+        if not os.path.exists(ENGLISH_DATASET_FILE):
+            missing.append(("English", ENGLISH_DATASET_FILE, "generate_dataset_english"))
+        if not missing:
+            return
+        try:
+            import transformers  # noqa
+        except ImportError:
+            print("'transformers' not installed. pip install transformers torch")
+            sys.exit(1)
+        for label, path, module_name in missing:
+            print(f"Generating {label} dataset...")
+            module = __import__(module_name)
+            module.generate(output_file=path)
+        if os.path.exists(NGRAM_CACHE_FILE):
+            os.remove(NGRAM_CACHE_FILE)
 
     # ── Pre-load datasets & model ─────────────────────────────────────────────
     _ensure_datasets()
@@ -72,36 +323,33 @@ def main():
         ngram_model.save_cache()
     ngram_model.load_user_learning()
 
-    # ── Events for coordination ───────────────────────────────────────────────
-    calib_done  = threading.Event()
-    stop_gaze   = threading.Event()
+    stop_gaze = threading.Event()
 
     # ── Build gaze tracker ────────────────────────────────────────────────────
     tracker = GazeTrackerApp(
-        camera_id  = args.camera,
-        num_points = args.points,
-        spp        = args.samples,
-        ema_alpha  = args.ema,
-        pnoise     = args.pnoise,
-        mnoise     = args.mnoise,
+        camera_id  = cfg["camera"],
+        num_points = cfg["points"],
+        spp        = cfg["samples"],
+        ema_alpha  = cfg["ema"],
+        pnoise     = cfg["pnoise"],
+        mnoise     = cfg["mnoise"],
     )
 
-    # ── Run gaze tracker in background thread ─────────────────────────────────
+    # ── Phase 1: Calibration on main thread (required on macOS) ──────────────
+    print("  Starting calibration...")
+    ok = tracker.calibrate()
+    if not ok:
+        print("[Info] Calibration cancelled.")
+        sys.exit(0)
+    print("\n✓ Calibration complete — launching keyboard...\n")
+
+    # ── Phase 2: Tracking in background thread (no OpenCV GUI) ───────────────
     gaze_thread = threading.Thread(
-        target=tracker.run,
-        kwargs={"calib_done_event": calib_done, "stop_event": stop_gaze},
+        target=tracker.track,
+        kwargs={"stop_event": stop_gaze},
         daemon=True,
     )
     gaze_thread.start()
-
-    print("=" * 60)
-    print("  GAZE-BASED DIGITAL KEYBOARD")
-    print("  Waiting for calibration to complete...")
-    print("=" * 60)
-
-    # Block until calibration is done
-    calib_done.wait()
-    print("\n✓ Calibration complete — launching keyboard...\n")
 
     # ── Launch Tkinter keyboard on main thread ────────────────────────────────
     from ui import FilipinoKeyboard

@@ -112,6 +112,8 @@ class NgramModel:
         self.word_usage_history  = []
         self.flores_word_rules   = {}   # Flores et al. whole-word rules
         self.flores_char_rules   = {}   # Flores et al. character substitution rules
+        self.filipino_vocab      = set()  # words that came from Filipino dataset
+        self.english_vocab       = set()  # words that came from English dataset
 
     # ── Training ──────────────────────────────────────────────────────────────
     def train_from_builtin(self):
@@ -157,6 +159,8 @@ class NgramModel:
             return
 
         for label, data in datasets:
+            lang_vocab_set = self.filipino_vocab if label == "Filipino" else self.english_vocab
+
             # 1. corpus_sequences — preserves word order for bigrams/trigrams
             sequences = data.get("corpus_sequences", [])
             if sequences:
@@ -164,6 +168,7 @@ class NgramModel:
                 for seq in sequences:
                     tokens = [t.lower() for t in seq if isinstance(t, str)]
                     if len(tokens) >= 2:
+                        lang_vocab_set.update(tokens)
                         for _ in range(PHRASE_REPEATS):
                             all_sequences.append(tokens)
             else:
@@ -175,6 +180,7 @@ class NgramModel:
                 for phrase in corpus:
                     tokens = phrase.lower().split()
                     if len(tokens) >= 2:
+                        lang_vocab_set.update(tokens)
                         for _ in range(PHRASE_REPEATS):
                             all_sequences.append(tokens)
 
@@ -183,6 +189,7 @@ class NgramModel:
             for category, words in vocab.items():
                 for word in words:
                     w = word.lower()
+                    lang_vocab_set.add(w)
                     all_unigram_tokens.extend([w] * WORD_REPEATS)
 
             # 3. shortcuts
@@ -453,9 +460,11 @@ class NgramModel:
                 f"{k[0]}|{k[1]}": dict(v)
                 for k, v in self.char_trigrams.items()
             },
-            'vocabulary':   list(self.vocabulary),
-            'total_words':  self.total_words,
-            'csv_shortcuts':self.csv_shortcuts,
+            'vocabulary':      list(self.vocabulary),
+            'total_words':     self.total_words,
+            'csv_shortcuts':   self.csv_shortcuts,
+            'filipino_vocab':  list(self.filipino_vocab),
+            'english_vocab':   list(self.english_vocab),
         }
         try:
             with open(NGRAM_CACHE_FILE, 'w', encoding='utf-8') as f:
@@ -501,9 +510,11 @@ class NgramModel:
                 if len(parts) == 2:
                     self.char_trigrams[(parts[0], parts[1])] = Counter(v)
 
-            self.vocabulary    = set(data['vocabulary'])
-            self.total_words   = data['total_words']
-            self.csv_shortcuts = data.get('csv_shortcuts', {})
+            self.vocabulary     = set(data['vocabulary'])
+            self.total_words    = data['total_words']
+            self.csv_shortcuts  = data.get('csv_shortcuts', {})
+            self.filipino_vocab = set(data.get('filipino_vocab', []))
+            self.english_vocab  = set(data.get('english_vocab', []))
 
             print(f"✓ Cache loaded — "
                   f"Vocabulary: {len(self.vocabulary)}, "
@@ -541,10 +552,32 @@ class NgramModel:
                 return self.get_word_probability(word, [prev1])
             return (count + alpha) / (ctx_count + alpha * vocab_size)
 
-    def get_completion_suggestions(self, prefix, context=None, max_results=8):
+    # Common English function words that should never appear in Filipino-only mode
+    _ENGLISH_STOPWORDS = {
+        'is','are','was','were','the','a','an','and','or','but','not',
+        'to','of','in','on','at','for','with','by','from','as','be',
+        'have','has','had','do','does','did','will','would','could',
+        'should','may','might','must','shall','been','being',
+        'this','that','these','those','it','its','they','them',
+        'their','there','here','what','which','who','how','when','where','why',
+    }
+
+    def _lang_filter(self, word, language="both"):
+        """Return True if word passes the language filter."""
+        if language == "both":
+            return True
+        if language == "filipino":
+            return word in self.filipino_vocab or word not in self.english_vocab
+        if language == "english":
+            return word in self.english_vocab or word not in self.filipino_vocab
+        return True
+
+    def get_completion_suggestions(self, prefix, context=None, max_results=8, language="both"):
         prefix = prefix.lower()
         shortcut_candidates = []
         for full_word, source in self.get_all_shortcut_expansions(prefix):
+            if not self._lang_filter(full_word, language):
+                continue
             mult = 10.0 if source == 'user' else 8.0
             shortcut_candidates.append((full_word, False, True, mult))
 
@@ -553,6 +586,7 @@ class NgramModel:
             w for w in self.vocabulary
             if w.startswith(prefix) and len(w) >= min_word_length
             and w.isalpha() and self._has_vowels(w)
+            and self._lang_filter(w, language)
         ]
         char_completions = self.get_char_level_completions(prefix, max_results=10)
         candidates = [
@@ -566,6 +600,8 @@ class NgramModel:
                 if word in exact_matches or len(word) < min_word_length:
                     continue
                 if not word.isalpha() or not self._has_vowels(word):
+                    continue
+                if not self._lang_filter(word, language):
                     continue
                 if prefix in word:
                     pos = word.index(prefix)
@@ -606,23 +642,47 @@ class NgramModel:
         unique = sorted(seen.items(), key=lambda x: -x[1])
         return [w for w, _ in unique[:max_results]]
 
-    def get_next_word_suggestions(self, context=None, max_results=6):
+    # Words that don't make sense as sentence starters
+    _BAD_STARTERS = {
+        'is','are','was','were','to','of','in','on','at','for','with',
+        'by','from','as','and','or','but','the','a','an','not','been',
+        'being','had','has','have','did','does','do','will','would',
+        'could','should','may','might','must','shall','na','ng','sa',
+        'nang','ang','mga','ay','din','rin','lang','lamang','pa',
+    }
+
+    def get_next_word_suggestions(self, context=None, max_results=6, language="both"):
+        def _filter(pairs, no_starters=False):
+            result = []
+            for w, _ in pairs:
+                if not self._lang_filter(w, language):
+                    continue
+                if no_starters and w in self._BAD_STARTERS:
+                    continue
+                result.append(w)
+                if len(result) >= max_results:
+                    break
+            return result
+
         if not context:
-            return [w for w, _ in self.unigrams.most_common(max_results)]
+            return _filter(self.unigrams.most_common(max_results * 5), no_starters=True)
         elif len(context) == 1:
             prev   = self.resolve_shortcut(context[0].lower())
             source = self.bigrams[prev] if prev in self.bigrams else self.unigrams
-            return [w for w, _ in source.most_common(max_results)]
+            return _filter(source.most_common(max_results * 3))
         else:
             prev2 = self.resolve_shortcut(context[-2].lower())
             prev1 = self.resolve_shortcut(context[-1].lower())
             ctx   = (prev2, prev1)
             if ctx in self.trigrams:
-                return [w for w, _ in self.trigrams[ctx].most_common(max_results)]
-            elif prev1 in self.bigrams:
-                return [w for w, _ in self.bigrams[prev1].most_common(max_results)]
-            else:
-                return [w for w, _ in self.unigrams.most_common(max_results)]
+                result = _filter(self.trigrams[ctx].most_common(max_results * 3))
+                if result:
+                    return result
+            if prev1 in self.bigrams:
+                result = _filter(self.bigrams[prev1].most_common(max_results * 3))
+                if result:
+                    return result
+            return _filter(self.unigrams.most_common(max_results * 5), no_starters=True)
 
 
 # =============================================================================

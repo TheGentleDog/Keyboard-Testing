@@ -453,16 +453,17 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         for w in self.predictive_container.winfo_children():
             w.destroy()
 
+        lang = config.PREDICTION_LANGUAGE
         if self.current_input:
             # Completion mode — suggest completions for the partial word being typed
             ctx_words = self.output_words[:self.output_cursor] if self.output_cursor != -1 else self.output_words
-            context   = get_context_words(" ".join(ctx_words), n=2)
-            words     = ngram_model.get_completion_suggestions(self.current_input, context, max_results=4)
+            context   = ctx_words[-2:] if len(ctx_words) >= 2 else ctx_words
+            words     = ngram_model.get_completion_suggestions(self.current_input, context, max_results=4, language=lang)
             handler   = self.apply_completion
         else:
-            # Next-word mode — suggest likely following words
-            context = get_context_words(" ".join(self.output_words), n=2)
-            words   = ngram_model.get_next_word_suggestions(context, max_results=4)
+            # Next-word mode — use the last 2 committed words directly as context
+            context = self.output_words[-2:] if len(self.output_words) >= 2 else self.output_words
+            words   = ngram_model.get_next_word_suggestions(context, max_results=4, language=lang)
             handler = self.apply_prediction
 
         theme = self.themes[self.current_theme]
@@ -483,7 +484,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
 
     def apply_prediction(self, word):
         """User selected a next-word prediction (after space has been pressed)."""
-        context = get_context_words(" ".join(self.output_words), n=2)
+        context = self.output_words[-2:] if len(self.output_words) >= 2 else self.output_words
         self.output_words.append(word)
         self.output_cursor = -1
         ngram_model.track_word_usage(word, context)
@@ -495,7 +496,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     # =========================================================================
     def _commit_word(self, word):
         ctx_words = self.output_words[:self.output_cursor] if self.output_cursor != -1 else self.output_words
-        context   = get_context_words(" ".join(ctx_words), n=2)
+        context   = ctx_words[-2:] if len(ctx_words) >= 2 else ctx_words
         if self.current_input and self.current_input != word:
             ngram_model.learn_from_user_typing(self.current_input, word)
         ngram_model.track_word_usage(word, context)
@@ -693,10 +694,35 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     def show_settings(self):
         win = tk.Toplevel(self)
         win.title("Settings")
-        win.geometry("420x520")
-        win.resizable(False, False)
+        win.geometry("440x640")
+        win.resizable(False, True)
         win.transient(self)
         win.grab_set()
+
+        # Scrollable container
+        outer = tk.Frame(win)
+        outer.pack(fill="both", expand=True)
+        canvas  = tk.Canvas(outer, borderwidth=0, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        inner = tk.Frame(canvas)
+        win_id = canvas.create_window((0, 0), window=inner, anchor="nw")
+
+        def _on_resize(e):
+            canvas.itemconfig(win_id, width=e.width)
+        canvas.bind("<Configure>", _on_resize)
+
+        def _on_frame(e):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        inner.bind("<Configure>", _on_frame)
+
+        def _on_mousewheel(e):
+            canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+        win = inner  # point all subsequent widgets at the scrollable inner frame
 
         # Theme
         tf = ttk.LabelFrame(win, text="Theme", padding=12)
@@ -807,5 +833,26 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         ttk.Scale(zoom_delay_row, from_=0, to=800, orient="horizontal",
                   variable=zoom_delay_var, command=on_zoom_delay).pack(
                   side="left", fill="x", expand=True, padx=(0, 6))
+
+        # Prediction Language
+        lf = ttk.LabelFrame(win, text="Prediction Language", padding=12)
+        lf.pack(fill="x", padx=20, pady=(0, 8))
+        lang_var = tk.StringVar(value=config.PREDICTION_LANGUAGE)
+
+        def _set_lang(val):
+            config.PREDICTION_LANGUAGE = val
+            self.update_predictions()
+
+        ttk.Radiobutton(lf, text="Both (Filipino + English)",
+                        variable=lang_var, value="both",
+                        command=lambda: _set_lang("both")).pack(anchor="w")
+        ttk.Radiobutton(lf, text="Filipino only",
+                        variable=lang_var, value="filipino",
+                        command=lambda: _set_lang("filipino")).pack(anchor="w", pady=(4, 0))
+        ttk.Radiobutton(lf, text="English only",
+                        variable=lang_var, value="english",
+                        command=lambda: _set_lang("english")).pack(anchor="w", pady=(4, 0))
+        ttk.Label(lf, text="Filters autocomplete and next-word predictions.",
+                  font=("Segoe UI", 8, "italic"), foreground="gray").pack(anchor="w", pady=(6, 0))
 
         ttk.Button(win, text="Close", command=win.destroy).pack(pady=(8, 12))

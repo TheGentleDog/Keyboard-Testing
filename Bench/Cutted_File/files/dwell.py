@@ -168,23 +168,18 @@ class DwellMixin:
                 self.dwell_hover_ms[bid] += config.DWELL_POLL_MS
                 progress = min(self.dwell_hover_ms[bid] / config.DWELL_MIN_MS, 1.0)
                 self._update_bar(bid, progress)
-                self._zoom_show(self.dwell_hovered, progress)
                 # Early fire if one key dominates mid-trial
                 if self.dwell_hover_ms[bid] >= config.DWELL_MIN_MS:
                     print(f"✓ Sync early-fire at {self.dwell_hover_ms[bid]}ms")
-                    self._zoom_hide()
                     self._dwell_fire(bid)
                     self._dwell_reset_all()
                     return
-        else:
-            self._zoom_hide()
 
         self._dwell_trial_elapsed += config.DWELL_POLL_MS
         if self._dwell_trial_elapsed >= config.DWELL_MIN_MS:
             winner_bid = max(self.dwell_hover_ms, key=self.dwell_hover_ms.get, default=None)
             if winner_bid is not None and self.dwell_hover_ms[winner_bid] > 0:
                 print(f"✓ Sync trial winner: {self.dwell_hover_ms[winner_bid]}ms")
-                self._zoom_hide()
                 self._dwell_fire(winner_bid)
             self._dwell_reset_all()
 

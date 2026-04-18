@@ -355,7 +355,8 @@ class GazeTrackerApp:
         self._fpsq  = collections.deque(maxlen=30)
         self._pip          = True
         self._dbg          = False
-        self._mouse_ctrl   = False   # off by default — press X to enable
+        self._mouse_ctrl   = False
+        self._window_open  = True
         self._blink = False  # blink state indicator
         self._last_gaze = (SCREEN_W // 2, SCREEN_H // 2)  # last known good gaze
         self.canvas = np.zeros((SCREEN_H, SCREEN_W, 3), np.uint8)
@@ -466,13 +467,14 @@ class GazeTrackerApp:
             cv2.circle(cam,(int(lms[idx].x*w),int(lms[idx].y*h)),3,(255,100,0),-1)
 
     # ── main loop ───────────────────────────────────────────────
-    def run(self, calib_done_event=None, stop_event=None):
+    def calibrate(self):
         """
-        calib_done_event : threading.Event — set when calibration completes
-        stop_event       : threading.Event — set externally to stop the loop
+        Phase 1 — MUST run on the main thread (macOS OpenCV GUI requirement).
+        Opens fullscreen calibration window, blocks until calibration completes,
+        then destroys the window. Call track() in a background thread after this.
         """
-        cap = cv2.VideoCapture(self.cam_id)
-        if not cap.isOpened():
+        self._cap = cv2.VideoCapture(self.cam_id)
+        if not self._cap.isOpened():
             print(f"[Error] Cannot open camera {self.cam_id}"); return
 
         print(f"[Info] Fullscreen 1920×1080  |  {self.num_points}-point calibration")
@@ -482,7 +484,41 @@ class GazeTrackerApp:
         cv2.namedWindow(self.WIN, cv2.WINDOW_NORMAL)
         cv2.setWindowProperty(self.WIN, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
-        _calib_signalled = False
+        while not self.calib.done:
+            ret, cam = self._cap.read()
+            if not ret: break
+            cam = cv2.flip(cam, 1)
+            res = self.mesh.process(cv2.cvtColor(cam, cv2.COLOR_BGR2RGB))
+
+            feat = lms = None
+            if res.multi_face_landmarks:
+                lms  = res.multi_face_landmarks[0].landmark
+                feat = self.extractor.extract(lms, cam.shape[1], cam.shape[0])
+
+            self._debug_cam(cam, lms)
+            self._render_calib(cam, feat, lms)
+            cv2.imshow(self.WIN, self.canvas)
+
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
+                self._cap.release()
+                cv2.destroyAllWindows()
+                return False
+
+        # Calibration done — destroy window, continue tracking headlessly
+        cv2.destroyWindow(self.WIN)
+        cv2.waitKey(1)
+        self._mouse_ctrl = True
+        print("[Info] Calibration done — tracking active.")
+        return True
+
+    def track(self, stop_event=None):
+        """
+        Phase 2 — runs in a background thread (no OpenCV GUI).
+        Requires calibrate() to have completed first.
+        """
+        cap = self._cap
+        fps = self._fps
 
         while True:
             if stop_event and stop_event.is_set():
@@ -499,37 +535,19 @@ class GazeTrackerApp:
                 feat = self.extractor.extract(lms, cam.shape[1], cam.shape[0])
 
             self._debug_cam(cam, lms)
-            fps = self._fps()
+            self._render_track(cam, feat, lms, fps())
 
-            if not self.calib.done:
-                self._render_calib(cam, feat, lms)
-                if self.calib.done:
-                    print("[Info] Calibration done — tracking active.")
-                    if calib_done_event and not _calib_signalled:
-                        # Enable mouse control automatically in integrated mode
-                        self._mouse_ctrl = True
-                        # Minimize the OpenCV window after calibration
-                        cv2.setWindowProperty(self.WIN, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
-                        cv2.setWindowProperty(self.WIN, cv2.WND_PROP_VISIBLE, 0)
-                        calib_done_event.set()
-                        _calib_signalled = True
-            else:
-                self._render_track(cam, feat, lms, fps)
+        cap.release()
+        print("[Info] Tracking stopped.")
 
-            cv2.imshow(self.WIN, self.canvas)
-
-            key = cv2.waitKey(1) & 0xFF
-            if   key == ord('q'): break
-            elif key == ord('r'): print("[Info] Recalibrating…"); self._new_calib()
-            elif key == ord('h'): self._pip = not self._pip
-            elif key == ord('d'): self._dbg = not self._dbg
-            elif key == ord('x'):
-                self._mouse_ctrl = not self._mouse_ctrl
-                state = "ENABLED" if self._mouse_ctrl else "DISABLED"
-                print(f"[Info] Mouse control {state}")
-
-        cap.release(); cv2.destroyAllWindows()
-        print("[Info] Stopped.")
+    def run(self, calib_done_event=None, stop_event=None):
+        """Legacy single-thread entry point (non-macOS or standalone use)."""
+        ok = self.calibrate()
+        if not ok:
+            return
+        if calib_done_event:
+            calib_done_event.set()
+        self.track(stop_event=stop_event)
 
 
 # ──────────────────────────────────────────────────────────────
