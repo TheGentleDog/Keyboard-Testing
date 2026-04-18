@@ -33,8 +33,10 @@ try:
     import pyautogui
     pyautogui.FAILSAFE  = False   # don't crash if cursor hits screen corner
     pyautogui.PAUSE     = 0       # no delay between calls
+    _PYAUTOGUI_SCREEN_W, _PYAUTOGUI_SCREEN_H = pyautogui.size()
     _PYAUTOGUI_OK = True
 except ImportError:
+    _PYAUTOGUI_SCREEN_W, _PYAUTOGUI_SCREEN_H = 1920, 1080
     _PYAUTOGUI_OK = False
     print("[Warn] pyautogui not installed — mouse control disabled. pip install pyautogui")
 
@@ -361,6 +363,8 @@ class GazeTrackerApp:
         self._last_gaze = (SCREEN_W // 2, SCREEN_H // 2)  # last known good gaze
         self._tracking_frames = 0
         self._tracking_faces = 0
+        self._tracking_predictions = 0
+        self._mouse_moves = 0
         self._tracking_error = None
         self.canvas = np.zeros((SCREEN_H, SCREEN_W, 3), np.uint8)
 
@@ -429,9 +433,13 @@ class GazeTrackerApp:
             gx  = int(np.clip(smo[0]*SCREEN_W,  0, SCREEN_W-1))
             gy  = int(np.clip(smo[1]*SCREEN_H, 0, SCREEN_H-1))
             self._last_gaze = (gx, gy)
+            self._tracking_predictions += 1
             self.hist.append((gx, gy))
             if self._mouse_ctrl and _PYAUTOGUI_OK:
-                pyautogui.moveTo(gx, gy)
+                mx = int(gx * _PYAUTOGUI_SCREEN_W / SCREEN_W)
+                my = int(gy * _PYAUTOGUI_SCREEN_H / SCREEN_H)
+                pyautogui.moveTo(mx, my)
+                self._mouse_moves += 1
 
         # Always draw cursor at last known position
         gx, gy = self._last_gaze
@@ -549,6 +557,8 @@ class GazeTrackerApp:
         fps = self._fps
         self._tracking_frames = 0
         self._tracking_faces = 0
+        self._tracking_predictions = 0
+        self._mouse_moves = 0
         self._tracking_error = None
 
         try:

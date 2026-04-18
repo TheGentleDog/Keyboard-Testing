@@ -463,7 +463,11 @@ def main():
             if can_update_status:
                 state = "ON" if tracker._mouse_ctrl else "OFF"
                 app.status_bar.config(
-                    text=f"Gaze tracking active | mouse {state} | frames {tracker._tracking_frames} | faces {tracker._tracking_faces}"
+                    text=(
+                        f"Gaze active | mouse {state} | frames {tracker._tracking_frames} | "
+                        f"faces {tracker._tracking_faces} | points {tracker._tracking_predictions} | "
+                        f"moves {tracker._mouse_moves}"
+                    )
                 )
             app.after(3000, monitor_tracking)
 
