@@ -113,7 +113,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self.bind_all('<KeyPress-R>', self._keyboard_only_gaze_shortcut)
 
         self.ui_layout               = ui_layout if ui_layout in ("qwerty", "ui2") else "qwerty"
-        self._ui2_groups             = ("abcd", "efgh", "ijkl", "mnop", "qrst", "yz")
+        self._ui2_groups             = ("abcd", "efgh", "ijkl", "mnop", "qrstu", "vwxyz")
         self.current_theme           = "dark"
         self.themes                  = self.THEMES
         self.current_completion      = ""
@@ -357,8 +357,8 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             ("EFGH", lambda: self._show_ui2_letters("efgh")),
             ("IJKL", lambda: self._show_ui2_letters("ijkl")),
             ("MNOP", lambda: self._show_ui2_letters("mnop")),
-            ("QRST", lambda: self._show_ui2_letters("qrst")),
-            ("YZ",   lambda: self._show_ui2_letters("yz")),
+            ("QRSTU", lambda: self._show_ui2_letters("qrstu")),
+            ("VWXYZ", lambda: self._show_ui2_letters("vwxyz")),
             ("⌫",    self.backspace),
             ("Clear all", self.clear_all),
         ]
