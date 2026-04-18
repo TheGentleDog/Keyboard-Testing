@@ -359,6 +359,9 @@ class GazeTrackerApp:
         self._window_open  = True
         self._blink = False  # blink state indicator
         self._last_gaze = (SCREEN_W // 2, SCREEN_H // 2)  # last known good gaze
+        self._tracking_frames = 0
+        self._tracking_faces = 0
+        self._tracking_error = None
         self.canvas = np.zeros((SCREEN_H, SCREEN_W, 3), np.uint8)
 
     def _new_calib(self):
@@ -544,23 +547,34 @@ class GazeTrackerApp:
         """
         cap = self._cap
         fps = self._fps
+        self._tracking_frames = 0
+        self._tracking_faces = 0
+        self._tracking_error = None
 
-        while True:
-            if stop_event and stop_event.is_set():
-                break
+        try:
+            while True:
+                if stop_event and stop_event.is_set():
+                    break
 
-            ret, cam = cap.read()
-            if not ret: break
-            cam = cv2.flip(cam, 1)
-            res = self.mesh.process(cv2.cvtColor(cam, cv2.COLOR_BGR2RGB))
+                ret, cam = cap.read()
+                if not ret:
+                    self._tracking_error = "Camera frame read failed"
+                    break
+                self._tracking_frames += 1
+                cam = cv2.flip(cam, 1)
+                res = self.mesh.process(cv2.cvtColor(cam, cv2.COLOR_BGR2RGB))
 
-            feat = lms = None
-            if res.multi_face_landmarks:
-                lms  = res.multi_face_landmarks[0].landmark
-                feat = self.extractor.extract(lms, cam.shape[1], cam.shape[0])
+                feat = lms = None
+                if res.multi_face_landmarks:
+                    self._tracking_faces += 1
+                    lms  = res.multi_face_landmarks[0].landmark
+                    feat = self.extractor.extract(lms, cam.shape[1], cam.shape[0])
 
-            self._debug_cam(cam, lms)
-            self._render_track(cam, feat, lms, fps())
+                self._debug_cam(cam, lms)
+                self._render_track(cam, feat, lms, fps())
+        except Exception as e:
+            self._tracking_error = str(e)
+            print(f"[Error] Tracking crashed: {e}")
 
         cap.release()
         print("[Info] Tracking stopped.")

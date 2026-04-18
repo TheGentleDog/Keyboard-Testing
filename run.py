@@ -382,17 +382,20 @@ def main():
     if not ok:
         print("[Info] Calibration cancelled.")
         sys.exit(0)
+    tracker._mouse_ctrl = True
     print("\n✓ Calibration complete — launching keyboard...\n")
 
     # ── Phase 2: Tracking in background thread (no OpenCV GUI) ───────────────
     def start_tracking():
         nonlocal gaze_thread
+        tracker._tracking_error = None
         gaze_thread = threading.Thread(
             target=tracker.track,
             kwargs={"stop_event": stop_gaze},
             daemon=True,
         )
         gaze_thread.start()
+        print("[Info] Tracking thread started.")
 
     def stop_tracking():
         stop_gaze.set()
@@ -437,12 +440,32 @@ def main():
 
         ok = tracker.calibrate()
         if ok:
+            tracker._mouse_ctrl = True
             start_tracking()
             app.status_bar.config(text="Recalibration complete | gaze tracking active")
         else:
             app.status_bar.config(text="Recalibration cancelled | closing session")
             on_close()
         return "break"
+
+    def monitor_tracking():
+        current_status = app.status_bar.cget("text")
+        can_update_status = current_status.startswith((
+            "Gaze tracking",
+            "Gaze-based keyboard ready",
+            "Recalibration",
+        ))
+        if tracker._tracking_error:
+            app.status_bar.config(text=f"Gaze tracking stopped: {tracker._tracking_error}")
+        elif gaze_thread and not gaze_thread.is_alive():
+            app.status_bar.config(text="Gaze tracking stopped")
+        else:
+            if can_update_status:
+                state = "ON" if tracker._mouse_ctrl else "OFF"
+                app.status_bar.config(
+                    text=f"Gaze tracking active | mouse {state} | frames {tracker._tracking_frames} | faces {tracker._tracking_faces}"
+                )
+            app.after(3000, monitor_tracking)
 
     app.protocol("WM_DELETE_WINDOW", on_close)
     app.bind_all("<KeyPress-q>", quit_session)
@@ -451,6 +474,7 @@ def main():
     app.bind_all("<KeyPress-X>", toggle_mouse_control)
     app.bind_all("<KeyPress-r>", recalibrate)
     app.bind_all("<KeyPress-R>", recalibrate)
+    app.after(1000, monitor_tracking)
     app.mainloop()
 
     # Cleanup
