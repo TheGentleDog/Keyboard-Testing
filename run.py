@@ -452,6 +452,7 @@ def main():
         current_status = app.status_bar.cget("text")
         can_update_status = current_status.startswith((
             "Gaze tracking",
+            "Gaze active",
             "Gaze-based keyboard ready",
             "Recalibration",
         ))
@@ -466,7 +467,7 @@ def main():
                     text=(
                         f"Gaze active | mouse {state} | frames {tracker._tracking_frames} | "
                         f"faces {tracker._tracking_faces} | points {tracker._tracking_predictions} | "
-                        f"moves {tracker._mouse_moves}"
+                        f"moves {tracker._mouse_moves} | pyauto {'OK' if tracker.pyautogui_ok else 'NO'}"
                     )
                 )
             app.after(3000, monitor_tracking)

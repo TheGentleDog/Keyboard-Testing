@@ -366,6 +366,8 @@ class GazeTrackerApp:
         self._tracking_predictions = 0
         self._mouse_moves = 0
         self._tracking_error = None
+        self.pyautogui_ok = _PYAUTOGUI_OK
+        self.pyautogui_screen_size = (_PYAUTOGUI_SCREEN_W, _PYAUTOGUI_SCREEN_H)
         self.canvas = np.zeros((SCREEN_H, SCREEN_W, 3), np.uint8)
 
     def _new_calib(self):
