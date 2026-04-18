@@ -4,6 +4,7 @@
 
 import os
 import sys
+import argparse
 from config import (
     FILIPINO_DATASET_FILE,
     ENGLISH_DATASET_FILE,
@@ -73,6 +74,11 @@ def _ensure_rules():
 # STEP 3: Boot model + launch UI
 # ─────────────────────────────────────────────
 def main():
+    parser = argparse.ArgumentParser(description="Launch the keyboard UI only.")
+    parser.add_argument("--ui", choices=["qwerty", "ui2"], default="qwerty",
+                        help="Keyboard layout to open.")
+    args = parser.parse_args()
+
     _ensure_datasets()
     _ensure_rules()
 
@@ -93,7 +99,7 @@ def main():
     print("\nLoading user learning...")
     ngram_model.load_user_learning()
 
-    app = FilipinoKeyboard()
+    app = FilipinoKeyboard(ui_layout=args.ui)
     app.mainloop()
 
 

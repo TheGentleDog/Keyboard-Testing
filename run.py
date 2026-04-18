@@ -54,7 +54,7 @@ class LauncherUI(tk.Tk):
         self.configure(bg=d["bg"])
 
         # ── Center window ─────────────────────────────────────────
-        W, H = 560, 700
+        W, H = 560, 770
         sw = self.winfo_screenwidth()
         sh = self.winfo_screenheight()
         self.geometry(f"{W}x{H}+{(sw-W)//2}+{(sh-H)//2}")
@@ -149,6 +149,23 @@ class LauncherUI(tk.Tk):
         for mode, label in [("sync", "Synchronous"), ("async", "Asynchronous")]:
             rb = tk.Radiobutton(dwell_frame, text=label, variable=self._dwell_mode_var,
                                 value=mode, bg=d["card"], fg=d["text"],
+                                selectcolor=d["accent"], activebackground=d["card"],
+                                activeforeground=d["text"],
+                                font=("Segoe UI", 10))
+            rb.pack(side="left", padx=8)
+
+        # ────────────────────────────────────────────────────────
+        #  UI LAYOUT
+        # ────────────────────────────────────────────────────────
+        layout = self._section(body, "UI LAYOUT")
+        self._ui_layout_var = tk.StringVar(value="qwerty")
+        layout_frame = tk.Frame(layout, bg=d["card"])
+        layout_frame.pack(fill="x", pady=3)
+        tk.Label(layout_frame, text="Keyboard UI", bg=d["card"], fg=d["text"],
+                 font=("Segoe UI", 11), anchor="w", width=22).pack(side="left")
+        for value, label in [("qwerty", "QWERTY"), ("ui2", "UI2")]:
+            rb = tk.Radiobutton(layout_frame, text=label, variable=self._ui_layout_var,
+                                value=value, bg=d["card"], fg=d["text"],
                                 selectcolor=d["accent"], activebackground=d["card"],
                                 activeforeground=d["text"],
                                 font=("Segoe UI", 10))
@@ -277,6 +294,7 @@ class LauncherUI(tk.Tk):
             "pnoise":  self._pnoise_var.get(),
             "mnoise":  self._mnoise_var.get(),
             "dwell_mode": self._dwell_mode_var.get(),
+            "ui_layout": self._ui_layout_var.get(),
         }
         self.destroy()
 
@@ -303,7 +321,7 @@ def main():
     print("  GAZE-BASED DIGITAL KEYBOARD")
     print(f"  Points: {cfg['points']}  |  Samples: {cfg['samples']}  |  "
           f"EMA: {cfg['ema']:.2f}  |  Camera: {cfg['camera']}  |  "
-          f"Dwell: {cfg['dwell_mode']}")
+          f"Dwell: {cfg['dwell_mode']}  |  UI: {cfg['ui_layout']}")
     print("=" * 60)
 
     # ── Deferred imports (avoid slowing down launcher) ────────────────────────
@@ -386,7 +404,7 @@ def main():
     # ── Launch Tkinter keyboard on main thread ────────────────────────────────
     from ui import FilipinoKeyboard
 
-    app = FilipinoKeyboard()
+    app = FilipinoKeyboard(ui_layout=cfg["ui_layout"])
 
     def on_close():
         stop_tracking()

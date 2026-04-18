@@ -73,7 +73,12 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             restore_fg = theme["button_fg"]
         try:
             btn.config(bg="#00cc44", fg="#ffffff")
-            btn.after(200, lambda: btn.config(bg=restore_bg, fg=restore_fg))
+            def restore():
+                try:
+                    btn.config(bg=restore_bg, fg=restore_fg)
+                except Exception:
+                    pass
+            btn.after(200, restore)
         except Exception:
             pass
 
@@ -94,13 +99,21 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._dwell_register(lbl, command)
         return lbl
 
-    def __init__(self):
+    def __init__(self, ui_layout="qwerty"):
         super().__init__()
         self.title("Filipino Keyboard - Gaze-Based")
         self.attributes('-fullscreen', True)
         self.bind('<Escape>', lambda e: self.attributes('-fullscreen', False))
         self.bind('<s>', lambda e: self.show_settings())   # caretaker shortcut
+        self.bind_all('<KeyPress-q>', self._quit_keyboard)
+        self.bind_all('<KeyPress-Q>', self._quit_keyboard)
+        self.bind_all('<KeyPress-x>', self._keyboard_only_gaze_shortcut)
+        self.bind_all('<KeyPress-X>', self._keyboard_only_gaze_shortcut)
+        self.bind_all('<KeyPress-r>', self._keyboard_only_gaze_shortcut)
+        self.bind_all('<KeyPress-R>', self._keyboard_only_gaze_shortcut)
 
+        self.ui_layout               = ui_layout if ui_layout in ("qwerty", "ui2") else "qwerty"
+        self._ui2_groups             = ("abcd", "efgh", "ijkl", "mnop", "qrst", "yz")
         self.current_theme           = "dark"
         self.themes                  = self.THEMES
         self.current_completion      = ""
@@ -115,6 +128,16 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._dwell_init()
         self._load_sentence_counts()
         self._create_widgets()
+
+    def _quit_keyboard(self, _event=None):
+        self.destroy()
+        return "break"
+
+    def _keyboard_only_gaze_shortcut(self, event=None):
+        if hasattr(self, "status_bar"):
+            key = event.keysym.upper() if event else ""
+            self.status_bar.config(text=f"{key} is available in gaze mode only")
+        return "break"
 
     # =========================================================================
     # WIDGET SETUP
@@ -177,7 +200,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self.letters_frame    = tk.Frame(self.main_grid, bg=theme["bg"])
         self.predefined_frame = tk.Frame(self.main_grid, bg=theme["bg"])
         self.letters_frame.grid(row=1, column=0, rowspan=3, sticky="nsew")
-        self._create_letter_rows(self.letters_frame)
+        self._create_keyboard_area(self.letters_frame)
 
         self.apply_theme()
         self.update_display()
@@ -186,6 +209,38 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     # =========================================================================
     # KEYBOARD LAYOUT
     # =========================================================================
+    def _unregister_widgets(self, parent):
+        """Remove parent descendants from dwell tracking before rebuilding them."""
+        def descendants(widget):
+            items = []
+            for child in widget.winfo_children():
+                items.append(child)
+                items.extend(descendants(child))
+            return items
+
+        widgets = descendants(parent)
+
+        for widget in widgets:
+            bid = id(widget)
+            self.dwell_btn_meta.pop(bid, None)
+            self.dwell_hover_ms.pop(bid, None)
+            self.dwell_overlays.pop(bid, None)
+
+        self.keyboard_buttons = self.keyboard_buttons[:5] if hasattr(self, "keyboard_buttons") else []
+        if hasattr(self, "_backspace_btn"):
+            del self._backspace_btn
+        if hasattr(self, "_clearall_btn"):
+            del self._clearall_btn
+
+        for widget in parent.winfo_children():
+            widget.destroy()
+
+    def _create_keyboard_area(self, parent):
+        if self.ui_layout == "ui2":
+            self._create_ui2_group_rows(parent)
+        else:
+            self._create_letter_rows(parent)
+
     def _create_func_row(self, parent):
         """Always-visible function row: ◄ ► SPACE Predefined 🔊"""
         theme    = self.themes[self.current_theme]
@@ -222,6 +277,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     def _create_letter_rows(self, parent):
         """Q-P / A-⌫ / Z-Clear all rows."""
         theme = self.themes[self.current_theme]
+        self._unregister_widgets(parent)
 
         def btn_kw(**extra):
             return dict(
@@ -276,6 +332,83 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                 ca.grid(row=0, column=7, sticky="nsew", padx=1)
                 self.keyboard_buttons.append(ca)
                 self._clearall_btn = ca
+
+    def _create_ui2_group_rows(self, parent):
+        """UI2 Design 6: grouped letter blocks."""
+        theme = self.themes[self.current_theme]
+        self._unregister_widgets(parent)
+
+        def btn_kw(**extra):
+            return dict(
+                bg=theme["button_bg"], fg=theme["button_fg"],
+                relief="raised", bd=1, cursor="hand2",
+                **extra,
+            )
+
+        main = tk.Frame(parent, bg=theme["bg"])
+        main.pack(fill="both", expand=True)
+        for r in range(2):
+            main.grid_rowconfigure(r, weight=1, uniform="ui2row")
+        for c in range(4):
+            main.grid_columnconfigure(c, weight=1, uniform="ui2col")
+
+        cells = [
+            ("ABCD", lambda: self._show_ui2_letters("abcd")),
+            ("EFGH", lambda: self._show_ui2_letters("efgh")),
+            ("IJKL", lambda: self._show_ui2_letters("ijkl")),
+            ("MNOP", lambda: self._show_ui2_letters("mnop")),
+            ("QRST", lambda: self._show_ui2_letters("qrst")),
+            ("YZ",   lambda: self._show_ui2_letters("yz")),
+            ("⌫",    self.backspace),
+            ("Clear all", self.clear_all),
+        ]
+
+        for idx, (text, cmd) in enumerate(cells):
+            row, col = divmod(idx, 4)
+            is_special = text in ("⌫", "Clear all")
+            btn = self._make_dwell_btn(
+                main, cmd,
+                text=text, font=("Segoe UI", 22 if text != "Clear all" else 16, "bold"),
+                bg=theme.get("funckey_bg", theme["button_bg"]) if is_special else theme["button_bg"],
+                fg=theme.get("funckey_fg", theme["button_fg"]) if is_special else theme["button_fg"],
+                relief="raised", bd=1, cursor="hand2",
+            )
+            btn.grid(row=row, column=col, sticky="nsew", padx=2, pady=2)
+            self.keyboard_buttons.append(btn)
+            if text == "⌫":
+                self._backspace_btn = btn
+            elif text == "Clear all":
+                self._clearall_btn = btn
+
+        self._dwell_reset_all()
+
+    def _show_ui2_letters(self, letters):
+        """UI2 Design 7: large individual letter choices for a selected group."""
+        theme = self.themes[self.current_theme]
+        self._unregister_widgets(self.letters_frame)
+
+        main = tk.Frame(self.letters_frame, bg=theme["bg"])
+        main.pack(fill="both", expand=True)
+        main.grid_rowconfigure(0, weight=1)
+        for col in range(len(letters)):
+            main.grid_columnconfigure(col, weight=1, uniform="ui2letters")
+
+        for col, ch in enumerate(letters):
+            btn = self._make_dwell_btn(
+                main, lambda c=ch: self._insert_ui2_char(c),
+                text=ch.upper(), font=("Segoe UI", 28, "bold"),
+                bg=theme["button_bg"], fg=theme["button_fg"],
+                relief="raised", bd=1, cursor="hand2",
+            )
+            btn.grid(row=0, column=col, sticky="nsew", padx=2, pady=2)
+            self.keyboard_buttons.append(btn)
+
+        self._dwell_reset_all()
+        self.status_bar.config(text=f"UI2 letter group: {letters.upper()}")
+
+    def _insert_ui2_char(self, char):
+        self.insert_char(char)
+        self._create_ui2_group_rows(self.letters_frame)
 
     # =========================================================================
     # PREDEFINED SENTENCE PANEL

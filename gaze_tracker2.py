@@ -355,7 +355,7 @@ class GazeTrackerApp:
         self._fpsq  = collections.deque(maxlen=30)
         self._pip          = True
         self._dbg          = False
-        self._mouse_ctrl   = False
+        self._mouse_ctrl   = True
         self._window_open  = True
         self._blink = False  # blink state indicator
         self._last_gaze = (SCREEN_W // 2, SCREEN_H // 2)  # last known good gaze
@@ -401,7 +401,8 @@ class GazeTrackerApp:
         label = f"Calibration  ·  Point {self.calib.idx+1} / {self.calib.n}   ({int(prog*100)}%)"
         lw = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 1)[0][0]
         txt(cv, label, (SCREEN_W//2 - lw//2, by-12), scale=0.65, color=C_TEXT)
-        hint = "Keep your eyes on the dot  ·  H=pip  D=debug  Q=quit"
+        mouse_state = "ON" if self._mouse_ctrl else "OFF"
+        hint = f"Keep eyes on dot  ·  R=recalibrate  H=pip  D=debug  X=mouse({mouse_state})  Q=quit"
         hw = cv2.getTextSize(hint, cv2.FONT_HERSHEY_SIMPLEX, 0.48, 1)[0][0]
         txt(cv, hint, (SCREEN_W//2 - hw//2, SCREEN_H-18), scale=0.48, color=(100,100,100))
 
@@ -466,6 +467,30 @@ class GazeTrackerApp:
         for idx in GazeFeatureExtractor.L_CORNERS + GazeFeatureExtractor.R_CORNERS:
             cv2.circle(cam,(int(lms[idx].x*w),int(lms[idx].y*h)),3,(255,100,0),-1)
 
+    def _handle_calib_key(self, key):
+        if key == 255:
+            return None
+        ch = chr(key).lower()
+        if ch == 'q':
+            return "quit"
+        if ch == 'r':
+            self._new_calib()
+            print("[Info] Calibration restarted.")
+            return "restart"
+        if ch == 'h':
+            self._pip = not self._pip
+            print(f"[Info] Camera PiP {'on' if self._pip else 'off'}.")
+            return "handled"
+        if ch == 'd':
+            self._dbg = not self._dbg
+            print(f"[Info] Debug landmarks {'on' if self._dbg else 'off'}.")
+            return "handled"
+        if ch == 'x':
+            self._mouse_ctrl = not self._mouse_ctrl
+            print(f"[Info] Mouse control {'on' if self._mouse_ctrl else 'off'} after calibration.")
+            return "handled"
+        return None
+
     # ── main loop ───────────────────────────────────────────────
     def calibrate(self):
         """
@@ -500,7 +525,8 @@ class GazeTrackerApp:
             cv2.imshow(self.WIN, self.canvas)
 
             key = cv2.waitKey(1) & 0xFF
-            if key == ord('q'):
+            action = self._handle_calib_key(key)
+            if action == "quit":
                 self._cap.release()
                 cv2.destroyAllWindows()
                 return False
@@ -508,7 +534,6 @@ class GazeTrackerApp:
         # Calibration done — destroy window, continue tracking headlessly
         cv2.destroyWindow(self.WIN)
         cv2.waitKey(1)
-        self._mouse_ctrl = True
         print("[Info] Calibration done — tracking active.")
         return True
 

@@ -18,7 +18,8 @@
     "ama": "amazing",
     "gut": "gutom",
     "hu": "hungry",
-    "ge": "george"
+    "ge": "george",
+    "tha": "thanks"
   },
   "user_shortcut_usage": {
     "ta": 9,
@@ -39,14 +40,11 @@
     "ama": 1,
     "gut": 2,
     "hu": 1,
-    "ge": 1
+    "ge": 1,
+    "tha": 1
   },
   "new_words": [],
   "word_usage_history": [
-    [
-      "is",
-      []
-    ],
     [
       "tayo",
       []
@@ -751,6 +749,10 @@
         "you",
         "chat"
       ]
+    ],
+    [
+      "than",
+      []
     ]
   ]
 }
