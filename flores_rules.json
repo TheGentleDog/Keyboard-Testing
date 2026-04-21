@@ -1,0 +1,1634 @@
+{
+  "metadata": {
+    "source": "Flores et al. (2022) — efficient-spelling-normalization-filipino",
+    "github": "https://github.com/ljyflores/efficient-spelling-normalization-filipino",
+    "pairs_used": 401,
+    "description": "Substitution rules derived from the original Flores et al. dataset",
+    "last_updated": "2026-04-18"
+  },
+  "word_rules": {
+    "0": "o",
+    "2loy": "tuloy",
+    "2luyan": "tuluyan",
+    "abutn": "abutin",
+    "anq": "ang",
+    "anu": "ano",
+    "aq": "ako",
+    "atlest": "at least",
+    "awayn": "awayin",
+    "b": "ba",
+    "bbagyo": "babagyo",
+    "bcos": "because",
+    "bcoz": "because",
+    "bgay": "bagay",
+    "bgyo": "bagyo",
+    "bgyong": "bagyong",
+    "bhala": "bahala",
+    "bhay": "bahay",
+    "bk8": "bakit",
+    "bka": "baka",
+    "bkt": "bakit",
+    "bqyo": "bagyo",
+    "bta": "bata",
+    "bwat": "bawat",
+    "c": "si",
+    "c0mplain": "complain",
+    "c0ntr0l": "control",
+    "cgro": "siguro",
+    "cguro": "siguro",
+    "cia": "siya",
+    "cignal": "signal",
+    "cla": "sila",
+    "cmula": "simula",
+    "cnabi": "sinabi",
+    "d": "di",
+    "d2": "dito",
+    "da": "the",
+    "dahel": "dahil",
+    "dahl": "dahil",
+    "dba": "diba",
+    "dhil": "dahil",
+    "dn": "din",
+    "dnt": "dont",
+    "donot": "do not",
+    "dpat": "dapat",
+    "dretso": "diretso",
+    "drtso": "diretso",
+    "ds": "this",
+    "dto": "dito",
+    "dyn": "diyan",
+    "dyos": "diyos",
+    "esave": "isave",
+    "f0r": "for",
+    "frm": "from",
+    "gbi": "gabi",
+    "ggwin": "gagawin",
+    "gnabi": "ginabi",
+    "gnagawa": "ginagawa",
+    "gnawa": "ginawa",
+    "gnyan": "ganyan",
+    "gr8": "great",
+    "gud": "good",
+    "gvi": "gabi",
+    "gwa": "gawa",
+    "h0pe": "hope",
+    "habng": "habang",
+    "hangn": "hangin",
+    "hnd": "hindi",
+    "hndi": "hindi",
+    "hnggng": "hanggang",
+    "hwag": "huwag",
+    "i layo": "ilayo",
+    "i2": "ito",
+    "ibg": "ibig",
+    "icp": "isip",
+    "ingt": "ingat",
+    "iniicp": "iniisip",
+    "ipag dasal": "ipagdasal",
+    "jan": "diyan",
+    "jn": "diyan",
+    "k": "ka",
+    "kaba": "ka ba",
+    "kailngan": "kailangan",
+    "kakatpoz": "kakatapos",
+    "kana": "ka na",
+    "kania": "kanya",
+    "kau": "kayo",
+    "kawa2": "kawawa",
+    "kc": "kasi",
+    "kci": "kasi",
+    "kelangan": "kailangan",
+    "khit": "kahit",
+    "kkilabot": "kakakilabot",
+    "kla": "kala",
+    "kme": "kami",
+    "kn": "ka na",
+    "kna": "ka na",
+    "kng": "kung",
+    "kp": "ka pa",
+    "kphmakan": "kapahamakan",
+    "ksma": "kasama",
+    "ktabi": "katabi",
+    "kun": "kung",
+    "kya": "kaya",
+    "la2ki": "lalaki",
+    "lage": "lagi",
+    "lhat": "lahat",
+    "lht": "lahat",
+    "lng": "lang",
+    "m": "mo",
+    "m0rning": "morning",
+    "ma2loy": "matuloy",
+    "maapek2han": "maapektuhan",
+    "maapktuhan": "maapektuhan",
+    "mageng": "maging",
+    "magkakat0t0o": "magkatotoo",
+    "magpasalamt": "magpasalamat",
+    "maherap": "mahirap",
+    "malasakt": "malasakit",
+    "matu2naw": "matutunaw",
+    "mbahaan": "mabahaan",
+    "mejo": "medyo",
+    "mg": "mag",
+    "mganda": "maganda",
+    "mggwa": "magagawa",
+    "mgiingt": "magiingat",
+    "mging": "maging",
+    "mgingt": "magingat",
+    "mgkr0n": "magkaroon",
+    "mgppkampante": "magpapakampante",
+    "mgppsko": "magpapasko",
+    "mgpray": "magpray",
+    "mgsalita": "magsalita",
+    "mgsi2datingan": "magsisidatingan",
+    "mhal": "mahal",
+    "mkasalanan": "makasalanan",
+    "mkitd": "makitid",
+    "mla2gay": "malalagay",
+    "mlaki": "malaki",
+    "mlapit": "malapit",
+    "mlyo": "malayo",
+    "mmukhang": "mumukhang",
+    "mn": "man",
+    "morng": "morning",
+    "mphmak": "mapahamak",
+    "mrami": "marami",
+    "mrnsn": "maranasan",
+    "ms": "mas",
+    "msaktan": "masaktan",
+    "msama": "masama",
+    "msira": "masira",
+    "mskit": "masakit",
+    "msktan": "masaktan",
+    "msma": "masama",
+    "msyado": "masyado",
+    "mtitikman": "matitikman",
+    "mtmaan": "matamaan",
+    "mttgas": "matitigas",
+    "mttmaan": "matatamaan",
+    "mu": "mo",
+    "mwalan": "mawalan",
+    "mwla": "mawala",
+    "my": "may",
+    "n": "na",
+    "n0body": "nobody",
+    "nabgyo": "nabagyo",
+    "nagdul0t": "nagdulot",
+    "naghi2ntay": "naghihintay",
+    "nagppakita": "nagpapakita",
+    "nah": "na",
+    "naka2": "nakaka",
+    "nakkita": "nakikita",
+    "naleto": "nalito",
+    "nalng": "nalang",
+    "namn": "namin",
+    "nangya2ri": "nangyayari",
+    "nappagod": "napapagod",
+    "nd": "hindi",
+    "ne": "ni",
+    "nea": "niya",
+    "ngaalala": "nagaalala",
+    "ngaun": "ngayon",
+    "ngdadasal": "nagdadasal",
+    "ngyari": "nangyari",
+    "ngyri": "nangyari",
+    "ngyun": "ngayon",
+    "ngyyri": "nangyayari",
+    "nio": "niyo",
+    "nka2bangon": "nakakabangon",
+    "nkkawa": "nakakaawa",
+    "nkktkt": "nakakatakot",
+    "nkraang": "nakaraang",
+    "nku": "nako",
+    "nl": "nila",
+    "nla": "nila",
+    "nlng": "nalang",
+    "nman": "naman",
+    "nmang": "namang",
+    "nmen": "namin",
+    "nmn": "naman",
+    "nnaman": "na naman",
+    "nnamn": "na naman",
+    "nngailngn": "nangangailangan",
+    "npapakinggan": "napapakinggan",
+    "nrin": "na rin",
+    "nring": "na ring",
+    "nsa": "nasa",
+    "nsabi": "nasabi",
+    "ntin": "natin",
+    "nttwa": "natatawa",
+    "nwln": "nawalan",
+    "nyan": "niyan",
+    "nyo": "niyo",
+    "p": "pa",
+    "paba2yaan": "pababayaan",
+    "pangin0on": "panginoon",
+    "paraw": "pa raw",
+    "pask0": "pasko",
+    "pba": "pa ba",
+    "pbyaan": "pabayaan",
+    "pde": "pwede",
+    "pdin": "pa din",
+    "pede": "pwede",
+    "pg": "pag",
+    "pinaki2nggan": "pinakikinggan",
+    "pla": "pala",
+    "plage": "palagi",
+    "plng": "pa lang",
+    "pls": "please",
+    "plz": "please",
+    "pmilya": "pamilya",
+    "pmlya": "pamilya",
+    "pnapnalangin": "pinapanalangin",
+    "png": "pang",
+    "pngssbi": "pinagsasabi",
+    "poceblidad": "posibilidad",
+    "poe": "po",
+    "ppbyaan": "papabayaan",
+    "pptak": "papatak",
+    "pra": "para",
+    "pring": "pa ring",
+    "prn": "pa rin",
+    "prng": "parang",
+    "pro": "pero",
+    "ptak": "patak",
+    "pwd": "pwede",
+    "pwdi": "pwede",
+    "q": "ko",
+    "qna": "ka na",
+    "r": "are",
+    "rgard": "regard",
+    "s": "sa",
+    "sabagay": "sa bagay",
+    "sainyo": "sa inyo",
+    "samen": "sa amin",
+    "samin": "sa amin",
+    "savi": "sabi",
+    "sbay": "sabay",
+    "sbihin": "sabihin",
+    "sbuhay": "sa buhay",
+    "sby": "sabay",
+    "sgnal": "signal",
+    "slmt": "salamat",
+    "smahan": "samahan",
+    "smen": "sa amin",
+    "smin": "sa amin",
+    "sna": "sana",
+    "snsabi": "sinasabi",
+    "su2nod": "susunod",
+    "svi": "sabi",
+    "t0": "to",
+    "tatma": "tatama",
+    "tau": "tayo",
+    "teu": "tayo",
+    "tga": "taga",
+    "thanxs": "thanks",
+    "thnks": "thanks",
+    "tkot": "takot",
+    "tlg": "talaga",
+    "tluyan": "tuluyan",
+    "tnx": "thanks",
+    "tska": "tsaka",
+    "ttma": "tatama",
+    "tulongan": "tulungan",
+    "twla": "tiwala",
+    "ty0": "tayo",
+    "tym": "time",
+    "tyong": "tayong",
+    "uag": "huwag",
+    "ult": "ulit",
+    "ultin": "ulitin",
+    "umaarw": "umaaraw",
+    "un": "yun",
+    "ur": "your",
+    "walng": "walang",
+    "wg": "wag",
+    "wkas": "wakas",
+    "wla": "wala",
+    "xa": "sa",
+    "xabi": "sabi",
+    "yn": "yan",
+    "yta": "yata",
+    "0n": "on",
+    "2mama": "tumama",
+    "2naw": "tunaw",
+    "ah0n": "ahon",
+    "alm": "alam",
+    "anjan": "andiyan",
+    "cnic": "sinisi",
+    "cntro": "sentro",
+    "cya": "siya",
+    "destructi0n": "destruction",
+    "dng": "ding",
+    "engat": "ingat",
+    "ginagavi": "ginagabi",
+    "gnagabi": "ginagabi",
+    "gumagawah": "gumagawa",
+    "herap": "hirap",
+    "hin2": "hinto",
+    "hnggang": "hanggang",
+    "kb": "ka ba",
+    "kbabayan": "kababayan",
+    "kbbyan": "kababayan",
+    "kelan": "kailan",
+    "klaki": "kalaki",
+    "kmi": "kami",
+    "kmsta": "kamusta",
+    "koh": "ko",
+    "lanq": "lang",
+    "ma2naw": "matunaw",
+    "manaliq": "manalig",
+    "mappnta": "mapupunta",
+    "masktan": "masaktan",
+    "mbahala": "mabahala",
+    "mgbabaha": "magbabaha",
+    "mggawa": "magagawa",
+    "mghapon": "maghapon",
+    "mgkar00n": "magkaroon",
+    "mglandfall": "maglandfall",
+    "mglaro": "maglaro",
+    "mgpakampante": "magpakampante",
+    "mgpasalamat": "magpasalamat",
+    "mhangin": "mahangin",
+    "mhirap": "mahirap",
+    "mkakaya": "makakaya",
+    "mkitid": "makitid",
+    "mkpg": "makapag",
+    "mlagay": "malagay",
+    "mlakas": "malakas",
+    "mlmig": "malamig",
+    "mlpit": "malapit",
+    "mlusaw": "malusaw",
+    "mppkinggan": "mapapakinggan",
+    "msyadong": "masyadong",
+    "n0rthern": "northern",
+    "na2wa": "natuwa",
+    "naka2ah0n": "nakakaahon",
+    "naka2lito": "nakakalito",
+    "nde": "hindi",
+    "ndi": "hindi",
+    "ngaung": "ngayong",
+    "ngay0n": "ngayon",
+    "ngddsal": "nagdadasal",
+    "ngyn": "ngayon",
+    "nkakagets": "nakakagets",
+    "nkakalungkot": "nakakalungkot",
+    "nkakarecover": "nakakarecover",
+    "npkrming": "napakaraming",
+    "ntn": "natin",
+    "paanu": "paano",
+    "pe0ple": "people",
+    "pguugali": "paguugali",
+    "pki": "paki",
+    "plagi": "palagi",
+    "poh": "po",
+    "ppbayaan": "papabayaan",
+    "pplapit": "papalapit",
+    "prin": "pa rin",
+    "pwdeng": "pwedeng",
+    "rep0rt": "report",
+    "saamin": "sa amin",
+    "salamt": "salamat",
+    "sanah": "sana",
+    "sbi": "sabi",
+    "sguro": "siguro",
+    "sming": "sa aming",
+    "snasabi": "sinasabi",
+    "sya": "siya",
+    "taung": "tayong",
+    "tlga": "talaga",
+    "tma": "tama",
+    "ttgil": "titigil",
+    "tyo": "tayo",
+    "ung": "yung",
+    "wlang": "walang",
+    "wlng": "walang",
+    "xana": "sana",
+    "xero": "zero",
+    "yng": "yang"
+  },
+  "char_rules": {
+    "2l": [
+      "tu",
+      "t",
+      "k",
+      "tul",
+      "ka",
+      "kal"
+    ],
+    "lo": [
+      "ul",
+      "u",
+      "ulo"
+    ],
+    "oy": [
+      "l",
+      "lo",
+      "loy"
+    ],
+    "lu": [
+      "ulu",
+      "alu",
+      "a",
+      "u",
+      "al",
+      "ul"
+    ],
+    "uy": [
+      "l",
+      "luy",
+      "lu"
+    ],
+    "q": [
+      "ko",
+      "a",
+      "k",
+      "ag",
+      "g",
+      "ka",
+      "agy"
+    ],
+    "es": [
+      "i",
+      "isa",
+      "l",
+      "lea",
+      "le",
+      "is"
+    ],
+    "st": [
+      "eas",
+      "mu",
+      "e",
+      "mus",
+      "m",
+      "ea"
+    ],
+    "gy": [
+      "a",
+      "ang",
+      "ag",
+      "an",
+      "agy"
+    ],
+    "co": [
+      "eca",
+      "eco",
+      "ec",
+      "e"
+    ],
+    "os": [
+      "c",
+      "yo",
+      "yos",
+      "ca",
+      "cau",
+      "y"
+    ],
+    "oz": [
+      "pos",
+      "c",
+      "po",
+      "ca",
+      "p",
+      "cau"
+    ],
+    "z": [
+      "e",
+      "eas",
+      "a",
+      "o",
+      "os",
+      "ea",
+      "aus",
+      "au"
+    ],
+    "k8": [
+      "aki",
+      "a",
+      "ak"
+    ],
+    "8": [
+      "e",
+      "eat",
+      "ea",
+      "k",
+      "ki",
+      "kit"
+    ],
+    "kt": [
+      "ekt",
+      "e",
+      "ek",
+      "ak",
+      "a",
+      "akt",
+      "sak",
+      "s",
+      "sa",
+      "aki"
+    ],
+    "qy": [
+      "agy",
+      "a",
+      "ag"
+    ],
+    "0m": [
+      "o",
+      "omp",
+      "om"
+    ],
+    "0l": [
+      "o",
+      "ol"
+    ],
+    "cg": [
+      "sig",
+      "si",
+      "s"
+    ],
+    "gr": [
+      "i",
+      "igu",
+      "ig"
+    ],
+    "gu": [
+      "agu",
+      "igu",
+      "a",
+      "i",
+      "ig",
+      "ag"
+    ],
+    "ur": [
+      "gu",
+      "yo",
+      "g",
+      "gur",
+      "y",
+      "you"
+    ],
+    "ci": [
+      "a",
+      "sig",
+      "as",
+      "s",
+      "siy",
+      "asi",
+      "si"
+    ],
+    "cl": [
+      "si",
+      "s",
+      "sil"
+    ],
+    "cm": [
+      "sim",
+      "si",
+      "s"
+    ],
+    "mu": [
+      "um",
+      "i",
+      "u",
+      "imu",
+      "im",
+      "umu"
+    ],
+    "ul": [
+      "mul",
+      "m",
+      "mu"
+    ],
+    "cn": [
+      "sen",
+      "sin",
+      "s",
+      "se",
+      "si"
+    ],
+    "bi": [
+      "sab",
+      "ab",
+      "abi",
+      "a",
+      "sas",
+      "sa",
+      "s"
+    ],
+    "el": [
+      "il",
+      "ail",
+      "ai",
+      "a",
+      "i"
+    ],
+    "hi": [
+      "ahi",
+      "a",
+      "ih",
+      "i",
+      "ihi",
+      "ah"
+    ],
+    "ot": [
+      "ko",
+      "kot",
+      "la",
+      "not",
+      "lab",
+      "no",
+      "l",
+      "k",
+      "n"
+    ],
+    "re": [
+      "ire",
+      "ir",
+      "ar",
+      "a",
+      "i",
+      "are"
+    ],
+    "et": [
+      "re",
+      "i",
+      "ret",
+      "ge",
+      "ito",
+      "g",
+      "get",
+      "it",
+      "r"
+    ],
+    "ts": [
+      "ets",
+      "e",
+      "et",
+      "re",
+      "ret",
+      "r"
+    ],
+    "so": [
+      "ts",
+      "ets",
+      "e",
+      "et",
+      "t",
+      "tso"
+    ],
+    "rt": [
+      "ire",
+      "i",
+      "ir"
+    ],
+    "ds": [
+      "t",
+      "th",
+      "thi"
+    ],
+    "to": [
+      "i",
+      "it",
+      "ito"
+    ],
+    "yn": [
+      "iy",
+      "ay",
+      "i",
+      "a",
+      "ayo",
+      "iya"
+    ],
+    "0r": [
+      "orn",
+      "o",
+      "or",
+      "ort"
+    ],
+    "gw": [
+      "a",
+      "ag",
+      "aga"
+    ],
+    "wi": [
+      "g",
+      "gaw",
+      "ga"
+    ],
+    "ny": [
+      "iny",
+      "a",
+      "i",
+      "in",
+      "any",
+      "an"
+    ],
+    "ud": [
+      "oo",
+      "o",
+      "ood"
+    ],
+    "v": [
+      "ab",
+      "abi",
+      "ove",
+      "a",
+      "o",
+      "b",
+      "ov",
+      "bi"
+    ],
+    "vi": [
+      "ab",
+      "abi",
+      "a",
+      "b",
+      "bi"
+    ],
+    "0p": [
+      "opl",
+      "ope",
+      "o",
+      "op"
+    ],
+    "nd": [
+      "ind",
+      "h",
+      "a",
+      "i",
+      "in",
+      "hi",
+      "an",
+      "and",
+      "hin"
+    ],
+    "di": [
+      "ind",
+      "e",
+      "a",
+      "i",
+      "ede",
+      "ed",
+      "in",
+      "ndi",
+      "nd",
+      "n"
+    ],
+    "gg": [
+      "ng",
+      "aga",
+      "kin",
+      "a",
+      "ngg",
+      "ag",
+      "k",
+      "n",
+      "ki"
+    ],
+    "cp": [
+      "si",
+      "sip",
+      "s"
+    ],
+    "j": [
+      "diy",
+      "d",
+      "di",
+      "dy",
+      "dyo"
+    ],
+    "ja": [
+      "diy",
+      "di",
+      "d"
+    ],
+    "jn": [
+      "diy",
+      "di",
+      "d"
+    ],
+    "po": [
+      "ap",
+      "a",
+      "apo"
+    ],
+    "ia": [
+      "y",
+      "ya"
+    ],
+    "bo": [
+      "i",
+      "ila",
+      "il"
+    ],
+    "me": [
+      "ami",
+      "a",
+      "am"
+    ],
+    "ph": [
+      "ap",
+      "a",
+      "apa"
+    ],
+    "hm": [
+      "p",
+      "pa",
+      "pah"
+    ],
+    "sm": [
+      "a",
+      "as",
+      "asa"
+    ],
+    "2k": [
+      "l",
+      "la",
+      "lak"
+    ],
+    "ht": [
+      "a",
+      "ah",
+      "aha"
+    ],
+    "2h": [
+      "tu",
+      "t",
+      "tuh"
+    ],
+    "tu": [
+      "ktu",
+      "k",
+      "kt"
+    ],
+    "uh": [
+      "tu",
+      "t",
+      "tuh"
+    ],
+    "0t": [
+      "oo",
+      "o",
+      "ot"
+    ],
+    "t0": [
+      "o"
+    ],
+    "er": [
+      "ir",
+      "i",
+      "ve",
+      "v",
+      "ver",
+      "ira"
+    ],
+    "ah": [
+      "ba",
+      "m",
+      "b",
+      "ma",
+      "bah",
+      "mah"
+    ],
+    "jo": [
+      "dy",
+      "d",
+      "dyo"
+    ],
+    "ii": [
+      "gi",
+      "gii",
+      "g"
+    ],
+    "gt": [
+      "nga",
+      "ng",
+      "n"
+    ],
+    "gk": [
+      "ng",
+      "ngk",
+      "a",
+      "ag",
+      "agk",
+      "n"
+    ],
+    "kr": [
+      "ak",
+      "gka",
+      "a",
+      "pa",
+      "g",
+      "pak",
+      "aka",
+      "p",
+      "gk"
+    ],
+    "r0": [
+      "ar",
+      "a",
+      "k",
+      "kar",
+      "ka",
+      "aro"
+    ],
+    "gp": [
+      "a",
+      "ag",
+      "agp"
+    ],
+    "pp": [
+      "ap",
+      "a",
+      "gpa",
+      "g",
+      "apa",
+      "gp"
+    ],
+    "mp": [
+      "amp",
+      "ak",
+      "a",
+      "aka",
+      "am"
+    ],
+    "te": [
+      "pan",
+      "nte",
+      "pa",
+      "nt",
+      "p",
+      "n"
+    ],
+    "sk": [
+      "ap",
+      "a",
+      "as",
+      "apa",
+      "asa"
+    ],
+    "ko": [
+      "ako",
+      "ak",
+      "pa",
+      "a",
+      "gk",
+      "g",
+      "gko",
+      "p",
+      "pas"
+    ],
+    "pr": [
+      "gpr",
+      "g",
+      "gp"
+    ],
+    "gs": [
+      "a",
+      "nag",
+      "na",
+      "ag",
+      "ags",
+      "n"
+    ],
+    "li": [
+      "il",
+      "a",
+      "i",
+      "ili",
+      "al",
+      "ali"
+    ],
+    "si": [
+      "gsi",
+      "a",
+      "as",
+      "asi",
+      "gs",
+      "g"
+    ],
+    "i2": [
+      "sis",
+      "si",
+      "s"
+    ],
+    "2d": [
+      "i",
+      "isi",
+      "is"
+    ],
+    "ti": [
+      "d",
+      "a",
+      "at",
+      "i",
+      "iti",
+      "ati",
+      "dat",
+      "da",
+      "it"
+    ],
+    "td": [
+      "i",
+      "it",
+      "iti"
+    ],
+    "a2": [
+      "la",
+      "lal",
+      "l",
+      "k",
+      "kak",
+      "ka"
+    ],
+    "2g": [
+      "a",
+      "ala",
+      "al"
+    ],
+    "pi": [
+      "ap",
+      "api",
+      "la",
+      "lap",
+      "a",
+      "l"
+    ],
+    "ly": [
+      "ala",
+      "il",
+      "a",
+      "i",
+      "m",
+      "al",
+      "mi",
+      "ily",
+      "mil"
+    ],
+    "uk": [
+      "muk",
+      "m",
+      "mu"
+    ],
+    "kh": [
+      "ukh",
+      "u",
+      "uk"
+    ],
+    "mi": [
+      "ami",
+      "la",
+      "a",
+      "lam",
+      "l",
+      "k",
+      "kar",
+      "ka",
+      "am"
+    ],
+    "rn": [
+      "ar",
+      "a",
+      "ara"
+    ],
+    "ns": [
+      "i",
+      "ra",
+      "in",
+      "ran",
+      "ina",
+      "r"
+    ],
+    "sn": [
+      "a",
+      "an",
+      "ana"
+    ],
+    "ir": [
+      "sir",
+      "h",
+      "s",
+      "hir",
+      "hi",
+      "si"
+    ],
+    "sy": [
+      "a",
+      "as",
+      "asy"
+    ],
+    "ad": [
+      "d",
+      "dad",
+      "ya",
+      "yad",
+      "y",
+      "da"
+    ],
+    "do": [
+      "a",
+      "ado",
+      "ad"
+    ],
+    "ik": [
+      "t",
+      "ti",
+      "tik"
+    ],
+    "km": [
+      "ik",
+      "i",
+      "ikm"
+    ],
+    "tm": [
+      "at",
+      "a",
+      "ata"
+    ],
+    "tt": [
+      "at",
+      "a",
+      "ata",
+      "ati"
+    ],
+    "wl": [
+      "awa",
+      "aw",
+      "a",
+      "i",
+      "iwa",
+      "iw"
+    ],
+    "0b": [
+      "o",
+      "obo",
+      "ob"
+    ],
+    "2r": [
+      "yar",
+      "y",
+      "ya"
+    ],
+    "ri": [
+      "ar",
+      "a",
+      "gya",
+      "gy",
+      "yar",
+      "ya",
+      "g",
+      "yay",
+      "ari",
+      "y"
+    ],
+    "go": [
+      "ago",
+      "ang",
+      "a",
+      "ag",
+      "an"
+    ],
+    "od": [
+      "nod",
+      "god",
+      "no",
+      "go",
+      "g",
+      "n"
+    ],
+    "ea": [
+      "iya",
+      "i",
+      "iy"
+    ],
+    "un": [
+      "lun",
+      "yon",
+      "yo",
+      "lu",
+      "l",
+      "yun",
+      "y",
+      "yu"
+    ],
+    "gd": [
+      "a",
+      "ag",
+      "agd"
+    ],
+    "yr": [
+      "ng",
+      "gya",
+      "gy",
+      "g",
+      "ngy",
+      "n"
+    ],
+    "yu": [
+      "ay",
+      "a",
+      "ayo"
+    ],
+    "yy": [
+      "ngy",
+      "ng",
+      "n"
+    ],
+    "2b": [
+      "aka",
+      "a",
+      "ak"
+    ],
+    "kk": [
+      "aka",
+      "a",
+      "ak"
+    ],
+    "tk": [
+      "aka",
+      "a",
+      "ak"
+    ],
+    "ku": [
+      "ako",
+      "a",
+      "ak"
+    ],
+    "ln": [
+      "ng",
+      "wa",
+      "ala",
+      "a",
+      "w",
+      "al",
+      "nga",
+      "wal",
+      "n"
+    ],
+    "mn": [
+      "ama",
+      "a",
+      "na",
+      "nam",
+      "am",
+      "n"
+    ],
+    "ai": [
+      "gan",
+      "g",
+      "ga"
+    ],
+    "gn": [
+      "ail",
+      "ai",
+      "a",
+      "i",
+      "ig",
+      "ign"
+    ],
+    "2y": [
+      "b",
+      "bay",
+      "ba"
+    ],
+    "0o": [
+      "oo",
+      "o",
+      "oon"
+    ],
+    "by": [
+      "pab",
+      "ab",
+      "a",
+      "pa",
+      "p",
+      "aba"
+    ],
+    "de": [
+      "ind",
+      "e",
+      "w",
+      "i",
+      "ede",
+      "ed",
+      "in",
+      "we",
+      "wed"
+    ],
+    "ed": [
+      "w",
+      "wed",
+      "we"
+    ],
+    "ge": [
+      "age",
+      "a",
+      "ag",
+      "agi"
+    ],
+    "ml": [
+      "ami",
+      "a",
+      "am"
+    ],
+    "pn": [
+      "ap",
+      "a",
+      "u",
+      "upu",
+      "apa",
+      "up"
+    ],
+    "ss": [
+      "a",
+      "ag",
+      "ags"
+    ],
+    "sb": [
+      "gs",
+      "gsa",
+      "g"
+    ],
+    "ce": [
+      "si",
+      "sib",
+      "s"
+    ],
+    "eb": [
+      "ib",
+      "ibi",
+      "i"
+    ],
+    "id": [
+      "ti",
+      "t",
+      "l",
+      "li",
+      "tid",
+      "lid"
+    ],
+    "pb": [
+      "ap",
+      "a",
+      "apa"
+    ],
+    "pt": [
+      "ap",
+      "a",
+      "apa"
+    ],
+    "qn": [
+      "k",
+      "ka"
+    ],
+    "rd": [
+      "ar",
+      "a",
+      "ard"
+    ],
+    "ih": [
+      "bi",
+      "b",
+      "bih"
+    ],
+    "bu": [
+      "a"
+    ],
+    "lm": [
+      "a",
+      "ala",
+      "al"
+    ],
+    "mt": [
+      "l",
+      "la",
+      "lam"
+    ],
+    "no": [
+      "uno",
+      "u",
+      "un"
+    ],
+    "eu": [
+      "ay",
+      "a",
+      "ayo"
+    ],
+    "xs": [
+      "k",
+      "ks"
+    ],
+    "nk": [
+      "a",
+      "ank",
+      "an"
+    ],
+    "ks": [
+      "n",
+      "nks",
+      "nk"
+    ],
+    "lg": [
+      "a",
+      "ala",
+      "al"
+    ],
+    "nx": [
+      "h",
+      "ha",
+      "han"
+    ],
+    "y0": [
+      "ay",
+      "a",
+      "ayo"
+    ],
+    "ym": [
+      "i",
+      "im",
+      "ime"
+    ],
+    "ua": [
+      "h",
+      "hu",
+      "huw"
+    ],
+    "xa": [
+      "san",
+      "sa",
+      "sab",
+      "s"
+    ],
+    "2m": [
+      "tu",
+      "t",
+      "tum"
+    ],
+    "ni": [
+      "i",
+      "ini",
+      "in"
+    ],
+    "ic": [
+      "ni",
+      "nis",
+      "n"
+    ],
+    "tr": [
+      "nt",
+      "n",
+      "ntr"
+    ],
+    "cy": [
+      "si",
+      "s",
+      "siy"
+    ],
+    "bb": [
+      "a",
+      "aba",
+      "ab"
+    ],
+    "ms": [
+      "a",
+      "am",
+      "amu"
+    ],
+    "gb": [
+      "a",
+      "ag",
+      "agb"
+    ],
+    "gh": [
+      "agh",
+      "a",
+      "ag"
+    ],
+    "00": [
+      "ro",
+      "r",
+      "roo"
+    ],
+    "gl": [
+      "a",
+      "agl",
+      "ag"
+    ],
+    "df": [
+      "nd",
+      "n",
+      "ndf"
+    ],
+    "f": [
+      "df",
+      "d",
+      "dfa"
+    ],
+    "fa": [
+      "df",
+      "d",
+      "dfa"
+    ],
+    "ll": [
+      "a",
+      "al",
+      "all"
+    ],
+    "kp": [
+      "aka",
+      "a",
+      "ak"
+    ],
+    "pg": [
+      "k",
+      "ka",
+      "kap"
+    ],
+    "ig": [
+      "ami",
+      "a",
+      "am"
+    ],
+    "lp": [
+      "a",
+      "ala",
+      "al"
+    ],
+    "us": [
+      "l",
+      "lus",
+      "lu"
+    ],
+    "2w": [
+      "tu",
+      "t",
+      "tuw"
+    ],
+    "2a": [
+      "kaa",
+      "k",
+      "ka"
+    ],
+    "h0": [
+      "a",
+      "ah",
+      "aho"
+    ],
+    "dd": [
+      "gd",
+      "gda",
+      "g"
+    ],
+    "ec": [
+      "re",
+      "r",
+      "rec"
+    ],
+    "ov": [
+      "co",
+      "cov",
+      "c"
+    ],
+    "ve": [
+      "ov",
+      "o",
+      "ove"
+    ],
+    "pk": [
+      "ap",
+      "a",
+      "apa"
+    ],
+    "rm": [
+      "aka",
+      "a",
+      "ak"
+    ],
+    "tn": [
+      "at",
+      "a",
+      "ati"
+    ],
+    "uu": [
+      "gu",
+      "g",
+      "guu"
+    ],
+    "pl": [
+      "ap",
+      "a",
+      "apa"
+    ],
+    "tg": [
+      "i",
+      "it",
+      "iti"
+    ],
+    "xe": [
+      "zer",
+      "ze",
+      "z"
+    ]
+  }
+}

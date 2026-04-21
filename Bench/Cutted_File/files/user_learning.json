@@ -1,7 +1,7 @@
 {
   "user_shortcuts": {
     "ta": "tayo",
-    "n": "ngayon",
+    "n": "nang",
     "tayo": "tayong",
     "u": "umuwi",
     "o": "over",
@@ -19,11 +19,17 @@
     "gut": "gutom",
     "hu": "hungry",
     "ge": "george",
-    "tha": "thanks"
+    "tha": "thanks",
+    "hi": "hindi",
+    "gu": "gusto",
+    "ado": "adobo",
+    "gus": "gusto",
+    "b": "bahay",
+    "rs": "read"
   },
   "user_shortcut_usage": {
     "ta": 9,
-    "n": 1,
+    "n": 2,
     "tayo": 1,
     "u": 1,
     "o": 1,
@@ -41,54 +47,16 @@
     "gut": 2,
     "hu": 1,
     "ge": 1,
-    "tha": 1
+    "tha": 1,
+    "hi": 1,
+    "gu": 1,
+    "ado": 1,
+    "gus": 1,
+    "b": 1,
+    "rs": 1
   },
   "new_words": [],
   "word_usage_history": [
-    [
-      "tayo",
-      []
-    ],
-    [
-      "tayo",
-      []
-    ],
-    [
-      "cj",
-      []
-    ],
-    [
-      "over",
-      []
-    ],
-    [
-      "over",
-      []
-    ],
-    [
-      "over",
-      [
-        "over"
-      ]
-    ],
-    [
-      "here?",
-      [
-        "over",
-        "over"
-      ]
-    ],
-    [
-      "here?",
-      [
-        "over",
-        "over"
-      ]
-    ],
-    [
-      "na",
-      []
-    ],
     [
       "na",
       []
@@ -753,6 +721,76 @@
     [
       "than",
       []
+    ],
+    [
+      "pede",
+      [
+        "pede"
+      ]
+    ],
+    [
+      "gusto",
+      [
+        "gusto",
+        "kong",
+        "kumain",
+        "ng"
+      ]
+    ],
+    [
+      "kong",
+      [
+        "gusto",
+        "kong",
+        "kumain",
+        "ng"
+      ]
+    ],
+    [
+      "kumain",
+      [
+        "gusto",
+        "kong"
+      ]
+    ],
+    [
+      "ng",
+      [
+        "kong",
+        "kumain"
+      ]
+    ],
+    [
+      "gusto",
+      [
+        "gusto",
+        "kong",
+        "magluto",
+        "sa"
+      ]
+    ],
+    [
+      "kong",
+      [
+        "gusto",
+        "kong",
+        "magluto",
+        "sa"
+      ]
+    ],
+    [
+      "magluto",
+      [
+        "gusto",
+        "kong"
+      ]
+    ],
+    [
+      "sa",
+      [
+        "kong",
+        "magluto"
+      ]
     ]
   ]
 }
