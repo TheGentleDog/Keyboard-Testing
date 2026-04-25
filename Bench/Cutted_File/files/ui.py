@@ -53,6 +53,11 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         },
     }
 
+    POINTER_SIZE = 24
+    POINTER_OUTLINE = "#ff4d4d"
+    POINTER_FILL = "#a7adb7"
+    POINTER_CENTER = "#f5f7fa"
+
     # ── Override dwell flash to restore correct per-button colour ─────────────
     def _dwell_flash(self, btn):
         theme = self.themes[self.current_theme]
@@ -93,6 +98,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         kwargs.pop('command', None)
         relief = kwargs.pop('relief', 'flat')
         bd     = kwargs.pop('bd', 1)
+        kwargs['cursor'] = "none"
 
         lbl = tk.Label(parent, relief=relief, bd=bd, **kwargs)
         lbl.bind('<Button-1>', lambda _e, c=command: c())
@@ -103,6 +109,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         super().__init__()
         self.title("Filipino Keyboard - Gaze-Based")
         self.attributes('-fullscreen', True)
+        self.configure(cursor="none")
         self.bind('<Escape>', lambda e: self.attributes('-fullscreen', False))
         self.bind('<s>', lambda e: self.show_settings())   # caretaker shortcut
         self.bind_all('<KeyPress-q>', self._quit_keyboard)
@@ -124,12 +131,20 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._in_predefined_mode     = False
         self.predefined_func_buttons = []
         self._panic_active           = False
+        self._settings_open          = False
+        self._pointer_overlay        = None
+        self._pointer_canvas         = None
+        self._pointer_job            = None
 
         self._dwell_init()
         self._load_sentence_counts()
         self._create_widgets()
+        self._init_pointer_overlay()
+        self._show_main_pointer()
+        self.after(50, self._take_focus)
 
     def _quit_keyboard(self, _event=None):
+        self._destroy_pointer_overlay()
         self.destroy()
         return "break"
 
@@ -138,6 +153,124 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             key = event.keysym.upper() if event else ""
             self.status_bar.config(text=f"{key} is available in gaze mode only")
         return "break"
+
+    def _apply_none_cursor(self, widget):
+        try:
+            widget.configure(cursor="none")
+        except Exception:
+            pass
+        for child in widget.winfo_children():
+            self._apply_none_cursor(child)
+
+    def _apply_arrow_cursor(self, widget):
+        try:
+            widget.configure(cursor="arrow")
+        except Exception:
+            pass
+        for child in widget.winfo_children():
+            self._apply_arrow_cursor(child)
+
+    def _init_pointer_overlay(self):
+        try:
+            overlay = tk.Toplevel(self)
+            overlay.withdraw()
+            overlay.overrideredirect(True)
+            overlay.attributes("-topmost", True)
+            overlay.configure(bg="#010203", cursor="none")
+            try:
+                overlay.wm_attributes("-transparentcolor", "#010203")
+            except Exception:
+                pass
+            try:
+                overlay.wm_attributes("-disabled", True)
+            except Exception:
+                pass
+
+            size = self.POINTER_SIZE
+            canvas = tk.Canvas(
+                overlay,
+                width=size,
+                height=size,
+                bg="#010203",
+                highlightthickness=0,
+                bd=0,
+                cursor="none",
+            )
+            canvas.pack()
+            center = size // 2
+            outer = size - 4
+            canvas.create_oval(2, 2, outer, outer, outline=self.POINTER_OUTLINE, width=2, fill=self.POINTER_FILL)
+            canvas.create_oval(center - 3, center - 3, center + 3, center + 3,
+                               outline=self.POINTER_OUTLINE, width=1, fill=self.POINTER_CENTER)
+            self._pointer_overlay = overlay
+            self._pointer_canvas = canvas
+            self._track_pointer_overlay()
+        except Exception:
+            self._pointer_overlay = None
+            self._pointer_canvas = None
+
+    def _track_pointer_overlay(self):
+        if not self._pointer_overlay or self._settings_open:
+            return
+        try:
+            half = self.POINTER_SIZE // 2
+            x = self.winfo_pointerx() - half
+            y = self.winfo_pointery() - half
+            self._pointer_overlay.geometry(f"{self.POINTER_SIZE}x{self.POINTER_SIZE}+{x}+{y}")
+            self._pointer_overlay.deiconify()
+        except Exception:
+            pass
+        self._pointer_job = self.after(16, self._track_pointer_overlay)
+
+    def _destroy_pointer_overlay(self):
+        if self._pointer_job is not None:
+            try:
+                self.after_cancel(self._pointer_job)
+            except Exception:
+                pass
+            self._pointer_job = None
+        if self._pointer_overlay:
+            try:
+                self._pointer_overlay.destroy()
+            except Exception:
+                pass
+        self._pointer_overlay = None
+        self._pointer_canvas = None
+
+    def _show_main_pointer(self):
+        self.configure(cursor="none")
+        self._apply_none_cursor(self)
+        if self._pointer_overlay and self._pointer_job is None:
+            self._track_pointer_overlay()
+
+    def _show_system_pointer(self):
+        self._settings_open = True
+        if self._pointer_job is not None:
+            try:
+                self.after_cancel(self._pointer_job)
+            except Exception:
+                pass
+            self._pointer_job = None
+        if self._pointer_overlay:
+            try:
+                self._pointer_overlay.withdraw()
+            except Exception:
+                pass
+        self.configure(cursor="arrow")
+        self._apply_arrow_cursor(self)
+
+    def _restore_main_cursor(self):
+        self._settings_open = False
+        self._show_main_pointer()
+
+    def _take_focus(self):
+        try:
+            self.lift()
+            self.focus_force()
+            self.attributes("-topmost", True)
+            self.after(150, lambda: self.attributes("-topmost", False))
+        except Exception:
+            pass
 
     # =========================================================================
     # WIDGET SETUP
@@ -408,7 +541,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
 
     def _insert_ui2_char(self, char):
         self.insert_char(char)
-        self._create_ui2_group_rows(self.letters_frame)
+        self.after(220, lambda: self._create_ui2_group_rows(self.letters_frame))
 
     # =========================================================================
     # PREDEFINED SENTENCE PANEL
@@ -605,11 +738,11 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                 self.predictive_container,
                 lambda w=word: handler(w),
                 text=word,
-                font=("Segoe UI", 22, "bold"),
+                font=("Segoe UI", 28, "bold"),
                 relief="raised", bd=2, cursor="hand2",
                 bg=theme["button_bg"], fg=theme["button_fg"],
             )
-            btn.pack(side="left", padx=3, ipadx=20, ipady=30, expand=True, fill="both")
+            btn.pack(side="left", padx=3, ipadx=26, ipady=38, expand=True, fill="both")
 
     def apply_completion(self, word):
         """User selected a completion suggestion while typing (before space)."""
@@ -825,15 +958,28 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     # SETTINGS PANEL  (caretaker opens via physical 'S' key)
     # =========================================================================
     def show_settings(self):
-        win = tk.Toplevel(self)
-        win.title("Settings")
-        win.geometry("440x640")
-        win.resizable(False, True)
-        win.transient(self)
-        win.grab_set()
+        self._show_system_pointer()
+        settings_win = tk.Toplevel(self)
+        settings_win.title("Settings")
+        settings_win.geometry("440x640")
+        settings_win.resizable(False, True)
+        settings_win.transient(self)
+        settings_win.grab_set()
+        self._apply_arrow_cursor(settings_win)
+
+        def _close_settings():
+            try:
+                settings_win.grab_release()
+            except Exception:
+                pass
+            settings_win.destroy()
+            self._restore_main_cursor()
+            self._take_focus()
+
+        settings_win.protocol("WM_DELETE_WINDOW", _close_settings)
 
         # Scrollable container
-        outer = tk.Frame(win)
+        outer = tk.Frame(settings_win)
         outer.pack(fill="both", expand=True)
         canvas  = tk.Canvas(outer, borderwidth=0, highlightthickness=0)
         scrollbar = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
@@ -855,6 +1001,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
         canvas.bind_all("<MouseWheel>", _on_mousewheel)
 
+        inner.bind("<Destroy>", lambda _e: canvas.unbind_all("<MouseWheel>"))
         win = inner  # point all subsequent widgets at the scrollable inner frame
 
         # Theme
@@ -864,9 +1011,9 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         btn_row = tk.Frame(tf)
         btn_row.pack(fill="x")
         ttk.Button(btn_row, text="☀ Light Mode",
-                   command=lambda: self.change_theme("light", win), width=18).pack(side="left", padx=(0, 10), ipady=8)
+                   command=lambda: self.change_theme("light", settings_win), width=18).pack(side="left", padx=(0, 10), ipady=8)
         ttk.Button(btn_row, text="🌙 Dark Mode",
-                   command=lambda: self.change_theme("dark",  win), width=18).pack(side="left", ipady=8)
+                   command=lambda: self.change_theme("dark",  settings_win), width=18).pack(side="left", ipady=8)
         ttk.Label(tf, text=f"Current: {self.current_theme.capitalize()} Mode",
                   font=("Segoe UI", 9, "italic")).pack(anchor="w", pady=(8, 0))
 
@@ -988,4 +1135,5 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         ttk.Label(lf, text="Filters autocomplete and next-word predictions.",
                   font=("Segoe UI", 8, "italic"), foreground="gray").pack(anchor="w", pady=(6, 0))
 
-        ttk.Button(win, text="Close", command=win.destroy).pack(pady=(8, 12))
+        ttk.Button(win, text="Close", command=_close_settings).pack(pady=(8, 12))
+        self._apply_arrow_cursor(settings_win)

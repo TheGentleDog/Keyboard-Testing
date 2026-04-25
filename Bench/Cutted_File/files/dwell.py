@@ -49,26 +49,7 @@ class DwellMixin:
 
     # ── Overlay (progress bar) ─────────────────────────────────────────────
     def _dwell_create_overlay(self, btn):
-        bid = id(btn)
-        if bid in self.dwell_overlays:
-            return
-        try:
-            w = btn.winfo_width()
-            if w < 2:
-                btn.after(100, lambda: self._dwell_create_overlay(btn))
-                return
-            theme  = self.themes[self.current_theme]
-            canvas = tk.Canvas(btn.master, height=6, bd=0,
-                               highlightthickness=0, bg=theme["dwell_bg"])
-            canvas.place(in_=btn, relx=0, rely=1.0, anchor="sw",
-                         relwidth=1.0, height=6)
-            canvas.lift()
-            canvas.create_rectangle(0, 0, 0, 6,
-                                    fill=theme["dwell_bar"],
-                                    outline="", tags="bar")
-            self.dwell_overlays[bid] = canvas
-        except Exception:
-            pass
+        return
 
     # ── Enter / Leave — only track hover, NO reset on leave ───────────────────
     def _dwell_enter(self, btn):
@@ -267,13 +248,21 @@ class DwellMixin:
                 self._zoom_popup      = tk.Toplevel(self)
                 self._zoom_popup.overrideredirect(True)
                 self._zoom_popup.attributes('-topmost', True)
+                self._zoom_popup.configure(
+                    cursor=getattr(self, "pointer_cursor", "arrow"),
+                    bg=theme["bg"],
+                    highlightbackground=theme.get("button_active_bg", theme["button_bg"]),
+                    highlightthickness=2,
+                )
                 self._zoom_lbl = tk.Label(
                     self._zoom_popup,
                     text=text,
                     font=("Segoe UI", font_sz, "bold"),
                     bg=bg, fg=fg,
-                    relief="raised", bd=3,
+                    relief="flat", bd=0,
                     justify="center",
+                    cursor=getattr(self, "pointer_cursor", "arrow"),
+                    padx=10, pady=10,
                 )
                 self._zoom_lbl.pack(fill="both", expand=True)
                 # Bind Enter/Leave on the zoom popup itself
@@ -285,6 +274,12 @@ class DwellMixin:
                     text=text,
                     font=("Segoe UI", font_sz, "bold"),
                     bg=bg, fg=fg,
+                    cursor=getattr(self, "pointer_cursor", "arrow"),
+                )
+                self._zoom_popup.configure(
+                    cursor=getattr(self, "pointer_cursor", "arrow"),
+                    bg=theme["bg"],
+                    highlightbackground=theme.get("button_active_bg", theme["button_bg"]),
                 )
 
             self._zoom_popup.geometry(f"{pw}x{ph}+{x}+{y}")

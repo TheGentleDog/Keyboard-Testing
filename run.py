@@ -36,10 +36,13 @@ class LauncherUI(tk.Tk):
         "bg":         "#1e1f22",
         "panel":      "#2b2d31",
         "card":       "#313338",
+        "card_alt":   "#26282d",
         "accent":     "#5865f2",
         "accent_hov": "#4752c4",
+        "accent_soft":"#2f3f87",
         "text":       "#dcddde",
         "subtext":    "#96989d",
+        "muted":      "#7d8187",
         "danger":     "#ed4245",
         "border":     "#3f4147",
     }
@@ -65,16 +68,19 @@ class LauncherUI(tk.Tk):
         self.attributes("-topmost", True)
         self.after(200, lambda: self.attributes("-topmost", False))
 
-    def _section(self, parent, title):
+    def _section(self, parent, title, subtitle=None):
         """Returns a card frame with a section label."""
         d = self.DARK
         outer = tk.Frame(parent, bg=d["card"], bd=0, highlightbackground=d["border"],
                          highlightthickness=1)
-        outer.pack(fill="x", padx=16, pady=(0, 10))
+        outer.pack(fill="x", padx=18, pady=(0, 12))
         tk.Label(outer, text=title, bg=d["card"], fg=d["subtext"],
-                 font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=12, pady=(8, 2))
+                 font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=14, pady=(10, 2))
+        if subtitle:
+            tk.Label(outer, text=subtitle, bg=d["card"], fg=d["muted"],
+                     font=("Segoe UI", 9)).pack(anchor="w", padx=14, pady=(0, 6))
         inner = tk.Frame(outer, bg=d["card"])
-        inner.pack(fill="x", padx=12, pady=(0, 10))
+        inner.pack(fill="x", padx=14, pady=(0, 12))
         return inner
 
     def _row(self, parent, label, widget_fn):
@@ -92,20 +98,50 @@ class LauncherUI(tk.Tk):
         # ── Header ───────────────────────────────────────────────
         hdr = tk.Frame(self, bg=d["panel"])
         hdr.pack(fill="x")
+        pill = tk.Label(hdr, text="SESSION SETUP",
+                        bg=d["accent_soft"], fg="#ffffff",
+                        font=("Segoe UI", 8, "bold"),
+                        padx=10, pady=4)
+        pill.pack(anchor="w", padx=18, pady=(18, 10))
         tk.Label(hdr, text="Gaze-Based Filipino Keyboard",
                  bg=d["panel"], fg=d["text"],
-                 font=("Segoe UI", 15, "bold")).pack(pady=(18, 2))
-        tk.Label(hdr, text="Configure your session before starting",
+                 font=("Segoe UI", 20, "bold")).pack(anchor="w", padx=18)
+        tk.Label(hdr, text="Tune calibration, smoothing, dwell mode, and layout before launch.",
                  bg=d["panel"], fg=d["subtext"],
-                 font=("Segoe UI", 10)).pack(pady=(0, 16))
+                 font=("Segoe UI", 10)).pack(anchor="w", padx=18, pady=(4, 16))
 
-        body = tk.Frame(self, bg=d["bg"])
-        body.pack(fill="both", expand=True, pady=8)
+        body_outer = tk.Frame(self, bg=d["bg"])
+        body_outer.pack(fill="both", expand=True, pady=10)
+
+        canvas = tk.Canvas(body_outer, bg=d["bg"], highlightthickness=0, bd=0)
+        scrollbar = ttk.Scrollbar(body_outer, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        body = tk.Frame(canvas, bg=d["bg"])
+        body_window = canvas.create_window((0, 0), window=body, anchor="nw")
+
+        def _sync_scrollregion(_event=None):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        def _resize_body(_event):
+            canvas.itemconfigure(body_window, width=_event.width)
+
+        body.bind("<Configure>", _sync_scrollregion)
+        canvas.bind("<Configure>", _resize_body)
+
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        canvas.bind("<Enter>", lambda _e: canvas.bind_all("<MouseWheel>", _on_mousewheel))
+        canvas.bind("<Leave>", lambda _e: canvas.unbind_all("<MouseWheel>"))
 
         # ────────────────────────────────────────────────────────
         #  CALIBRATION
         # ────────────────────────────────────────────────────────
-        calib = self._section(body, "CALIBRATION")
+        calib = self._section(body, "CALIBRATION",
+                              "Grid density and sample count affect precision and startup time.")
 
         # Calibration points
         self._points_var = tk.IntVar(value=9)
@@ -140,7 +176,8 @@ class LauncherUI(tk.Tk):
         # ────────────────────────────────────────────────────────
         #  DWELL MODE
         # ────────────────────────────────────────────────────────
-        dwell = self._section(body, "DWELL MODE")
+        dwell = self._section(body, "DWELL MODE",
+                              "Choose whether selection happens by trial winner or immediate hold.")
         self._dwell_mode_var = tk.StringVar(value="sync")
         dwell_frame = tk.Frame(dwell, bg=d["card"])
         dwell_frame.pack(fill="x", pady=3)
@@ -157,7 +194,8 @@ class LauncherUI(tk.Tk):
         # ────────────────────────────────────────────────────────
         #  UI LAYOUT
         # ────────────────────────────────────────────────────────
-        layout = self._section(body, "UI LAYOUT")
+        layout = self._section(body, "UI LAYOUT",
+                               "Pick the keyboard layout shown after calibration.")
         self._ui_layout_var = tk.StringVar(value="qwerty")
         layout_frame = tk.Frame(layout, bg=d["card"])
         layout_frame.pack(fill="x", pady=3)
@@ -174,7 +212,8 @@ class LauncherUI(tk.Tk):
         # ────────────────────────────────────────────────────────
         #  SMOOTHER
         # ────────────────────────────────────────────────────────
-        smooth = self._section(body, "SMOOTHER")
+        smooth = self._section(body, "SMOOTHER",
+                               "EMA reduces jitter before gaze positions are applied.")
 
         # EMA toggle
         self._ema_on = tk.BooleanVar(value=True)
@@ -207,7 +246,8 @@ class LauncherUI(tk.Tk):
         # ────────────────────────────────────────────────────────
         #  KALMAN FILTER
         # ────────────────────────────────────────────────────────
-        kalman = self._section(body, "KALMAN FILTER")
+        kalman = self._section(body, "KALMAN FILTER",
+                               "Lower noise values react faster; higher values smooth more.")
 
         # Process noise
         self._pnoise_var = tk.DoubleVar(value=1e-3)
@@ -244,7 +284,8 @@ class LauncherUI(tk.Tk):
         # ────────────────────────────────────────────────────────
         #  CAMERA
         # ────────────────────────────────────────────────────────
-        cam = self._section(body, "CAMERA")
+        cam = self._section(body, "CAMERA",
+                            "Use the camera index that matches the device you want for tracking.")
         self._camera_var = tk.IntVar(value=0)
         cam_frame = tk.Frame(cam, bg=d["card"])
         cam_frame.pack(fill="x", pady=3)
@@ -260,18 +301,25 @@ class LauncherUI(tk.Tk):
         # ────────────────────────────────────────────────────────
         #  Buttons
         # ────────────────────────────────────────────────────────
-        btn_row = tk.Frame(self, bg=d["bg"])
-        btn_row.pack(fill="x", padx=16, pady=(4, 16))
+        footer = tk.Frame(self, bg=d["panel"])
+        footer.pack(fill="x", side="bottom")
+        tk.Label(footer, text="You can recalibrate later with R during the session.",
+                 bg=d["panel"], fg=d["muted"], font=("Segoe UI", 9)).pack(anchor="w", padx=18, pady=(10, 6))
 
-        cancel_btn = tk.Label(btn_row, text="Cancel", bg=d["border"], fg=d["subtext"],
-                              font=("Segoe UI", 12), relief="flat", bd=0,
-                              padx=24, pady=10, cursor="hand2")
+        btn_row = tk.Frame(footer, bg=d["panel"])
+        btn_row.pack(fill="x", padx=18, pady=(0, 16))
+
+        cancel_btn = tk.Label(btn_row, text="Cancel", bg=d["card_alt"], fg=d["text"],
+                              font=("Segoe UI", 11, "bold"), relief="flat", bd=0,
+                              padx=22, pady=11, cursor="hand2")
         cancel_btn.pack(side="left")
         cancel_btn.bind("<Button-1>", lambda _: self.destroy())
+        cancel_btn.bind("<Enter>", lambda _: cancel_btn.config(bg=d["border"]))
+        cancel_btn.bind("<Leave>", lambda _: cancel_btn.config(bg=d["card_alt"]))
 
         start_btn = tk.Label(btn_row, text="Start Session", bg=d["accent"], fg="#ffffff",
                              font=("Segoe UI", 12, "bold"), relief="flat", bd=0,
-                             padx=24, pady=10, cursor="hand2")
+                             padx=26, pady=11, cursor="hand2")
         start_btn.pack(side="right")
         start_btn.bind("<Button-1>", self._on_start)
         start_btn.bind("<Enter>", lambda _: start_btn.config(bg=d["accent_hov"]))
