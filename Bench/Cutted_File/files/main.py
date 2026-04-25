@@ -58,6 +58,36 @@ def _ensure_datasets():
         print(f"🗑  Removed stale cache: {NGRAM_CACHE_FILE}\n")
 
 
+def _rebuild_datasets():
+    print("=" * 60)
+    print("♻  Rebuilding Filipino and English datasets...")
+    print("=" * 60)
+
+    try:
+        import transformers  # noqa: F401
+    except ImportError:
+        print("\n❌  'transformers' package not installed.")
+        print("    Install it with:  pip install transformers torch")
+        print("    Then re-run the keyboard.\n")
+        sys.exit(1)
+
+    for label, path, module_name in [
+        ("Filipino", FILIPINO_DATASET_FILE, "generate_dataset"),
+        ("English", ENGLISH_DATASET_FILE, "generate_dataset_english"),
+    ]:
+        print(f"\n🚀  Regenerating {label} dataset via RoBERTa...")
+        try:
+            module = __import__(module_name)
+            module.generate(output_file=path)
+        except Exception as e:
+            print(f"❌  Failed to regenerate {label} dataset: {e}")
+            sys.exit(1)
+
+    if os.path.exists(NGRAM_CACHE_FILE):
+        os.remove(NGRAM_CACHE_FILE)
+        print(f"🗑  Removed stale cache: {NGRAM_CACHE_FILE}\n")
+
+
 # ─────────────────────────────────────────────
 # STEP 2: Generate Flores rules if missing
 # ─────────────────────────────────────────────
@@ -82,6 +112,10 @@ def main():
     _ensure_datasets()
     _ensure_rules()
 
+    if not os.path.exists(NGRAM_CACHE_FILE):
+        print("\n⚠  Model cache missing — forcing dataset regeneration first.")
+        _rebuild_datasets()
+
     # Import after datasets are guaranteed to exist
     from model import ngram_model
     from ui import FilipinoKeyboard
@@ -93,7 +127,9 @@ def main():
 
     if not ngram_model.load_cache():
         print("\nNo cache found — building from datasets...")
-        ngram_model.train_from_builtin()
+        if not ngram_model.train_from_builtin():
+            print("❌  Failed to build n-gram model: datasets were not available.")
+            sys.exit(1)
         ngram_model.save_cache()
 
     print("\nLoading user learning...")

@@ -401,13 +401,35 @@ def main():
         if os.path.exists(NGRAM_CACHE_FILE):
             os.remove(NGRAM_CACHE_FILE)
 
+    def _rebuild_datasets():
+        try:
+            import transformers  # noqa
+        except ImportError:
+            print("'transformers' not installed. pip install transformers torch")
+            sys.exit(1)
+        for label, path, module_name in [
+            ("Filipino", FILIPINO_DATASET_FILE, "generate_dataset"),
+            ("English", ENGLISH_DATASET_FILE, "generate_dataset_english"),
+        ]:
+            print(f"Regenerating {label} dataset...")
+            module = __import__(module_name)
+            module.generate(output_file=path)
+        if os.path.exists(NGRAM_CACHE_FILE):
+            os.remove(NGRAM_CACHE_FILE)
+
     # ── Pre-load datasets & model ─────────────────────────────────────────────
     _ensure_datasets()
     _ensure_flores()
 
+    if not os.path.exists(NGRAM_CACHE_FILE):
+        print("Model cache missing — forcing dataset regeneration first.")
+        _rebuild_datasets()
+
     if not ngram_model.load_cache():
         print("Building n-gram model from datasets...")
-        ngram_model.train_from_builtin()
+        if not ngram_model.train_from_builtin():
+            print("Failed to build n-gram model: datasets were not available.")
+            sys.exit(1)
         ngram_model.save_cache()
     ngram_model.load_user_learning()
 
