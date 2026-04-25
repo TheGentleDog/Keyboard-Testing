@@ -331,6 +331,70 @@ CATEGORY_MAP = {
     "daily_life":   "verbs",
 }
 
+# ─────────────────────────────────────────────
+# FILTER SETS — applied after vocabulary generation
+# ─────────────────────────────────────────────
+
+# US, UK, and international politicians / public figures the model may
+# predict in person-like template slots (e.g. "My <mask> is here.")
+ENGLISH_POLITICIANS = {
+    # US
+    "trump", "biden", "obama", "clinton", "bush", "reagan", "carter",
+    "lincoln", "washington", "jefferson", "kennedy", "nixon", "johnson",
+    "harris", "pence", "cheney", "pelosi", "mcconnell", "schumer",
+    "sanders", "warren", "aoc", "desantis", "newsom", "abbott",
+    # UK
+    "sunak", "starmer", "johnson", "thatcher", "blair", "cameron",
+    "may", "brown", "major", "heath", "callaghan", "attlee",
+    # International
+    "putin", "zelensky", "xi", "jinping", "modi", "trudeau", "macron",
+    "scholz", "meloni", "kim", "netanyahu", "erdogan", "bolsonaro",
+    "lula", "milei", "orban", "lukashenko", "marcos", "duterte",
+}
+
+# Vulgar / sexually explicit / crude English words
+ENGLISH_VULGAR = {
+    # strong profanity
+    "fuck", "fucking", "fucked", "fucker", "fucks",
+    "shit", "shitty", "bullshit", "horseshit",
+    "bitch", "bitches", "bastard", "bastards",
+    "ass", "asses", "asshole", "assholes",
+    "damn", "damned", "goddamn",
+    "crap", "crappy", "cunt", "cunts",
+    "dick", "dicks", "cock", "cocks", "prick",
+    "pussy", "pussies", "whore", "whores", "slut", "slutty",
+    "nigger", "nigga", "chink", "spic", "kike", "faggot", "dyke",
+    # explicit sexual
+    "porn", "porno", "sex", "sexy", "horny", "nude", "naked",
+    "penis", "vagina", "boobs", "breast", "nipple", "orgasm",
+    "masturbate", "ejaculate", "erect", "aroused",
+}
+
+# Filipino/Tagalog words that don't belong in an English vocabulary
+ENGLISH_FILIPINO_WORDS = {
+    # pronouns & particles
+    "ako", "ikaw", "siya", "tayo", "kami", "kayo", "sila",
+    "ito", "iyon", "iyan", "dito", "doon", "diyan",
+    "na", "ba", "pa", "nga", "po", "ho", "din", "rin", "lang", "naman",
+    "kasi", "kung", "kahit", "para", "pero", "at", "ay", "ni", "ng",
+    "nang", "sa", "kay", "pag", "kapag", "habang", "dahil",
+    # common words
+    "hindi", "wala", "may", "mayroon", "yung", "yun", "diba",
+    "bakit", "paano", "sana", "talaga", "grabe", "nandito",
+    "nandoon", "ngayon", "kahapon", "bukas", "mamaya", "kanina",
+    "gutom", "uhaw", "tulog", "gising", "pagkain", "tubig",
+    "bahay", "trabaho", "paaralan", "ospital", "tindahan",
+    "kumain", "uminom", "matulog", "pumunta", "bumalik",
+    "masaya", "malungkot", "maganda", "pangit", "mahal", "mura",
+    "malaki", "maliit", "bago", "luma", "mainit", "malamig",
+    "salamat", "pakiusap", "paumanhin", "sandali", "halika",
+    "siguro", "medyo", "sobra", "masyado", "konti", "marami",
+    "oo", "huwag", "pwede", "kailangan", "gusto", "ayaw",
+}
+
+# Combined English blocklist
+ENGLISH_BLOCKLIST = ENGLISH_POLITICIANS | ENGLISH_VULGAR | ENGLISH_FILIPINO_WORDS
+
 SHORTCUTS = {
     "u": "you", "ur": "your", "r": "are", "b": "be",
     "y": "why", "bc": "because", "bcz": "because",
@@ -352,8 +416,10 @@ SHORTCUTS = {
     "g2g": "got to go", "gtg": "got to go",
     "ttyl": "talk to you later", "ttys": "talk to you soon",
     "hmu": "hit me up", "dm": "direct message", "pm": "private message",
-    "np": "no problem", "ty": "thank you",
-    "thx": "thanks", "thnx": "thanks",
+    "np": "no problem", "ty": "thank you", "tq": "thank you", "tysm": "thank you so much",
+    "thx": "thanks", "thnx": "thanks", "tha": "thank", "thk": "thank",
+    "yw": "you're welcome", "wb": "welcome back",
+    "ofc": "of course", "nbd": "no big deal", "def": "definitely",
     "pls": "please", "plz": "please",
     "ok": "okay", "k": "okay",
     "gr8": "great", "l8r": "later",
@@ -453,16 +519,24 @@ def generate(output_file: str = OUTPUT_FILE):
     print("✓ Done.\n")
 
     # ── Post-process vocabulary ───────────────────────────────────────────────
+    print("🔎 Filtering vocabulary (politicians, vulgar, Filipino words)...")
     vocabulary     = {}
     all_words_flat = set()
+    removed        = []
     for cat, counter in category_words.items():
         mapped = CATEGORY_MAP.get(cat, cat)
         if mapped not in vocabulary:
             vocabulary[mapped] = []
         for w in top_words(counter, n=100):
+            if w in ENGLISH_BLOCKLIST:
+                removed.append(w)
+                continue
             if w not in all_words_flat:
                 vocabulary[mapped].append(w)
                 all_words_flat.add(w)
+    if removed:
+        print(f"   ✗ Removed {len(removed)} blocked words: {', '.join(sorted(set(removed))[:20])}"
+              + (" ..." if len(set(removed)) > 20 else ""))
 
     # ── communication_corpus: deduplicated phrase strings (legacy / display)
     seen_phrases = set()

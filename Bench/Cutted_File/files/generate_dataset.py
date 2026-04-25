@@ -336,6 +336,123 @@ CATEGORY_MAP = {
     "daily_life":    "verbs",
 }
 
+# ─────────────────────────────────────────────
+# FILTER SETS — applied after vocabulary generation
+# ─────────────────────────────────────────────
+
+# Philippine politicians, public figures, celebrities
+FILIPINO_POLITICIANS = {
+    # Presidents & families
+    "duterte", "digong", "marcos", "bongbong", "imee", "aquino", "noynoy",
+    "cory", "arroyo", "gloria", "estrada", "erap", "ramos", "pnoy",
+    # Senators / officials
+    "trillanes", "cayetano", "pimentel", "drilon", "lacson", "sotto",
+    "gordon", "villar", "ejercito", "binay", "revilla", "enrile",
+    "santiago", "miriam", "poe", "roxas", "panelo", "tulfo", "faeldon",
+    "lozada", "leni", "robredo", "sara", "pacquiao", "manny", "pacman",
+    # Other known names the model predicts
+    "kris", "robin", "marian", "sheryl", "david", "julius",
+    # Foreign politicians
+    "trump", "obama", "biden", "putin", "zelensky", "xi", "jinping",
+    "modi", "macron", "trudeau", "sunak", "scholz", "kishida", "kim",
+}
+
+# Common first/last names and religious figures the model predicts
+# in person slots — not appropriate vocabulary words
+FILIPINO_PROPER_NAMES = {
+    # Biblical / religious figures
+    "jesus", "hesus", "kristo", "maria", "jose", "diyos", "dios",
+    "panginoon", "lord", "satanas", "lucifer", "biblia", "bibliya",
+    "papa", "papa", "francis", "pedro", "pablo", "juan", "david",
+    "elias", "cesar", "nelson", "gordon", "tom", "tomas", "robin",
+    # Common Filipino first names the model predicts
+    "ana", "rosa", "luz", "grace", "amor", "joy", "faith", "hope",
+    "mark", "john", "paul", "james", "luke", "matthew",
+    "tony", "carlo", "carlo", "miguel", "angelo", "danilo",
+    "nena", "nene",
+    # Celebrities / non-political public figures
+    "pacman", "marian", "sheryl", "kris",
+}
+
+# Vulgar / sexually explicit / crude Filipino words
+FILIPINO_VULGAR = {
+    # Strong profanity
+    "putang", "puta", "putangina", "tangina", "gago", "gaga", "tanga",
+    "ulol", "leche", "letse", "hinayupak", "hayop", "kupal",
+    "tarantado", "pakyu", "punyeta", "syet", "bwisit", "lintik",
+    # Explicit sexual / body slang
+    "titi", "puki", "ari", "pepe", "kepyas", "burat", "etits", "otin",
+    "suso", "pwet", "puwet", "puet", "tae", "ihi", "libog", "malibog",
+    "kantot", "jakol", "bastos", "malaswa", "mahalay", "hubad",
+    "hubaran", "hubo", "seksi",
+}
+
+# Words misclassified into the wrong category by the model
+# (not wrong words per se, but they pollute categories like pronouns/time)
+FILIPINO_MISCLASSIFIED = {
+    
+    "trainer",
+    # Non-time words in time category
+    "digmaan", "laban", "hinaharap", "eleksyon", "kampanya", "halalan",
+    "labanan", "ministeryo", "patay", "hospice", "giyera",
+    
+    # Non-particles in particles category
+    "itan", "ip", "ing", "umin", "dak", "is", "ta",
+    # Non-food in food category
+    
+    # Non-location in location category
+    "impiyerno", "lindol", 
+    "sya", 
+    # Non-adjective in adjectives category
+    "namatay", "ipinanganak", "pumanaw", 
+    
+}
+
+# Pure English words that don't belong in Filipino vocabulary
+# (Taglish slang intentionally kept: grabe, bet, solid, enjoy, etc.)
+FILIPINO_ENGLISH_WORDS = {
+    "the", "and", "but", "for", "with", "from", "that", "this", "they",
+    "have", "not", "are", "was", "were", "been", "will", "would", "could",
+    "should", "may", "can", "did", "does", "had", "has", "its", "our",
+    "their", "your", "his", "her", "him", "them", "who", "what", "where",
+    "when", "why", "how", "all", "any", "some", "one", "two", "three",
+    "more", "most", "also", "just", "then", "than", "into", "over",
+    "after", "before", "about", "out", "up", "down", "off", "on", "in",
+    "at", "by", "to", "of", "is", "it", "if", "or", "do", "go", "get",
+    "got", "put", "let", "say", "said", "see", "saw", "come", "came",
+    "take", "make", "know", "want", "use", "find", "give", "work", "call",
+    "need", "feel", "seem", "keep", "try", "ask", "turn", "start", "show",
+    "hear", "play", "run", "move", "live", "hold", "believe", "happen",
+    "include", "continue", "become", "follow", "stop", "create", "speak",
+    "read", "spend", "grow", "open", "walk", "win", "offer", "remember",
+    "love", "consider", "appear", "buy", "wait", "plan", "learn", "change",
+    "lead", "watch", "form", "help", "develop", "carry", "break", "cover",
+    "build", "stay", "fall", "reach", "kill", "remain", "suggest", "raise",
+    "pass", "sell", "require", "report", "decide", "pull", "place", "add",
+    "yes", "no", "hi", "hello", "bye", "good", "bad", "big", "old",
+    "new", "high", "low", "long", "right", "left", "next", "last", "many",
+    "much", "few", "well", "even", "back", "only", "same", "own", "every",
+    "house", "home", "school", "work", "time", "year", "day", "week",
+    "month", "night", "morning", "life", "hand", "part", "place", "case",
+    "company", "system", "program", "question", "government",
+    "country", "city", "water", "world", "family", "man", "woman", "child",
+    "way", "thing", "person", "people", "room", "money", "area", "book",
+    "eye", "number", "face", "door", "car", "food", "body", "music",
+    "story", "fact", "idea", "game", "name", "group", "problem", "side",
+    "point", "small", "large", "white", "black", "real", "true",
+    "important", "possible", "public", "private", "free", "able", "late",
+    "hard", "early", "major", "second", "third",
+}
+
+# Combined Filipino blocklist
+FILIPINO_BLOCKLIST = (
+    FILIPINO_POLITICIANS
+    | FILIPINO_PROPER_NAMES
+    | FILIPINO_VULGAR
+    | FILIPINO_MISCLASSIFIED
+    | FILIPINO_ENGLISH_WORDS
+)
+
 SHORTCUTS = {
     "lng": "lang", "nlng": "nalang", "nmn": "naman",
     "ksi": "kasi", "kse": "kasi", "kng": "kung", "khit": "kahit",
@@ -352,9 +469,9 @@ SHORTCUTS = {
     "cguro": "siguro", "sguro": "siguro",
     "nman": "naman", "mdyo": "medyo",
     "wag": "huwag", "hwag": "huwag",
-    "thnk": "salamat", "ty": "salamat",
-    "pls": "pakiusap", "plz": "pakiusap",
-    "ok": "okay", "k": "okay",
+    "thnk": "salamat", "ty": "salamat", "tnx": "salamat", "slmat": "salamat", "slm": "salamat",
+    "pls": "pakiusap", "plz": "pakiusap", "plss": "pakiusap",
+    "ok": "okay", "k": "okay", "sge": "sige",
     "lol": "nakakatawa",
     "omg": "grabe", "wtf": "ano ba",
     "brb": "babalik agad", "afk": "wala sandali",
@@ -374,6 +491,11 @@ SHORTCUTS = {
     "dm": "direktang mensahe", "pm": "personal na mensahe",
     "np": "walang anuman", "nvm": "wag na",
     "ikr": "totoo nga", "tbf": "sa totoo lang",
+    "ano": "ano", "eh": "eh", "ndi": "hindi", "nd": "hindi",
+    "mkta": "makita", "mkikta": "makikita", "mgkta": "magkita",
+    "kpg": "kapag", "pag": "kapag", "pgka": "pagkatapos",
+    "dpat": "dapat", "dpt": "dapat",
+    "nsaan": "nasaan", "san": "nasaan",
 }
 
 
@@ -457,16 +579,24 @@ def generate(output_file: str = OUTPUT_FILE):
     print("✓ Done.\n")
 
     # ── Post-process vocabulary ───────────────────────────────────────────────
+    print("🔎 Filtering vocabulary (politicians, vulgar, English words)...")
     vocabulary     = {}
     all_words_flat = set()
+    removed        = []
     for cat, counter in category_words.items():
         mapped = CATEGORY_MAP.get(cat, cat)
         if mapped not in vocabulary:
             vocabulary[mapped] = []
         for w in top_words(counter, n=100):
+            if w in FILIPINO_BLOCKLIST:
+                removed.append(w)
+                continue
             if w not in all_words_flat:
                 vocabulary[mapped].append(w)
                 all_words_flat.add(w)
+    if removed:
+        print(f"   ✗ Removed {len(removed)} blocked words: {', '.join(sorted(set(removed))[:20])}"
+              + (" ..." if len(set(removed)) > 20 else ""))
 
     # ── communication_corpus: deduplicated phrase strings (for display / legacy)
     seen_phrases = set()
