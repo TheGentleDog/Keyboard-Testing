@@ -365,13 +365,13 @@ def draw_tutorial_screen(canvas, num_points, samples_per_point, seconds_left):
     canvas[:] = C_BG
     draw_grid(canvas)
 
-    title = "Calibration Tutorial"
-    subtitle = "Follow the dots with your eyes so the keyboard can learn your gaze."
+    title = "Calibration Phase"
+    subtitle = "Please look at the following dots."
     lines = [
-        f"1. Look directly at each dot until the green ring completes and a check appears.",
-        "2. Keep your head as still as possible while each point is recording.",
-        "3. Blink only after a point finishes, not while the ring is filling.",
-        f"4. Calibration will begin automatically in {seconds_left} second(s).",
+        "Look at the dot.",
+        "Wait until the check appears.",
+        "Then continue with the other dots.",
+        f"Starting automatically in {seconds_left} second(s).",
     ]
     footer = f"{num_points} points  ·  {samples_per_point} samples each  ·  R=restart  Q=quit"
 
@@ -404,6 +404,14 @@ def draw_tutorial_screen(canvas, num_points, samples_per_point, seconds_left):
 
     fw = cv2.getTextSize(footer, cv2.FONT_HERSHEY_SIMPLEX, 0.52, 1)[0][0]
     txt(canvas, footer, (SCREEN_W // 2 - fw // 2, y1 + 34), scale=0.52, color=(120, 120, 120))
+
+def draw_target_arrow(canvas, tx, ty):
+    start_x = max(90, tx - 180)
+    start_y = max(110, ty - 110)
+    end_x = tx - 34 if tx - 34 > start_x else tx
+    end_y = ty - 22 if ty - 22 > start_y else ty
+    cv2.arrowedLine(canvas, (start_x, start_y), (end_x, end_y), C_ACCENT, 4, cv2.LINE_AA, tipLength=0.22)
+    txt(canvas, "Look here", (start_x - 6, start_y - 18), scale=0.75, color=C_ACCENT, thick=2)
 
 
 # ──────────────────────────────────────────────────────────────
@@ -439,6 +447,7 @@ class GazeTrackerApp:
         self._tracking_predictions = 0
         self._mouse_moves = 0
         self._tracking_error = None
+        self._point_done_until = 0.0
         self.pyautogui_ok = _PYAUTOGUI_OK
         self.pyautogui_screen_size = (_PYAUTOGUI_SCREEN_W, _PYAUTOGUI_SCREEN_H)
         self.canvas = np.zeros((SCREEN_H, SCREEN_W, 3), np.uint8)
@@ -452,28 +461,34 @@ class GazeTrackerApp:
         return (len(self._fpsq)-1)/(self._fpsq[-1]-self._fpsq[0]+1e-9) if len(self._fpsq)>1 else 0
 
     def _calibration_copy(self, phase, has_face, is_blinking):
+        if time.time() < self._point_done_until:
+            return (
+                "Good job",
+                "Now continue with the other dots.",
+                None,
+            )
         if not has_face:
             return (
-                "Calibration Setup",
-                "Move your face into the camera frame and look at the highlighted dot.",
-                "Wait until your eyes are detected before the point starts saving.",
-            )
-        if is_blinking:
-            return (
-                "Hold Your Gaze",
-                "Keep your eyes open on the dot while this point is being recorded.",
-                "Blink after the green check appears, not while the ring is filling.",
+                "Calibration Phase",
+                "Please look at the following dots.",
+                "Move into the camera frame to begin.",
             )
         if phase == 'hold':
             return (
-                "Look At The Dot",
-                "Keep your head still and focus only on the highlighted dot.",
-                "The ring will turn green when the point is ready to record.",
+                "Calibration Phase",
+                "Please look at the following dots.",
+                "Look at the dot.",
+            )
+        if is_blinking:
+            return (
+                "Calibration Phase",
+                "Look at the dot.",
+                "Wait until the check appears.",
             )
         return (
-            "Recording This Point",
-            "Stay on the dot until the green ring finishes and a check appears.",
-            "You can blink or relax only after that check mark shows.",
+            "Calibration Phase",
+            "Look at the dot.",
+            "Wait until the check appears.",
         )
 
     # ── calibration render ──────────────────────────────────────
@@ -499,6 +514,7 @@ class GazeTrackerApp:
         cx,cy = self.calib.target_px
         phase,t = self.calib.dot_state()
         draw_calib_dot(cv, cx, cy, phase, t)
+        draw_target_arrow(cv, cx, cy)
 
         title, line1, line2 = self._calibration_copy(phase, lms is not None, is_blinking)
         draw_info_card(cv, title, line1, line2)
@@ -518,8 +534,11 @@ class GazeTrackerApp:
 
         if self._pip: overlay_pip(cv, cam)
         # Only add calibration samples when not blinking
+        prev_idx = self.calib.idx
         if feat is not None and not is_blinking:
             self.calib.add_sample(feat)
+        if self.calib.idx > prev_idx:
+            self._point_done_until = time.time() + 1.2
 
     # ── tracking render ─────────────────────────────────────────
     def _render_track(self, cam, feat, lms, fps):
