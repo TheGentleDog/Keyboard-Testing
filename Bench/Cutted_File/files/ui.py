@@ -109,7 +109,9 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         super().__init__()
         self.title("Filipino Keyboard - Gaze-Based")
         self.attributes('-fullscreen', True)
-        self.configure(cursor="none")
+        self._use_pointer_overlay      = (os.name != "nt")
+        self.pointer_cursor            = "none" if self._use_pointer_overlay else "arrow"
+        self.configure(cursor=self.pointer_cursor)
         self.bind('<Escape>', lambda e: self.attributes('-fullscreen', False))
         self.bind('<s>', lambda e: self.show_settings())   # caretaker shortcut
         self.bind_all('<KeyPress-q>', self._quit_keyboard)
@@ -139,7 +141,8 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._dwell_init()
         self._load_sentence_counts()
         self._create_widgets()
-        self._init_pointer_overlay()
+        if self._use_pointer_overlay:
+            self._init_pointer_overlay()
         self._show_main_pointer()
         self.after(50, self._take_focus)
 
@@ -238,8 +241,12 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._pointer_canvas = None
 
     def _show_main_pointer(self):
-        self.configure(cursor="none")
-        self._apply_none_cursor(self)
+        if self._use_pointer_overlay:
+            self.configure(cursor="none")
+            self._apply_none_cursor(self)
+        else:
+            self.configure(cursor="arrow")
+            self._apply_arrow_cursor(self)
         if self._pointer_overlay and self._pointer_job is None:
             self._track_pointer_overlay()
 
