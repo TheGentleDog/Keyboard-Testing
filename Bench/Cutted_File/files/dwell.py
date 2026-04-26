@@ -26,6 +26,7 @@ class DwellMixin:
         self.dwell_btn_meta       = {}
         self._dwell_trial_elapsed = 0
         self._zoom_popup          = None
+        self._zoom_source_btn     = None
         self._dwell_cooldown_ms   = 0      # remaining cooldown after a fire
 
     # ── Registration ──────────────────────────────────────────────────────────
@@ -111,6 +112,8 @@ class DwellMixin:
             self.dwell_trial_job = self.after(config.DWELL_POLL_MS, self._dwell_tick)
             return
 
+        self._dwell_refresh_hover_target()
+
         # Cooldown — pause after a key fires
         if self._dwell_cooldown_ms > 0:
             self._dwell_cooldown_ms -= config.DWELL_POLL_MS
@@ -123,6 +126,65 @@ class DwellMixin:
             self._dwell_tick_sync()
 
         self.dwell_trial_job = self.after(config.DWELL_POLL_MS, self._dwell_tick)
+
+    def _dwell_refresh_hover_target(self):
+        """Poll the current pointer target so stable gaze still accumulates dwell."""
+        try:
+            px = self.winfo_pointerx()
+            py = self.winfo_pointery()
+            target = self._dwell_target_at(px, py)
+        except Exception:
+            return
+
+        if target is None:
+            if config.DWELL_MODE == "async" and self.dwell_hovered is not None:
+                self._dwell_leave(self.dwell_hovered)
+            else:
+                self.dwell_hovered = None
+            return
+
+        if target is not self.dwell_hovered:
+            if config.DWELL_MODE == "async" and self.dwell_hovered is not None:
+                self._dwell_leave(self.dwell_hovered)
+            self._dwell_enter(target)
+
+    def _dwell_target_at(self, px, py):
+        """Return the registered dwell button at screen point px/py."""
+        if self._point_in_zoom_popup(px, py):
+            return self._zoom_source_btn
+
+        for btn, _command in self.dwell_btn_meta.values():
+            if self._point_in_widget(btn, px, py):
+                return btn
+        return None
+
+    def _point_in_zoom_popup(self, px, py):
+        if self._zoom_popup is None or self._zoom_source_btn is None:
+            return False
+        return self._point_in_widget(self._zoom_popup, px, py)
+
+    def _point_in_widget(self, widget, px, py):
+        try:
+            if not widget.winfo_ismapped():
+                return False
+            wx = widget.winfo_rootx()
+            wy = widget.winfo_rooty()
+            ww = widget.winfo_width()
+            wh = widget.winfo_height()
+            return wx <= px <= wx + ww and wy <= py <= wy + wh
+        except Exception:
+            return False
+
+    def _resolve_dwell_target(self, widget):
+        """Map the widget under the pointer to a registered dwell button."""
+        current = widget
+        while current is not None:
+            if id(current) in self.dwell_btn_meta:
+                return current
+            if self._zoom_popup is not None and current in (self._zoom_popup, getattr(self, "_zoom_lbl", None)):
+                return self._zoom_source_btn
+            current = getattr(current, "master", None)
+        return None
 
     # ── Async mode: fires as soon as the hovered key hits threshold ───────────
     def _dwell_tick_async(self):
@@ -246,6 +308,7 @@ class DwellMixin:
 
             if self._zoom_popup is None:
                 self._zoom_popup      = tk.Toplevel(self)
+                self._zoom_source_btn = btn
                 self._zoom_popup.overrideredirect(True)
                 self._zoom_popup.attributes('-topmost', True)
                 self._zoom_popup.configure(
@@ -270,6 +333,7 @@ class DwellMixin:
                     w.bind("<Enter>", lambda e, b=btn: self._dwell_enter(b))
                     w.bind("<Leave>", lambda e, b=btn: self._zoom_popup_leave(b))
             else:
+                self._zoom_source_btn = btn
                 self._zoom_lbl.config(
                     text=text,
                     font=("Segoe UI", font_sz, "bold"),
@@ -293,6 +357,7 @@ class DwellMixin:
             except Exception:
                 pass
             self._zoom_popup = None
+            self._zoom_source_btn = None
 
     def _zoom_popup_leave(self, btn):
         """Called when gaze leaves the zoom popup — check if it went back to the original button."""

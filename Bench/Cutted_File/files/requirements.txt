@@ -1,0 +1,12 @@
+opencv-python
+mediapipe
+numpy
+scipy
+pyautogui
+pygame
+edge-tts
+pyttsx3
+transformers
+torch
+nltk
+datasets
