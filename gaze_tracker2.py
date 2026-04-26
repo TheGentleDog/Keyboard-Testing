@@ -333,12 +333,85 @@ def overlay_pip(canvas, cam_frame, pip_w=320, pip_h=240):
     canvas[y0:y0+pip_h, x0:x0+pip_w] = cv2.resize(cam_frame, (pip_w,pip_h))
     txt(canvas, "Camera", (x0+4, y0+pip_h-8), scale=0.40, color=(140,140,140))
 
+def draw_info_card(canvas, title, line1, line2=None, y=54):
+    lines = [title, line1]
+    if line2:
+        lines.append(line2)
+
+    scales = [0.78, 0.58, 0.52][:len(lines)]
+    widths = [
+        cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, 1)[0][0]
+        for text, scale in zip(lines, scales)
+    ]
+    card_w = max(widths) + 56
+    card_h = 34 + 34 * len(lines)
+    x0 = SCREEN_W // 2 - card_w // 2
+    y0 = y
+    x1 = x0 + card_w
+    y1 = y0 + card_h
+
+    cv2.rectangle(canvas, (x0, y0), (x1, y1), (18, 18, 18), -1)
+    cv2.rectangle(canvas, (x0, y0), (x1, y1), (58, 58, 58), 1)
+
+    ty = y0 + 28
+    txt(canvas, title, (x0 + 20, ty), scale=0.78, color=C_ACCENT, thick=2)
+    ty += 34
+    txt(canvas, line1, (x0 + 20, ty), scale=0.58, color=C_TEXT)
+    if line2:
+        ty += 28
+        txt(canvas, line2, (x0 + 20, ty), scale=0.52, color=(150, 150, 150))
+
+def draw_tutorial_screen(canvas, num_points, samples_per_point, seconds_left):
+    canvas[:] = C_BG
+    draw_grid(canvas)
+
+    title = "Calibration Tutorial"
+    subtitle = "Follow the dots with your eyes so the keyboard can learn your gaze."
+    lines = [
+        f"1. Look directly at each dot until the green ring completes and a check appears.",
+        "2. Keep your head as still as possible while each point is recording.",
+        "3. Blink only after a point finishes, not while the ring is filling.",
+        f"4. Calibration will begin automatically in {seconds_left} second(s).",
+    ]
+    footer = f"{num_points} points  ·  {samples_per_point} samples each  ·  R=restart  Q=quit"
+
+    card_w = 1120
+    card_h = 360
+    x0 = SCREEN_W // 2 - card_w // 2
+    y0 = SCREEN_H // 2 - card_h // 2
+    x1 = x0 + card_w
+    y1 = y0 + card_h
+
+    cv2.rectangle(canvas, (x0, y0), (x1, y1), (18, 18, 18), -1)
+    cv2.rectangle(canvas, (x0, y0), (x1, y1), (64, 64, 64), 1)
+
+    txt(canvas, title, (x0 + 36, y0 + 52), scale=1.0, color=C_ACCENT, thick=2)
+    txt(canvas, subtitle, (x0 + 36, y0 + 92), scale=0.62, color=C_TEXT)
+
+    yy = y0 + 146
+    for line in lines:
+        txt(canvas, line, (x0 + 42, yy), scale=0.68, color=C_TEXT)
+        yy += 48
+
+    btn_text = f"Starting In {seconds_left}"
+    btn_w = cv2.getTextSize(btn_text, cv2.FONT_HERSHEY_SIMPLEX, 0.85, 2)[0][0] + 44
+    bx0 = SCREEN_W // 2 - btn_w // 2
+    by0 = y1 - 82
+    bx1 = bx0 + btn_w
+    by1 = by0 + 44
+    cv2.rectangle(canvas, (bx0, by0), (bx1, by1), C_ACCENT, -1)
+    txt(canvas, btn_text, (bx0 + 22, by0 + 30), scale=0.85, color=(12, 12, 12), thick=2)
+
+    fw = cv2.getTextSize(footer, cv2.FONT_HERSHEY_SIMPLEX, 0.52, 1)[0][0]
+    txt(canvas, footer, (SCREEN_W // 2 - fw // 2, y1 + 34), scale=0.52, color=(120, 120, 120))
+
 
 # ──────────────────────────────────────────────────────────────
 #  7.  Main Application
 # ──────────────────────────────────────────────────────────────
 class GazeTrackerApp:
     WIN = "GazeTracker"
+    TUTORIAL_SECONDS = 6
 
     def __init__(self, camera_id=0, num_points=16, ema_alpha=0.3,
                 pnoise=5e-3, mnoise=8.0, spp=60):
@@ -378,6 +451,31 @@ class GazeTrackerApp:
         now = time.time(); self._fpsq.append(now)
         return (len(self._fpsq)-1)/(self._fpsq[-1]-self._fpsq[0]+1e-9) if len(self._fpsq)>1 else 0
 
+    def _calibration_copy(self, phase, has_face, is_blinking):
+        if not has_face:
+            return (
+                "Calibration Setup",
+                "Move your face into the camera frame and look at the highlighted dot.",
+                "Wait until your eyes are detected before the point starts saving.",
+            )
+        if is_blinking:
+            return (
+                "Hold Your Gaze",
+                "Keep your eyes open on the dot while this point is being recorded.",
+                "Blink after the green check appears, not while the ring is filling.",
+            )
+        if phase == 'hold':
+            return (
+                "Look At The Dot",
+                "Keep your head still and focus only on the highlighted dot.",
+                "The ring will turn green when the point is ready to record.",
+            )
+        return (
+            "Recording This Point",
+            "Stay on the dot until the green ring finishes and a check appears.",
+            "You can blink or relax only after that check mark shows.",
+        )
+
     # ── calibration render ──────────────────────────────────────
     def _render_calib(self, cam, feat, lms=None):
         cv = self.canvas; cv[:] = C_BG
@@ -402,6 +500,9 @@ class GazeTrackerApp:
         phase,t = self.calib.dot_state()
         draw_calib_dot(cv, cx, cy, phase, t)
 
+        title, line1, line2 = self._calibration_copy(phase, lms is not None, is_blinking)
+        draw_info_card(cv, title, line1, line2)
+
         # progress bar centred at bottom
         prog = self.calib.progress()
         bx = SCREEN_W//2 - 300; by = SCREEN_H - 60
@@ -411,7 +512,7 @@ class GazeTrackerApp:
         lw = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 1)[0][0]
         txt(cv, label, (SCREEN_W//2 - lw//2, by-12), scale=0.65, color=C_TEXT)
         mouse_state = "ON" if self._mouse_ctrl else "OFF"
-        hint = f"Keep eyes on dot  ·  R=recalibrate  H=pip  D=debug  X=mouse({mouse_state})  Q=quit"
+        hint = f"R=recalibrate  ·  H=camera  ·  D=debug  ·  X=mouse({mouse_state})  ·  Q=quit"
         hw = cv2.getTextSize(hint, cv2.FONT_HERSHEY_SIMPLEX, 0.48, 1)[0][0]
         txt(cv, hint, (SCREEN_W//2 - hw//2, SCREEN_H-18), scale=0.48, color=(100,100,100))
 
@@ -518,6 +619,8 @@ class GazeTrackerApp:
         print(f"[Info] Fullscreen 1920×1080  |  {self.num_points}-point calibration")
         print("[Info] Q=quit  R=recalibrate  H=pip  D=debug  X=mouse ctrl")
         self._new_calib()
+        tutorial_done = False
+        tutorial_started_at = time.time()
 
         cv2.namedWindow(self.WIN, cv2.WINDOW_NORMAL)
         cv2.setWindowProperty(self.WIN, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
@@ -526,15 +629,24 @@ class GazeTrackerApp:
             ret, cam = self._cap.read()
             if not ret: break
             cam = cv2.flip(cam, 1)
-            res = self.mesh.process(cv2.cvtColor(cam, cv2.COLOR_BGR2RGB))
-
             feat = lms = None
-            if res.multi_face_landmarks:
-                lms  = res.multi_face_landmarks[0].landmark
-                feat = self.extractor.extract(lms, cam.shape[1], cam.shape[0])
 
-            self._debug_cam(cam, lms)
-            self._render_calib(cam, feat, lms)
+            if tutorial_done:
+                res = self.mesh.process(cv2.cvtColor(cam, cv2.COLOR_BGR2RGB))
+                if res.multi_face_landmarks:
+                    lms  = res.multi_face_landmarks[0].landmark
+                    feat = self.extractor.extract(lms, cam.shape[1], cam.shape[0])
+                self._debug_cam(cam, lms)
+                self._render_calib(cam, feat, lms)
+            else:
+                elapsed = time.time() - tutorial_started_at
+                seconds_left = max(1, math.ceil(self.TUTORIAL_SECONDS - elapsed))
+                self.canvas[:] = C_BG
+                overlay_pip(self.canvas, cam)
+                draw_tutorial_screen(self.canvas, self.calib.n, self.calib.spp, seconds_left)
+                if elapsed >= self.TUTORIAL_SECONDS:
+                    tutorial_done = True
+                    print("[Info] Calibration started.")
             cv2.imshow(self.WIN, self.canvas)
 
             key = cv2.waitKey(1) & 0xFF
@@ -543,6 +655,11 @@ class GazeTrackerApp:
                 self._cap.release()
                 cv2.destroyAllWindows()
                 return False
+            if action == "restart":
+                tutorial_done = False
+                tutorial_started_at = time.time()
+                self._new_calib()
+                continue
 
         # Calibration done — destroy window, continue tracking headlessly
         cv2.destroyWindow(self.WIN)

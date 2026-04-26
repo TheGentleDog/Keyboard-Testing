@@ -113,8 +113,7 @@ def main():
     _ensure_rules()
 
     if not os.path.exists(NGRAM_CACHE_FILE):
-        print("\n⚠  Model cache missing — forcing dataset regeneration first.")
-        _rebuild_datasets()
+        print("\n⚠  Model cache missing — building from existing datasets.")
 
     # Import after datasets are guaranteed to exist
     from model import ngram_model

@@ -422,8 +422,7 @@ def main():
     _ensure_flores()
 
     if not os.path.exists(NGRAM_CACHE_FILE):
-        print("Model cache missing — forcing dataset regeneration first.")
-        _rebuild_datasets()
+        print("Model cache missing — building n-gram model from existing datasets.")
 
     if not ngram_model.load_cache():
         print("Building n-gram model from datasets...")
