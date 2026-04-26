@@ -369,7 +369,7 @@ FILIPINO_PROPER_NAMES = {
     "ana", "rosa", "luz", "grace", "amor", "joy", "faith", "hope",
     "mark", "john", "paul", "james", "luke", "matthew",
     "tony", "carlo", "carlo", "miguel", "angelo", "danilo",
-    "nena", "nene", "lola", "lolo", "tita", "tito", "kuya", "ate",
+    "nena", "nene",
     # Celebrities / non-political public figures
     "pacman", "marian", "sheryl", "kris",
 }
@@ -390,31 +390,22 @@ FILIPINO_VULGAR = {
 # Words misclassified into the wrong category by the model
 # (not wrong words per se, but they pollute categories like pronouns/time)
 FILIPINO_MISCLASSIFIED = {
-    # Non-pronouns that appear in pronouns category
-    "resulta", "pagkatapos", "tubig", "mundo", "makina", "ngayon",
-    "doktor", "problema", "sagot", "kalikasan", "guro", "libro",
-    "buhay", "isa", "trainer", "kita", "pagkain", "lang",
-    "babae", "hari", "asin", "kabayo",
+    
+    "trainer",
     # Non-time words in time category
     "digmaan", "laban", "hinaharap", "eleksyon", "kampanya", "halalan",
-    "labanan", "ministeryo", "proseso", "patay", "hospice", "giyera",
-    "palabas", "pagluluto", "pagkabata",
+    "labanan", "ministeryo", "patay", "hospice", "giyera",
+    
     # Non-particles in particles category
-    "itan", "ip", "ing", "umin", "dak", "ta",
+    "itan", "ip", "ing", "umin", "dak", "is", "ta",
     # Non-food in food category
-    "dasal", "paumanhin", "kinakailangan", "kuryente", "kulay", "ilaw",
-    "klase", "tulog", "tawad", "mensahe", "kanta", "sorry", "bagay",
-    "temperatura", "taglamig", "pasko", "musika", "payo", "kaunti",
+    
     # Non-location in location category
-    "panganib", "impiyerno", "lindol", "baha", "apoy", "sunog", "ulan",
-    "sya", "bigla",
+    "impiyerno", "lindol", 
+    "sya", 
     # Non-adjective in adjectives category
-    "namatay", "ipinanganak", "pumanaw", "bumagsak", "tumaas",
-    "matematika", "dumadaloy", "pataas", "gumalaw", "isinilang",
-    "nagbabago", "namamaga", "nanginginig", "bumigay", "ginto",
-    # Non-verb particles that slip into verbs
-    "na", "ba", "rin", "pa", "wala", "dito", "rito", "nandito",
-    "nandoon", "naroon", "talaga", "aral", "ingat",
+    "namatay", "ipinanganak", "pumanaw", 
+    
 }
 
 # Pure English words that don't belong in Filipino vocabulary
@@ -454,14 +445,11 @@ FILIPINO_ENGLISH_WORDS = {
 }
 
 # Combined Filipino blocklist
-# NOTE: FILIPINO_MISCLASSIFIED is defined above for reference and logging
-# but intentionally NOT included here — those are valid Filipino words that
-# the model placed in the wrong category. They are kept in the vocabulary
-# so they can still appear under a correct category elsewhere.
 FILIPINO_BLOCKLIST = (
     FILIPINO_POLITICIANS
     | FILIPINO_PROPER_NAMES
     | FILIPINO_VULGAR
+    | FILIPINO_MISCLASSIFIED
     | FILIPINO_ENGLISH_WORDS
 )
 
