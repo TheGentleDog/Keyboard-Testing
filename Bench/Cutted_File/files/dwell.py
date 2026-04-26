@@ -28,6 +28,8 @@ class DwellMixin:
         self._zoom_popup          = None
         self._zoom_source_btn     = None
         self._dwell_cooldown_ms   = 0      # remaining cooldown after a fire
+        self._hover_miss_streak   = 0
+        self._hover_grace_polls   = 3
 
     # ── Registration ──────────────────────────────────────────────────────────
     def _dwell_register(self, btn, command):
@@ -137,12 +139,18 @@ class DwellMixin:
             return
 
         if target is None:
-            if config.DWELL_MODE == "async" and self.dwell_hovered is not None:
+            self._hover_miss_streak += 1
+            if (
+                config.DWELL_MODE == "async"
+                and self.dwell_hovered is not None
+                and self._hover_miss_streak >= self._hover_grace_polls
+            ):
                 self._dwell_leave(self.dwell_hovered)
-            else:
+            elif config.DWELL_MODE != "async":
                 self.dwell_hovered = None
             return
 
+        self._hover_miss_streak = 0
         if target is not self.dwell_hovered:
             if config.DWELL_MODE == "async" and self.dwell_hovered is not None:
                 self._dwell_leave(self.dwell_hovered)
