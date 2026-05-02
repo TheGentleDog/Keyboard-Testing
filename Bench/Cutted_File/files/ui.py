@@ -53,10 +53,9 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         },
     }
 
-    POINTER_SIZE = 24
-    POINTER_OUTLINE = "#ff4d4d"
-    POINTER_FILL = "#a7adb7"
-    POINTER_CENTER = "#f5f7fa"
+    POINTER_SIZE = 72
+    POINTER_OUTLINE = "#8b0018"
+    POINTER_FILL = "#8f8f8f"
 
     # ── Override dwell flash to restore correct per-button colour ─────────────
     def _dwell_flash(self, btn):
@@ -98,18 +97,20 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         kwargs.pop('command', None)
         relief = kwargs.pop('relief', 'flat')
         bd     = kwargs.pop('bd', 1)
-        kwargs['cursor'] = "none"
+        kwargs['cursor'] = getattr(self, "pointer_cursor", "arrow")
 
         lbl = tk.Label(parent, relief=relief, bd=bd, **kwargs)
         lbl.bind('<Button-1>', lambda _e, c=command: c())
         self._dwell_register(lbl, command)
         return lbl
 
-    def __init__(self, ui_layout="qwerty"):
+    def __init__(self, ui_layout="qwerty", gaze_tracking_active=False):
         super().__init__()
         self.title("Filipino Keyboard - Gaze-Based")
         self.attributes('-fullscreen', True)
-        self._use_pointer_overlay      = (os.name != "nt")
+        self._gaze_tracking_active     = gaze_tracking_active
+        self._use_pointer_overlay      = gaze_tracking_active
+        self._system_cursor_hidden     = False
         self.pointer_cursor            = "none" if self._use_pointer_overlay else "arrow"
         self.configure(cursor=self.pointer_cursor)
         self.bind('<Escape>', lambda e: self.attributes('-fullscreen', False))
@@ -147,9 +148,13 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self.after(50, self._take_focus)
 
     def _quit_keyboard(self, _event=None):
-        self._destroy_pointer_overlay()
         self.destroy()
         return "break"
+
+    def destroy(self):
+        self._show_system_cursor()
+        self._destroy_pointer_overlay()
+        super().destroy()
 
     def _keyboard_only_gaze_shortcut(self, event=None):
         if hasattr(self, "status_bar"):
@@ -173,12 +178,39 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         for child in widget.winfo_children():
             self._apply_arrow_cursor(child)
 
+    def _hide_system_cursor(self):
+        if os.name != "nt" or not self._gaze_tracking_active or self._system_cursor_hidden:
+            return
+        try:
+            import ctypes
+            user32 = ctypes.windll.user32
+            for _ in range(20):
+                if user32.ShowCursor(False) < 0:
+                    break
+            self._system_cursor_hidden = True
+        except Exception:
+            pass
+
+    def _show_system_cursor(self):
+        if os.name != "nt" or not self._system_cursor_hidden:
+            return
+        try:
+            import ctypes
+            user32 = ctypes.windll.user32
+            for _ in range(20):
+                if user32.ShowCursor(True) >= 0:
+                    break
+        except Exception:
+            pass
+        self._system_cursor_hidden = False
+
     def _init_pointer_overlay(self):
         try:
             overlay = tk.Toplevel(self)
             overlay.withdraw()
             overlay.overrideredirect(True)
             overlay.attributes("-topmost", True)
+            overlay.attributes("-alpha", 0.3)
             overlay.configure(bg="#010203", cursor="none")
             try:
                 overlay.wm_attributes("-transparentcolor", "#010203")
@@ -200,11 +232,16 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                 cursor="none",
             )
             canvas.pack()
-            center = size // 2
-            outer = size - 4
-            canvas.create_oval(2, 2, outer, outer, outline=self.POINTER_OUTLINE, width=2, fill=self.POINTER_FILL)
-            canvas.create_oval(center - 3, center - 3, center + 3, center + 3,
-                               outline=self.POINTER_OUTLINE, width=1, fill=self.POINTER_CENTER)
+            border = 5
+            canvas.create_oval(
+                border,
+                border,
+                size - border,
+                size - border,
+                outline=self.POINTER_OUTLINE,
+                width=4,
+                fill=self.POINTER_FILL,
+            )
             self._pointer_overlay = overlay
             self._pointer_canvas = canvas
             self._track_pointer_overlay()
@@ -244,14 +281,17 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         if self._use_pointer_overlay:
             self.configure(cursor="none")
             self._apply_none_cursor(self)
+            self._hide_system_cursor()
         else:
             self.configure(cursor="arrow")
             self._apply_arrow_cursor(self)
+            self._show_system_cursor()
         if self._pointer_overlay and self._pointer_job is None:
             self._track_pointer_overlay()
 
     def _show_system_pointer(self):
         self._settings_open = True
+        self._show_system_cursor()
         if self._pointer_job is not None:
             try:
                 self.after_cancel(self._pointer_job)
@@ -957,7 +997,13 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self.current_theme = theme
         self.apply_theme()
         if settings_window:
+            try:
+                settings_window.grab_release()
+            except Exception:
+                pass
             settings_window.destroy()
+            self._restore_main_cursor()
+            self._take_focus()
         self.update_display()
         self.status_bar.config(text=f"Theme changed to {theme.capitalize()} Mode")
 

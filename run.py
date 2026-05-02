@@ -702,7 +702,7 @@ def main():
     # ── Launch Tkinter keyboard on main thread ────────────────────────────────
     from ui import FilipinoKeyboard
 
-    app = FilipinoKeyboard(ui_layout=cfg["ui_layout"])
+    app = FilipinoKeyboard(ui_layout=cfg["ui_layout"], gaze_tracking_active=True)
 
     def on_close():
         stop_tracking()
