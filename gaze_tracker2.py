@@ -213,13 +213,10 @@ class GazeRegressionModel:
         self.Wy,*_ = np.linalg.lstsq(A, T[:,1], rcond=None)
         self.fitted = True
 
-    def predict_raw(self, f):
+    def predict(self, f):
         if not self.fitted: return np.array([0.5, 0.5])
         a = self._design(f.reshape(1,-1))
-        return np.array([float(a@self.Wx), float(a@self.Wy)], float)
-
-    def predict(self, f):
-        return np.clip(self.predict_raw(f), 0, 1)
+        return np.clip([float(a@self.Wx), float(a@self.Wy)], 0, 1)
 
 
 # ──────────────────────────────────────────────────────────────
@@ -398,8 +395,6 @@ class GazeTrackerApp:
         self._mouse_ctrl   = True
         self._window_open  = True
         self._blink = False  # blink state indicator
-        self._gaze_in_bounds = True
-        self._mouse_parked = False
         self._last_gaze = (SCREEN_W // 2, SCREEN_H // 2)  # last known good gaze
         self._tracking_frames = 0
         self._tracking_faces = 0
@@ -450,18 +445,6 @@ class GazeTrackerApp:
         except Exception:
             pass
         return self._last_distance
-
-    def _prediction_in_bounds(self, pred):
-        return 0.0 <= pred[0] <= 1.0 and 0.0 <= pred[1] <= 1.0
-
-    def _park_mouse_off_keys(self):
-        if not self._mouse_ctrl or not _PYAUTOGUI_OK:
-            return
-        try:
-            pyautogui.moveTo(8, 8)
-            self._mouse_parked = True
-        except Exception:
-            pass
 
     # ── calibration render ──────────────────────────────────────
     def _render_calib(self, cam, feat, lms=None):
@@ -517,35 +500,22 @@ class GazeTrackerApp:
             self._blink = self.extractor.is_blinking(lms, cam.shape[1], cam.shape[0])
 
         if feat is not None and not self._blink:
-            raw = self.calib.model.predict_raw(feat)
-            if self._prediction_in_bounds(raw):
-                self._gaze_in_bounds = True
-                self._mouse_parked = False
-                smo = self.smoother.update(raw)
-                gx  = int(np.clip(smo[0]*SCREEN_W,  0, SCREEN_W-1))
-                gy  = int(np.clip(smo[1]*SCREEN_H, 0, SCREEN_H-1))
-                self._last_gaze = (gx, gy)
-                self._tracking_predictions += 1
-                self.hist.append((gx, gy))
-                if self._mouse_ctrl and _PYAUTOGUI_OK:
-                    mx = int(gx * _PYAUTOGUI_SCREEN_W / SCREEN_W)
-                    my = int(gy * _PYAUTOGUI_SCREEN_H / SCREEN_H)
-                    pyautogui.moveTo(mx, my)
-                    self._mouse_moves += 1
-            else:
-                self._gaze_in_bounds = False
-                self.hist.clear()
-                self.smoother.reset()
-                if not self._mouse_parked:
-                    self._park_mouse_off_keys()
+            raw = self.calib.model.predict(feat)
+            smo = self.smoother.update(raw)
+            gx  = int(np.clip(smo[0]*SCREEN_W,  0, SCREEN_W-1))
+            gy  = int(np.clip(smo[1]*SCREEN_H, 0, SCREEN_H-1))
+            self._last_gaze = (gx, gy)
+            self._tracking_predictions += 1
+            self.hist.append((gx, gy))
+            if self._mouse_ctrl and _PYAUTOGUI_OK:
+                mx = int(gx * _PYAUTOGUI_SCREEN_W / SCREEN_W)
+                my = int(gy * _PYAUTOGUI_SCREEN_H / SCREEN_H)
+                pyautogui.moveTo(mx, my)
+                self._mouse_moves += 1
 
         # Always draw cursor at last known position
         gx, gy = self._last_gaze
-        if feat is not None and not self._gaze_in_bounds:
-            msg = "Gaze outside screen - input paused"
-            mw = cv2.getTextSize(msg, cv2.FONT_HERSHEY_SIMPLEX, 1.0, 2)[0][0]
-            txt(cv, msg, (SCREEN_W//2-mw//2, SCREEN_H//2), scale=1.0, color=C_WARN, thick=2)
-        elif feat is not None or self._blink:
+        if feat is not None or self._blink:
             draw_gaze_cursor(cv, gx, gy, self.hist)
             # coordinate badge
             badge = f"  {gx} x {gy}  "

@@ -18,6 +18,7 @@ PREDEFINED_THRESHOLD = 3   # times spoken before auto-saving
 
 
 class FilipinoKeyboard(tk.Tk, DwellMixin):
+    GAZE_FRAME_GAP_PX = 60
 
     THEMES = {
         "light": {
@@ -322,12 +323,15 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     # =========================================================================
     # WIDGET SETUP
     # =========================================================================
+    def _frame_gap(self):
+        return self.GAZE_FRAME_GAP_PX if self._gaze_tracking_active else 5
+
     def _create_widgets(self):
         theme = self.themes[self.current_theme]
 
         # ── Top area: text displays + PANIC BUTTON ────────────────────────────
         top_frame = tk.Frame(self, bg=theme["bg"])
-        top_frame.pack(fill="x", padx=5, pady=(5, 3))
+        top_frame.pack(fill="x", padx=self._frame_gap(), pady=(self._frame_gap(), 3))
 
         displays = tk.Frame(top_frame, bg=theme["bg"])
         displays.pack(side="left", fill="both", expand=True)
@@ -350,7 +354,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
 
         # ── Prediction bar ────────────────────────────────────────────────────
         self.predictive_container = tk.Frame(self, bg=theme["bg"])
-        self.predictive_container.pack(fill="x", padx=5, pady=3)
+        self.predictive_container.pack(fill="x", padx=self._frame_gap(), pady=3)
 
         # ── Status bar (pack first with side=bottom so it anchors correctly) ───
         self.status_bar = ttk.Label(
@@ -362,7 +366,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
 
         # ── Shared content area — keyboard and predefined panel swap here ──────
         self.content_area = tk.Frame(self, bg=theme["bg"])
-        self.content_area.pack(fill="both", expand=True, padx=5, pady=(3, 5))
+        self.content_area.pack(fill="both", expand=True, padx=self._frame_gap(), pady=(3, self._frame_gap()))
 
         # Main grid: row 0 = func row, rows 1-3 = letters (all equal weight)
         self.main_grid = tk.Frame(self.content_area, bg=theme["bg"])
