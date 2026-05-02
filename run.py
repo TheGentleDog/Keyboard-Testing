@@ -162,12 +162,12 @@ class LauncherUI(tk.Tk):
             rb.pack(side="left", padx=6)
 
         # Samples per point
-        self._samples_var = tk.IntVar(value=60)
+        self._samples_var = tk.IntVar(value=90)
         samples_frame = tk.Frame(calib, bg=d["card"])
         samples_frame.pack(fill="x", pady=3)
         tk.Label(samples_frame, text="Samples / point", bg=d["card"], fg=d["text"],
                  font=("Segoe UI", 11), anchor="w", width=22).pack(side="left")
-        self._samples_lbl = tk.Label(samples_frame, text="60", bg=d["card"],
+        self._samples_lbl = tk.Label(samples_frame, text="90", bg=d["card"],
                                      fg=d["accent"], font=("Segoe UI", 11, "bold"), width=4)
         self._samples_lbl.pack(side="right", padx=(0, 8))
         sl = tk.Scale(samples_frame, from_=20, to=120, orient="horizontal",
@@ -231,12 +231,12 @@ class LauncherUI(tk.Tk):
                        command=self._toggle_ema).pack(side="left")
 
         # EMA alpha
-        self._ema_var = tk.DoubleVar(value=0.15)
+        self._ema_var = tk.DoubleVar(value=0.30)
         self._ema_frame = tk.Frame(smooth, bg=d["card"])
         self._ema_frame.pack(fill="x", pady=3)
         tk.Label(self._ema_frame, text="EMA alpha  (0–1)", bg=d["card"], fg=d["text"],
                  font=("Segoe UI", 11), anchor="w", width=22).pack(side="left")
-        self._ema_lbl = tk.Label(self._ema_frame, text="0.15", bg=d["card"],
+        self._ema_lbl = tk.Label(self._ema_frame, text="0.30", bg=d["card"],
                                  fg=d["accent"], font=("Segoe UI", 11, "bold"), width=5)
         self._ema_lbl.pack(side="right", padx=(0, 8))
         tk.Scale(self._ema_frame, from_=0.01, to=1.0, resolution=0.01,
@@ -253,12 +253,12 @@ class LauncherUI(tk.Tk):
                                "Lower noise values react faster; higher values smooth more.")
 
         # Process noise
-        self._pnoise_var = tk.DoubleVar(value=1e-3)
+        self._pnoise_var = tk.DoubleVar(value=0.0100)
         pn_frame = tk.Frame(kalman, bg=d["card"])
         pn_frame.pack(fill="x", pady=3)
         tk.Label(pn_frame, text="Process noise", bg=d["card"], fg=d["text"],
                  font=("Segoe UI", 11), anchor="w", width=22).pack(side="left")
-        self._pnoise_lbl = tk.Label(pn_frame, text="0.001", bg=d["card"],
+        self._pnoise_lbl = tk.Label(pn_frame, text="0.0100", bg=d["card"],
                                     fg=d["accent"], font=("Segoe UI", 11, "bold"), width=6)
         self._pnoise_lbl.pack(side="right", padx=(0, 8))
         tk.Scale(pn_frame, from_=1e-4, to=0.1, resolution=1e-4,
@@ -269,12 +269,12 @@ class LauncherUI(tk.Tk):
                  ).pack(side="left", fill="x", expand=True)
 
         # Measurement noise
-        self._mnoise_var = tk.DoubleVar(value=12.0)
+        self._mnoise_var = tk.DoubleVar(value=5.5)
         mn_frame = tk.Frame(kalman, bg=d["card"])
         mn_frame.pack(fill="x", pady=3)
         tk.Label(mn_frame, text="Measurement noise", bg=d["card"], fg=d["text"],
                  font=("Segoe UI", 11), anchor="w", width=22).pack(side="left")
-        self._mnoise_lbl = tk.Label(mn_frame, text="12.0", bg=d["card"],
+        self._mnoise_lbl = tk.Label(mn_frame, text="5.5", bg=d["card"],
                                     fg=d["accent"], font=("Segoe UI", 11, "bold"), width=6)
         self._mnoise_lbl.pack(side="right", padx=(0, 8))
         tk.Scale(mn_frame, from_=1.0, to=50.0, resolution=0.5,

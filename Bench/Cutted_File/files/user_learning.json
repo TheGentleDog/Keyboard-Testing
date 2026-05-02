@@ -2,18 +2,57 @@
   "user_shortcuts": {
     "m": "make",
     "g": "grandmother",
-    "w": "want"
+    "w": "want",
+    "l": "looking"
   },
   "user_shortcut_usage": {
     "m": 1,
     "g": 1,
-    "w": 2
+    "w": 2,
+    "l": 1
   },
   "new_words": [],
   "word_usage_history": [
     [
       "i",
       [
+        "i"
+      ]
+    ],
+    [
+      "efghijkklmnopqr",
+      [
+        "efghijkklmnopqr"
+      ]
+    ],
+    [
+      "today",
+      [
+        "iyo",
+        "i",
+        "i"
+      ]
+    ],
+    [
+      "iyo",
+      [
+        "iyo",
+        "i",
+        "i"
+      ]
+    ],
+    [
+      "i",
+      [
+        "iyo",
+        "i",
+        "i"
+      ]
+    ],
+    [
+      "i",
+      [
+        "iyo",
         "i"
       ]
     ]
