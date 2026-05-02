@@ -44,6 +44,9 @@ except ImportError:
 #  Constants
 # ──────────────────────────────────────────────────────────────
 SCREEN_W, SCREEN_H = 1920, 1080
+CAMERA_FRAME_W, CAMERA_FRAME_H = 1920, 1080
+CAMERA_HFOV_DEG = 60.0
+REAL_IPD_CM = 6.3
 
 CALIB_25 = [
     (x, y)
@@ -319,6 +322,15 @@ def draw_gaze_cursor(canvas, gx, gy, history):
 def txt(canvas, text, xy, scale=0.6, color=C_TEXT, thick=1):
     cv2.putText(canvas, text, xy, cv2.FONT_HERSHEY_SIMPLEX, scale, color, thick, cv2.LINE_AA)
 
+def focal_px_for_width(width):
+    return width / (2.0 * math.tan(math.radians(CAMERA_HFOV_DEG) / 2.0))
+
+def configure_1080p_camera(cap):
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_FRAME_W)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_FRAME_H)
+    cap.set(cv2.CAP_PROP_FPS, 30)
+
 def draw_bar(canvas, prog, x, y, w, h):
     cv2.rectangle(canvas, (x,y), (x+w,y+h), (45,45,45), -1)
     fill = int(w * prog)
@@ -326,9 +338,28 @@ def draw_bar(canvas, prog, x, y, w, h):
         cv2.rectangle(canvas, (x,y), (x+fill,y+h), lerp_color((0,120,60), C_ACCENT, prog), -1)
     cv2.rectangle(canvas, (x,y), (x+w,y+h), (110,110,110), 1)
 
-def overlay_pip(canvas, cam_frame, pip_w=320, pip_h=240):
+def overlay_pip(canvas, cam_frame, pip_w=320, pip_h=240, distance_info=None):
     if cam_frame is None: return
     x0, y0 = SCREEN_W - pip_w - 20, SCREEN_H - pip_h - 20
+    if distance_info:
+        panel_w = 260
+        px0 = max(20, x0 - panel_w - 12)
+        cv2.rectangle(canvas, (px0, y0), (px0 + panel_w, y0 + pip_h), (18,18,18), -1)
+        cv2.rectangle(canvas, (px0, y0), (px0 + panel_w, y0 + pip_h), (55,55,55), 1)
+        txt(canvas, "Distance 1080p", (px0 + 14, y0 + 30), scale=0.62, color=C_ACCENT, thick=1)
+        txt(canvas, distance_info["label"], (px0 + 14, y0 + 78), scale=0.80, color=C_TEXT, thick=2)
+        txt(canvas, f"IPD px: {distance_info['ipd_px']:.1f}", (px0 + 14, y0 + 122),
+            scale=0.48, color=(160,160,160))
+        txt(canvas, f"Pos px: {distance_info['pos_px']}", (px0 + 14, y0 + 150),
+            scale=0.48, color=(160,160,160))
+        txt(canvas, f"Pos norm: {distance_info['pos_norm']}", (px0 + 14, y0 + 178),
+            scale=0.48, color=(160,160,160))
+        txt(canvas, f"Angle: {distance_info['angle_deg']}", (px0 + 14, y0 + 206),
+            scale=0.48, color=(160,160,160))
+        txt(canvas, f"Frame: {distance_info['frame']}", (px0 + 14, y0 + 226),
+            scale=0.40, color=(120,120,120))
+        txt(canvas, "Estimated from eye spacing", (px0 + 14, y0 + pip_h - 18),
+            scale=0.40, color=(120,120,120))
     cv2.rectangle(canvas, (x0-3,y0-3), (x0+pip_w+3,y0+pip_h+3), (55,55,55), 2)
     canvas[y0:y0+pip_h, x0:x0+pip_w] = cv2.resize(cam_frame, (pip_w,pip_h))
     txt(canvas, "Camera", (x0+4, y0+pip_h-8), scale=0.40, color=(140,140,140))
@@ -341,7 +372,9 @@ class GazeTrackerApp:
     WIN = "GazeTracker"
 
     def __init__(self, camera_id=0, num_points=16, ema_alpha=0.3,
-                pnoise=5e-3, mnoise=8.0, spp=60):
+                pnoise=5e-3, mnoise=8.0, spp=60,
+                show_camera_window=True, debug_landmarks=True,
+                show_distance=True):
         self.cam_id     = camera_id
         self.num_points = num_points
         self.spp        = spp
@@ -355,8 +388,10 @@ class GazeTrackerApp:
 
         self.hist   = collections.deque(maxlen=50)
         self._fpsq  = collections.deque(maxlen=30)
-        self._pip          = True
-        self._dbg          = False
+        self._pip          = show_camera_window
+        self._dbg          = debug_landmarks
+        self._show_distance = show_distance
+        self._last_distance = None
         self._mouse_ctrl   = True
         self._window_open  = True
         self._blink = False  # blink state indicator
@@ -377,6 +412,39 @@ class GazeTrackerApp:
     def _fps(self):
         now = time.time(); self._fpsq.append(now)
         return (len(self._fpsq)-1)/(self._fpsq[-1]-self._fpsq[0]+1e-9) if len(self._fpsq)>1 else 0
+
+    def _estimate_distance(self, lms, w, h):
+        if lms is None:
+            return self._last_distance
+        try:
+            left, right = self.extractor.iris_px(lms, w, h)
+            left_arr = np.array(left, float)
+            right_arr = np.array(right, float)
+            eye_center = (left_arr + right_arr) / 2.0
+            pos_x = eye_center[0] - (w / 2.0)
+            pos_y = (h / 2.0) - eye_center[1]
+            pos_x_norm = pos_x / (w / 2.0)
+            pos_y_norm = pos_y / (h / 2.0)
+            angle_x = math.degrees(math.atan(pos_x / focal_px_for_width(w)))
+            angle_y = math.degrees(math.atan(pos_y_norm))
+            ipd_px = float(np.linalg.norm(left_arr - right_arr))
+            if ipd_px < 1.0:
+                return self._last_distance
+            focal_px = focal_px_for_width(w)
+            distance_cm = (REAL_IPD_CM * focal_px) / ipd_px
+            self._last_distance = {
+                "cm": distance_cm,
+                "label": f"{distance_cm:.1f} cm",
+                "ipd_px": ipd_px,
+                "focal_px": focal_px,
+                "frame": f"{w}x{h}",
+                "pos_px": f"{pos_x:+.0f}, {pos_y:+.0f}",
+                "pos_norm": f"{pos_x_norm:+.2f}, {pos_y_norm:+.2f}",
+                "angle_deg": f"{angle_x:+.1f}, {angle_y:+.1f}",
+            }
+        except Exception:
+            pass
+        return self._last_distance
 
     # ── calibration render ──────────────────────────────────────
     def _render_calib(self, cam, feat, lms=None):
@@ -415,7 +483,9 @@ class GazeTrackerApp:
         hw = cv2.getTextSize(hint, cv2.FONT_HERSHEY_SIMPLEX, 0.48, 1)[0][0]
         txt(cv, hint, (SCREEN_W//2 - hw//2, SCREEN_H-18), scale=0.48, color=(100,100,100))
 
-        if self._pip: overlay_pip(cv, cam)
+        if self._pip:
+            distance_info = self._estimate_distance(lms, cam.shape[1], cam.shape[0]) if self._show_distance else None
+            overlay_pip(cv, cam, distance_info=distance_info)
         # Only add calibration samples when not blinking
         if feat is not None and not is_blinking:
             self.calib.add_sample(feat)
@@ -469,7 +539,9 @@ class GazeTrackerApp:
         cw = cv2.getTextSize(ctrl, cv2.FONT_HERSHEY_SIMPLEX, 0.48, 1)[0][0]
         txt(cv, ctrl, (SCREEN_W//2-cw//2, 26), scale=0.48, color=(110,110,110))
 
-        if self._pip: overlay_pip(cv, cam)
+        if self._pip:
+            distance_info = self._estimate_distance(lms, cam.shape[1], cam.shape[0]) if self._show_distance else None
+            overlay_pip(cv, cam, distance_info=distance_info)
 
     # ── debug overlay on camera pip ─────────────────────────────
     def _debug_cam(self, cam, lms):
@@ -504,6 +576,26 @@ class GazeTrackerApp:
             return "handled"
         return None
 
+    def _handle_track_key(self, key):
+        if key == 255:
+            return None
+        ch = chr(key).lower()
+        if ch == 'q':
+            return "quit"
+        if ch == 'h':
+            self._pip = not self._pip
+            print(f"[Info] Camera window {'on' if self._pip else 'off'}.")
+            return "handled"
+        if ch == 'd':
+            self._dbg = not self._dbg
+            print(f"[Info] Debug landmarks {'on' if self._dbg else 'off'}.")
+            return "handled"
+        if ch == 'x':
+            self._mouse_ctrl = not self._mouse_ctrl
+            print(f"[Info] Mouse control {'on' if self._mouse_ctrl else 'off'}.")
+            return "handled"
+        return None
+
     # ── main loop ───────────────────────────────────────────────
     def calibrate(self):
         """
@@ -512,10 +604,14 @@ class GazeTrackerApp:
         then destroys the window. Call track() in a background thread after this.
         """
         self._cap = cv2.VideoCapture(self.cam_id)
+        configure_1080p_camera(self._cap)
         if not self._cap.isOpened():
             print(f"[Error] Cannot open camera {self.cam_id}"); return
 
+        actual_w = int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        actual_h = int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         print(f"[Info] Fullscreen 1920×1080  |  {self.num_points}-point calibration")
+        print(f"[Info] Camera capture requested 1920×1080, using {actual_w}×{actual_h}")
         print("[Info] Q=quit  R=recalibrate  H=pip  D=debug  X=mouse ctrl")
         self._new_calib()
 
@@ -562,6 +658,7 @@ class GazeTrackerApp:
         self._tracking_predictions = 0
         self._mouse_moves = 0
         self._tracking_error = None
+        window_ready = False
 
         try:
             while True:
@@ -584,10 +681,24 @@ class GazeTrackerApp:
 
                 self._debug_cam(cam, lms)
                 self._render_track(cam, feat, lms, fps())
+                if self._pip:
+                    if not window_ready:
+                        cv2.namedWindow(self.WIN, cv2.WINDOW_NORMAL)
+                        cv2.resizeWindow(self.WIN, 960, 540)
+                        window_ready = True
+                    cv2.imshow(self.WIN, self.canvas)
+                    action = self._handle_track_key(cv2.waitKey(1) & 0xFF)
+                    if action == "quit":
+                        break
+                elif window_ready:
+                    cv2.destroyWindow(self.WIN)
+                    window_ready = False
         except Exception as e:
             self._tracking_error = str(e)
             print(f"[Error] Tracking crashed: {e}")
 
+        if window_ready:
+            cv2.destroyWindow(self.WIN)
         cap.release()
         print("[Info] Tracking stopped.")
 

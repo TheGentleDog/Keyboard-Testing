@@ -50,6 +50,8 @@ class LauncherUI(tk.Tk):
     def __init__(self):
         super().__init__()
         self.result = None
+        self._preview_stop = None
+        self._preview_thread = None
         d = self.DARK
 
         self.title("Gaze Keyboard — Launcher")
@@ -63,6 +65,7 @@ class LauncherUI(tk.Tk):
         self.geometry(f"{W}x{H}+{(sw-W)//2}+{(sh-H)//2}")
 
         self._build(d)
+        self.protocol("WM_DELETE_WINDOW", self._on_cancel)
         self.lift()
         self.focus_force()
         self.attributes("-topmost", True)
@@ -298,6 +301,55 @@ class LauncherUI(tk.Tk):
                            activeforeground=d["text"],
                            font=("Segoe UI", 10)).pack(side="left", padx=6)
 
+        camera_window = self._section(body, "CAMERA WINDOW",
+                                      "Preview and debug tools shown during eye tracking.")
+        self._camera_window_var = tk.BooleanVar(value=True)
+        self._camera_debug_var = tk.BooleanVar(value=True)
+        self._distance_var = tk.BooleanVar(value=True)
+
+        preview_frame = tk.Frame(camera_window, bg=d["card"])
+        preview_frame.pack(fill="x", pady=3)
+        tk.Label(preview_frame, text="Camera preview", bg=d["card"], fg=d["text"],
+                 font=("Segoe UI", 11), anchor="w", width=22).pack(side="left")
+        tk.Checkbutton(preview_frame, text="Enabled", variable=self._camera_window_var,
+                       bg=d["card"], fg=d["text"], selectcolor=d["accent"],
+                       activebackground=d["card"], activeforeground=d["text"],
+                       font=("Segoe UI", 10)).pack(side="left")
+
+        posture_frame = tk.Frame(camera_window, bg=d["card"])
+        posture_frame.pack(fill="x", pady=(8, 3))
+        tk.Label(posture_frame, text="Setup preview", bg=d["card"], fg=d["text"],
+                 font=("Segoe UI", 11), anchor="w", width=22).pack(side="left")
+        self._preview_btn = tk.Label(posture_frame, text="Open Preview", bg=d["accent"],
+                                     fg="#ffffff", font=("Segoe UI", 10, "bold"),
+                                     relief="flat", bd=0, padx=14, pady=7,
+                                     cursor="hand2")
+        self._preview_btn.pack(side="left")
+        self._preview_btn.bind("<Button-1>", self._toggle_setup_preview)
+        self._preview_btn.bind("<Enter>", lambda _: self._preview_btn.config(bg=d["accent_hov"]))
+        self._preview_btn.bind("<Leave>", lambda _: self._sync_preview_button())
+        self._preview_status = tk.Label(posture_frame, text="Closed", bg=d["card"],
+                                        fg=d["muted"], font=("Segoe UI", 9))
+        self._preview_status.pack(side="left", padx=10)
+
+        debug_frame = tk.Frame(camera_window, bg=d["card"])
+        debug_frame.pack(fill="x", pady=3)
+        tk.Label(debug_frame, text="Debug landmarks", bg=d["card"], fg=d["text"],
+                 font=("Segoe UI", 11), anchor="w", width=22).pack(side="left")
+        tk.Checkbutton(debug_frame, text="Enabled", variable=self._camera_debug_var,
+                       bg=d["card"], fg=d["text"], selectcolor=d["accent"],
+                       activebackground=d["card"], activeforeground=d["text"],
+                       font=("Segoe UI", 10)).pack(side="left")
+
+        distance_frame = tk.Frame(camera_window, bg=d["card"])
+        distance_frame.pack(fill="x", pady=3)
+        tk.Label(distance_frame, text="Distance panel", bg=d["card"], fg=d["text"],
+                 font=("Segoe UI", 11), anchor="w", width=22).pack(side="left")
+        tk.Checkbutton(distance_frame, text="Enabled", variable=self._distance_var,
+                       bg=d["card"], fg=d["text"], selectcolor=d["accent"],
+                       activebackground=d["card"], activeforeground=d["text"],
+                       font=("Segoe UI", 10)).pack(side="left")
+
         # ────────────────────────────────────────────────────────
         #  Buttons
         # ────────────────────────────────────────────────────────
@@ -313,7 +365,7 @@ class LauncherUI(tk.Tk):
                               font=("Segoe UI", 11, "bold"), relief="flat", bd=0,
                               padx=22, pady=11, cursor="hand2")
         cancel_btn.pack(side="left")
-        cancel_btn.bind("<Button-1>", lambda _: self.destroy())
+        cancel_btn.bind("<Button-1>", self._on_cancel)
         cancel_btn.bind("<Enter>", lambda _: cancel_btn.config(bg=d["border"]))
         cancel_btn.bind("<Leave>", lambda _: cancel_btn.config(bg=d["card_alt"]))
 
@@ -333,7 +385,174 @@ class LauncherUI(tk.Tk):
             except Exception:
                 pass
 
+    def _sync_preview_button(self):
+        d = self.DARK
+        running = self._preview_thread is not None and self._preview_thread.is_alive()
+        if hasattr(self, "_preview_btn"):
+            self._preview_btn.config(
+                text="Close Preview" if running else "Open Preview",
+                bg=d["danger"] if running else d["accent"],
+            )
+
+    def _set_preview_status(self, text, color=None):
+        if not hasattr(self, "_preview_status"):
+            return
+        self._preview_status.config(text=text, fg=color or self.DARK["muted"])
+        self._sync_preview_button()
+
+    def _toggle_setup_preview(self, _event=None):
+        running = self._preview_thread is not None and self._preview_thread.is_alive()
+        if running:
+            self._stop_setup_preview()
+        else:
+            self._start_setup_preview()
+        return "break"
+
+    def _start_setup_preview(self):
+        self._stop_setup_preview(join=False)
+        self._preview_stop = threading.Event()
+        self._preview_thread = threading.Thread(
+            target=self._run_setup_preview,
+            args=(
+                self._camera_var.get(),
+                self._camera_debug_var.get(),
+                self._distance_var.get(),
+            ),
+            daemon=True,
+        )
+        self._preview_thread.start()
+        self._set_preview_status("Opening...", self.DARK["accent"])
+
+    def _stop_setup_preview(self, join=True):
+        if self._preview_stop is not None:
+            self._preview_stop.set()
+        if join and self._preview_thread is not None and self._preview_thread.is_alive():
+            self._preview_thread.join(timeout=1.0)
+        self._sync_preview_button()
+
+    def _run_setup_preview(self, camera_id, debug_on, distance_on):
+        win = "Setup Camera Preview"
+        cap = None
+        mesh = None
+        try:
+            import cv2
+            import mediapipe as mp
+            import numpy as np
+            import math
+
+            camera_w, camera_h = 1920, 1080
+            camera_hfov_deg = 60.0
+            real_ipd_cm = 6.3
+
+            cap = cv2.VideoCapture(camera_id)
+            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, camera_w)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, camera_h)
+            cap.set(cv2.CAP_PROP_FPS, 30)
+            if not cap.isOpened():
+                self.after(0, lambda: self._set_preview_status("Camera not available", self.DARK["danger"]))
+                return
+            actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            if actual_w == camera_w and actual_h == camera_h:
+                status = "Preview open 1920x1080"
+            else:
+                status = f"Preview {actual_w}x{actual_h}"
+
+            mesh = mp.solutions.face_mesh.FaceMesh(
+                max_num_faces=1,
+                refine_landmarks=True,
+                min_detection_confidence=0.5,
+                min_tracking_confidence=0.5,
+            )
+            self.after(0, lambda: self._set_preview_status(status, self.DARK["accent"]))
+
+            while self._preview_stop is not None and not self._preview_stop.is_set():
+                ret, frame = cap.read()
+                if not ret:
+                    self.after(0, lambda: self._set_preview_status("Frame read failed", self.DARK["danger"]))
+                    break
+
+                frame = cv2.flip(frame, 1)
+                h, w = frame.shape[:2]
+                result = mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                lms = result.multi_face_landmarks[0].landmark if result.multi_face_landmarks else None
+
+                if lms is not None:
+                    left_eye = np.array([lms[468].x * w, lms[468].y * h])
+                    right_eye = np.array([lms[473].x * w, lms[473].y * h])
+                    eye_center = (left_eye + right_eye) / 2.0
+                    pos_x = eye_center[0] - (w / 2.0)
+                    pos_y = (h / 2.0) - eye_center[1]
+                    pos_x_norm = pos_x / (w / 2.0)
+                    pos_y_norm = pos_y / (h / 2.0)
+                    focal_x_px = w / (2.0 * math.tan(math.radians(camera_hfov_deg) / 2.0))
+                    angle_x = math.degrees(math.atan(pos_x / focal_x_px))
+                    angle_y = math.degrees(math.atan(pos_y_norm))
+
+                    cx, cy = int(w / 2), int(h / 2)
+                    ex, ey = int(eye_center[0]), int(eye_center[1])
+                    cv2.line(frame, (cx - 24, cy), (cx + 24, cy), (80, 80, 80), 1, cv2.LINE_AA)
+                    cv2.line(frame, (cx, cy - 24), (cx, cy + 24), (80, 80, 80), 1, cv2.LINE_AA)
+                    cv2.circle(frame, (ex, ey), 7, (0, 220, 120), 2, cv2.LINE_AA)
+                    cv2.line(frame, (cx, cy), (ex, ey), (0, 160, 220), 1, cv2.LINE_AA)
+
+                    if debug_on:
+                        for idx in [468, 473]:
+                            cv2.circle(frame, (int(lms[idx].x * w), int(lms[idx].y * h)), 4, (0, 220, 255), -1)
+                        for idx in [33, 133, 362, 263]:
+                            cv2.circle(frame, (int(lms[idx].x * w), int(lms[idx].y * h)), 3, (255, 100, 0), -1)
+
+                    if distance_on:
+                        ipd_px = float(np.linalg.norm(left_eye - right_eye))
+                        if ipd_px > 1.0:
+                            distance_cm = (real_ipd_cm * focal_x_px) / ipd_px
+                            cv2.rectangle(frame, (10, 10), (330, 222), (18, 18, 18), -1)
+                            cv2.putText(frame, f"1080p distance: {distance_cm:.1f} cm", (22, 42),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 220, 120), 2, cv2.LINE_AA)
+                            cv2.putText(frame, f"IPD px: {ipd_px:.1f}", (22, 72),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.48, (210, 210, 210), 1, cv2.LINE_AA)
+                            cv2.putText(frame, f"Position px: {pos_x:+.0f}, {pos_y:+.0f}", (22, 100),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.48, (160, 160, 160), 1, cv2.LINE_AA)
+                            cv2.putText(frame, f"Position norm: {pos_x_norm:+.2f}, {pos_y_norm:+.2f}", (22, 126),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.48, (160, 160, 160), 1, cv2.LINE_AA)
+                            cv2.putText(frame, f"Angle deg: {angle_x:+.1f}, {angle_y:+.1f}", (22, 152),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.48, (160, 160, 160), 1, cv2.LINE_AA)
+                            cv2.putText(frame, f"Frame: {w}x{h}", (22, 178),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.48, (160, 160, 160), 1, cv2.LINE_AA)
+                            cv2.putText(frame, f"Camera {camera_id}", (22, 204),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.48, (160, 160, 160), 1, cv2.LINE_AA)
+                else:
+                    cv2.rectangle(frame, (10, 10), (275, 58), (18, 18, 18), -1)
+                    cv2.putText(frame, "No face detected", (22, 42),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 100, 255), 2, cv2.LINE_AA)
+
+                cv2.imshow(win, frame)
+                key = cv2.waitKey(1) & 0xFF
+                if key in (ord("q"), 27):
+                    break
+        except Exception as exc:
+            msg = str(exc)
+            self.after(0, lambda: self._set_preview_status(msg[:28], self.DARK["danger"]))
+        finally:
+            if mesh is not None:
+                mesh.close()
+            if cap is not None:
+                cap.release()
+            try:
+                cv2.destroyWindow(win)
+            except Exception:
+                pass
+            if self._preview_stop is not None:
+                self._preview_stop.set()
+            self.after(0, lambda: self._set_preview_status("Closed"))
+
+    def _on_cancel(self, _event=None):
+        self._stop_setup_preview()
+        self.destroy()
+
     def _on_start(self, _event=None):
+        self._stop_setup_preview()
         self.result = {
             "camera":  self._camera_var.get(),
             "points":  self._points_var.get(),
@@ -343,6 +562,9 @@ class LauncherUI(tk.Tk):
             "mnoise":  self._mnoise_var.get(),
             "dwell_mode": self._dwell_mode_var.get(),
             "ui_layout": self._ui_layout_var.get(),
+            "camera_window": self._camera_window_var.get(),
+            "camera_debug": self._camera_debug_var.get(),
+            "distance_panel": self._distance_var.get(),
         }
         self.destroy()
 
@@ -444,6 +666,9 @@ def main():
         ema_alpha  = cfg["ema"],
         pnoise     = cfg["pnoise"],
         mnoise     = cfg["mnoise"],
+        show_camera_window = cfg["camera_window"],
+        debug_landmarks    = cfg["camera_debug"],
+        show_distance      = cfg["distance_panel"],
     )
 
     # ── Phase 1: Calibration on main thread (required on macOS) ──────────────
