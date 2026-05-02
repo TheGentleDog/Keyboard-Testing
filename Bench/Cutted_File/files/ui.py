@@ -105,7 +105,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._dwell_register(lbl, command)
         return lbl
 
-    def __init__(self, ui_layout="qwerty", gaze_tracking_active=False):
+    def __init__(self, ui_layout="qwerty", gaze_tracking_active=False, ui_tutorial=False):
         super().__init__()
         self.title("Filipino Keyboard - Gaze-Based")
         self.attributes('-fullscreen', True)
@@ -115,7 +115,8 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self.pointer_cursor            = "none" if self._use_pointer_overlay else "arrow"
         self.configure(cursor=self.pointer_cursor)
         self.bind('<Escape>', lambda e: self.attributes('-fullscreen', False))
-        self.bind('<s>', lambda e: self.show_settings())   # caretaker shortcut
+        self.bind_all('<KeyPress-s>', self._open_settings_shortcut)
+        self.bind_all('<KeyPress-S>', self._open_settings_shortcut)
         self.bind_all('<KeyPress-q>', self._quit_keyboard)
         self.bind_all('<KeyPress-Q>', self._quit_keyboard)
         self.bind_all('<KeyPress-x>', self._keyboard_only_gaze_shortcut)
@@ -139,6 +140,9 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._pointer_overlay        = None
         self._pointer_canvas         = None
         self._pointer_job            = None
+        self._ui_tutorial_enabled    = ui_tutorial and self.ui_layout == "ui2"
+        self._tutorial_overlay       = None
+        self._tutorial_prev_dwell    = None
 
         self._dwell_init()
         self._load_sentence_counts()
@@ -147,12 +151,15 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             self._init_pointer_overlay()
         self._show_main_pointer()
         self.after(50, self._take_focus)
+        if self._ui_tutorial_enabled:
+            self.after(700, lambda: self._show_ui_tutorial_text("Welcome to the keyboard", 5000))
 
     def _quit_keyboard(self, _event=None):
         self.destroy()
         return "break"
 
     def destroy(self):
+        self._hide_ui_tutorial_text()
         self._show_system_cursor()
         self._destroy_pointer_overlay()
         super().destroy()
@@ -161,6 +168,11 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         if hasattr(self, "status_bar"):
             key = event.keysym.upper() if event else ""
             self.status_bar.config(text=f"{key} is available in gaze mode only")
+        return "break"
+
+    def _open_settings_shortcut(self, _event=None):
+        if not self._settings_open:
+            self.show_settings()
         return "break"
 
     def _apply_none_cursor(self, widget):
@@ -319,6 +331,62 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             self.after(150, lambda: self.attributes("-topmost", False))
         except Exception:
             pass
+
+    def _show_ui_tutorial_text(self, text, duration_ms=5000):
+        if self._tutorial_overlay is not None:
+            return
+        self.update_idletasks()
+        self._tutorial_prev_dwell = self.dwell_enabled
+        self.dwell_enabled = False
+        self._dwell_reset_all()
+
+        overlay = tk.Toplevel(self)
+        overlay.withdraw()
+        overlay.overrideredirect(True)
+        overlay.attributes("-topmost", True)
+        overlay.attributes("-alpha", 0.86)
+        overlay.configure(bg="#000000", cursor=self.pointer_cursor)
+        overlay.geometry(
+            f"{self.winfo_width()}x{self.winfo_height()}+"
+            f"{self.winfo_rootx()}+{self.winfo_rooty()}"
+        )
+        try:
+            overlay.grab_set()
+        except Exception:
+            pass
+        overlay.bind("<Button-1>", lambda _e: "break")
+        overlay.bind("<Motion>", lambda _e: "break")
+        overlay.bind("<KeyPress>", lambda _e: "break")
+
+        label = tk.Label(
+            overlay,
+            text=text,
+            bg="#000000",
+            fg="#ffffff",
+            font=("Segoe UI", 72, "bold"),
+        )
+        label.place(relx=0.5, rely=0.5, anchor="center")
+        self._tutorial_overlay = overlay
+        overlay.deiconify()
+        overlay.lift()
+        self.after(duration_ms, self._hide_ui_tutorial_text)
+
+    def _hide_ui_tutorial_text(self):
+        if self._tutorial_overlay is None:
+            return
+        try:
+            self._tutorial_overlay.grab_release()
+        except Exception:
+            pass
+        try:
+            self._tutorial_overlay.destroy()
+        except Exception:
+            pass
+        self._tutorial_overlay = None
+        if self._tutorial_prev_dwell is not None:
+            self.dwell_enabled = self._tutorial_prev_dwell
+        self._tutorial_prev_dwell = None
+        self._dwell_reset_all()
 
     # =========================================================================
     # WIDGET SETUP

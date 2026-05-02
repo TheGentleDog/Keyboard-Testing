@@ -107,6 +107,10 @@ def main():
     parser = argparse.ArgumentParser(description="Launch the keyboard UI only.")
     parser.add_argument("--ui", choices=["qwerty", "ui2"], default="qwerty",
                         help="Keyboard layout to open.")
+    parser.add_argument("--gaze-preview", action="store_true",
+                        help="Use the gaze-mode keyboard layout without launching the tracker.")
+    parser.add_argument("--tutorial", action="store_true",
+                        help="Show the UI2 tutorial overlay when the keyboard opens.")
     args = parser.parse_args()
 
     _ensure_datasets()
@@ -135,7 +139,11 @@ def main():
     print("\nLoading user learning...")
     ngram_model.load_user_learning()
 
-    app = FilipinoKeyboard(ui_layout=args.ui)
+    app = FilipinoKeyboard(
+        ui_layout=args.ui,
+        gaze_tracking_active=args.gaze_preview,
+        ui_tutorial=args.tutorial,
+    )
     app.mainloop()
 
 
