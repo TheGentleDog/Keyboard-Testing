@@ -369,13 +369,21 @@ class LauncherUI(tk.Tk):
         cancel_btn.bind("<Enter>", lambda _: cancel_btn.config(bg=d["border"]))
         cancel_btn.bind("<Leave>", lambda _: cancel_btn.config(bg=d["card_alt"]))
 
-        start_btn = tk.Label(btn_row, text="Start Session", bg=d["accent"], fg="#ffffff",
+        start_btn = tk.Label(btn_row, text="Start with Tutorial", bg=d["accent"], fg="#ffffff",
                              font=("Segoe UI", 12, "bold"), relief="flat", bd=0,
-                             padx=26, pady=11, cursor="hand2")
+                             padx=20, pady=11, cursor="hand2")
         start_btn.pack(side="right")
-        start_btn.bind("<Button-1>", self._on_start)
+        start_btn.bind("<Button-1>", lambda e: self._on_start(e, tutorial=True))
         start_btn.bind("<Enter>", lambda _: start_btn.config(bg=d["accent_hov"]))
         start_btn.bind("<Leave>", lambda _: start_btn.config(bg=d["accent"]))
+
+        skip_btn = tk.Label(btn_row, text="Start without Tutorial", bg=d["card_alt"], fg=d["text"],
+                            font=("Segoe UI", 11, "bold"), relief="flat", bd=0,
+                            padx=16, pady=11, cursor="hand2")
+        skip_btn.pack(side="right", padx=(0, 10))
+        skip_btn.bind("<Button-1>", lambda e: self._on_start(e, tutorial=False))
+        skip_btn.bind("<Enter>", lambda _: skip_btn.config(bg=d["border"]))
+        skip_btn.bind("<Leave>", lambda _: skip_btn.config(bg=d["card_alt"]))
 
     def _toggle_ema(self):
         state = "normal" if self._ema_on.get() else "disabled"
@@ -551,7 +559,7 @@ class LauncherUI(tk.Tk):
         self._stop_setup_preview()
         self.destroy()
 
-    def _on_start(self, _event=None):
+    def _on_start(self, _event=None, tutorial=True):
         self._stop_setup_preview()
         self.result = {
             "camera":  self._camera_var.get(),
@@ -565,6 +573,7 @@ class LauncherUI(tk.Tk):
             "camera_window": self._camera_window_var.get(),
             "camera_debug": self._camera_debug_var.get(),
             "distance_panel": self._distance_var.get(),
+            "tutorial": tutorial,
         }
         self.destroy()
 
@@ -669,6 +678,7 @@ def main():
         show_camera_window = cfg["camera_window"],
         debug_landmarks    = cfg["camera_debug"],
         show_distance      = cfg["distance_panel"],
+        tutorial_enabled   = cfg["tutorial"],
     )
 
     # ── Phase 1: Calibration on main thread (required on macOS) ──────────────

@@ -374,7 +374,7 @@ class GazeTrackerApp:
     def __init__(self, camera_id=0, num_points=16, ema_alpha=0.3,
                 pnoise=5e-3, mnoise=8.0, spp=60,
                 show_camera_window=True, debug_landmarks=True,
-                show_distance=True):
+                show_distance=True, tutorial_enabled=True):
         self.cam_id     = camera_id
         self.num_points = num_points
         self.spp        = spp
@@ -391,6 +391,7 @@ class GazeTrackerApp:
         self._pip          = show_camera_window
         self._dbg          = debug_landmarks
         self._show_distance = show_distance
+        self._tutorial_enabled = tutorial_enabled
         self._last_distance = None
         self._mouse_ctrl   = True
         self._window_open  = True
@@ -412,6 +413,41 @@ class GazeTrackerApp:
     def _fps(self):
         now = time.time(); self._fpsq.append(now)
         return (len(self._fpsq)-1)/(self._fpsq[-1]-self._fpsq[0]+1e-9) if len(self._fpsq)>1 else 0
+
+    def _show_tutorial_text(self, lines, seconds=10):
+        if isinstance(lines, str):
+            lines = [lines]
+        start = time.time()
+        while True:
+            elapsed = time.time() - start
+            if elapsed >= seconds:
+                break
+
+            cv = self.canvas
+            cv[:] = (18, 18, 18)
+            remaining = max(0, int(math.ceil(seconds - elapsed)))
+            scale = 1.7
+            thick = 3
+            line_gap = 76
+            sizes = [cv2.getTextSize(line, cv2.FONT_HERSHEY_SIMPLEX, scale, thick)[0] for line in lines]
+            total_h = sum(size[1] for size in sizes) + line_gap * (len(lines) - 1)
+            y = (SCREEN_H - total_h) // 2
+            for line, size in zip(lines, sizes):
+                x = (SCREEN_W - size[0]) // 2
+                y += size[1]
+                txt(cv, line, (x, y), scale=scale, color=(235, 235, 235), thick=thick)
+                y += line_gap
+
+            counter = f"Starting in {remaining}"
+            csize = cv2.getTextSize(counter, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
+            txt(cv, counter, ((SCREEN_W - csize[0]) // 2, y + 28),
+                scale=0.8, color=(150, 150, 150), thick=2)
+
+            cv2.imshow(self.WIN, cv)
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
+                return False
+        return True
 
     def _estimate_distance(self, lms, w, h):
         if lms is None:
@@ -617,6 +653,15 @@ class GazeTrackerApp:
 
         cv2.namedWindow(self.WIN, cv2.WINDOW_NORMAL)
         cv2.setWindowProperty(self.WIN, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
+        if self._tutorial_enabled:
+            if not self._show_tutorial_text([
+                "Please look at the green circles",
+                "Only blink when you see a check mark",
+            ], seconds=10):
+                self._cap.release()
+                cv2.destroyAllWindows()
+                return False
 
         while not self.calib.done:
             ret, cam = self._cap.read()
