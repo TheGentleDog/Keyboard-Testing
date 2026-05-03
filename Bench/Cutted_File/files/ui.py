@@ -15,6 +15,7 @@ import panic_sound
 
 PREDEFINED_FILE      = "predefined_sentences.json"
 PREDEFINED_THRESHOLD = 3   # times spoken before auto-saving
+MAX_PREDEFINED_SENTENCES = 9
 
 
 class FilipinoKeyboard(tk.Tk, DwellMixin):
@@ -145,9 +146,11 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._tutorial_prev_dwell    = None
         self._tutorial_step          = None
         self._tutorial_job           = None
+        self._tutorial_overlay_canvas = None
         self._guide_overlay          = None
         self._guide_canvas           = None
         self._guide_job              = None
+        self._tutorial_predefined_selected = False
         self._ui2_group_buttons      = {}
         self._ui2_letter_buttons     = {}
 
@@ -349,7 +352,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     def _start_ui2_tutorial(self):
         self._tutorial_messages = [
             ("welcome", "Welcome to the keyboard", None),
-            ("type_hello", "Let's try inputting hello there", "keyboard"),
+            ("type_hello", "Let's type 'hello there'", "keyboard"),
         ]
         self._run_ui2_tutorial_message(0)
 
@@ -371,32 +374,72 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._ensure_guide_overlay()
         self._update_hello_guide()
 
+    def _cancel_guide_job(self):
+        if self._guide_job is not None:
+            try:
+                self.after_cancel(self._guide_job)
+            except Exception:
+                pass
+            self._guide_job = None
+
+    def _position_overlay(self, overlay):
+        if overlay is None:
+            return
+        try:
+            self.update_idletasks()
+            overlay.geometry(
+                f"{self.winfo_width()}x{self.winfo_height()}+"
+                f"{self.winfo_rootx()}+{self.winfo_rooty()}"
+            )
+            overlay.lift()
+        except Exception:
+            pass
+
     def _expected_hello_target(self):
         expected = "hello"
         words = [w.lower() for w in self.output_words]
         if words and words != ["hello"]:
-            return "Use Clear all, then type Hello manually", getattr(self, "_clearall_btn", None)
+            return "Gaze at Clear all, then type Hello again", getattr(self, "_clearall_btn", None)
         typed = self.current_input.lower()
         if not expected.startswith(typed):
-            return "Use backspace to fix the word", getattr(self, "_backspace_btn", None)
+            return "Gaze at backspace to fix the word", getattr(self, "_backspace_btn", None)
         if typed == expected:
-            return "Press space to input Hello", self.keyboard_buttons[2] if len(self.keyboard_buttons) >= 3 else None
+            return "Gaze at space to enter 'Hello'", self.keyboard_buttons[2] if len(self.keyboard_buttons) >= 3 else None
 
         next_ch = expected[len(typed)]
         for group in self._ui2_groups:
             if next_ch in group:
                 if next_ch in self._ui2_letter_buttons:
                     return f"Choose {next_ch.upper()}", self._ui2_letter_buttons[next_ch]
-                return f"Open {group.upper()}", self._ui2_group_buttons.get(group)
+                return f"Gaze at {group.upper()}", self._ui2_group_buttons.get(group)
+        return "", None
+
+    def _expected_hi_target(self):
+        expected = "hi"
+        typed = self.current_input.lower()
+        if not expected.startswith(typed):
+            return "Gaze at backspace to fix the word", getattr(self, "_backspace_btn", None)
+        if typed == expected:
+            return "Gaze at space to replace 'Hello'", self.keyboard_buttons[2] if len(self.keyboard_buttons) >= 3 else None
+
+        next_ch = expected[len(typed)]
+        for group in self._ui2_groups:
+            if next_ch in group:
+                if next_ch in self._ui2_letter_buttons:
+                    return f"Choose {next_ch.upper()}", self._ui2_letter_buttons[next_ch]
+                return f"Gaze at {group.upper()}", self._ui2_group_buttons.get(group)
         return "", None
 
     def _update_hello_guide(self):
+        self._cancel_guide_job()
         if self._tutorial_step != "type_hello":
+            return
+        if self._guide_back_to_keyboard_if_needed(self._update_hello_guide):
             return
         if self.output_words and self.output_words[0].lower() == "hello":
             self._tutorial_step = "select_there"
             self._show_ui_tutorial_text(
-                "When there appears in predictions, select it",
+                "Gaze at 'there' if it appears in the predictions",
                 5000,
                 self._update_prediction_guide,
                 target="predictions",
@@ -407,39 +450,265 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._guide_job = self.after(150, self._update_hello_guide)
 
     def _update_prediction_guide(self):
+        self._cancel_guide_job()
         if self._tutorial_step != "select_there":
             return
+        if self._guide_back_to_keyboard_if_needed(self._update_prediction_guide):
+            return
         words = [w.lower() for w in self.output_words]
-        if len(words) >= 2 and words[0] == "hello" and words[1] == "there":
-            self._tutorial_step = "tts"
+        if words == ["hello", "there"]:
+            self._tutorial_step = "tts_hello"
             self._show_ui_tutorial_text(
-                "Lastly, input the text to speech button",
+                "Gaze at text to speech for 'Hello there'",
                 5000,
                 self._update_tts_guide,
                 target="tts",
             )
             return
         if words and words[0] != "hello":
-            self._draw_guide("Use Clear all, then type Hello manually", getattr(self, "_clearall_btn", None))
+            self._draw_guide("Gaze at Clear all, then type Hello again", getattr(self, "_clearall_btn", None))
             self._guide_job = self.after(150, self._update_prediction_guide)
             return
-        if len(words) >= 2 and words[1] != "there":
-            self._draw_guide("Use Clear all, then try Hello there again", getattr(self, "_clearall_btn", None))
+        if len(words) >= 2:
+            bad_index = len(words) - 1
+            if self.output_cursor == -1:
+                self._draw_guide("Gaze at left arrow to choose the extra word", self.keyboard_buttons[0])
+            elif self.output_cursor < bad_index:
+                self._draw_guide("Gaze at right arrow to choose the extra word", self.keyboard_buttons[1])
+            elif self.output_cursor > bad_index:
+                self._draw_guide("Gaze at left arrow to choose the extra word", self.keyboard_buttons[0])
+            else:
+                self._draw_guide("Gaze at backspace to remove only this word", getattr(self, "_backspace_btn", None))
             self._guide_job = self.after(150, self._update_prediction_guide)
             return
         if self.current_input:
-            self._draw_guide("Use backspace. Select there from predictions", getattr(self, "_backspace_btn", None))
+            self._draw_guide("Gaze at backspace, then gaze at 'there'", getattr(self, "_backspace_btn", None))
             self._guide_job = self.after(150, self._update_prediction_guide)
             return
-        self._draw_guide("Select there", self._prediction_button("there"))
+        self._draw_guide("Gaze at 'there'", self._prediction_button("there"))
         self._guide_job = self.after(150, self._update_prediction_guide)
 
+    def _update_edit_hello_guide(self):
+        self._cancel_guide_job()
+        if self._tutorial_step != "edit_hello":
+            return
+        if self._guide_back_to_keyboard_if_needed(self._update_edit_hello_guide):
+            return
+
+        words = [w.lower() for w in self.output_words]
+        if words[:2] == ["hi", "there"] and not self.current_input:
+            self.output_cursor = -1
+            self.update_display()
+            self._tutorial_step = "tts_hi"
+            self._show_ui_tutorial_text(
+                "Gaze at text to speech for 'Hi there'",
+                5000,
+                self._update_tts_guide,
+                target="tts",
+            )
+            return
+
+        if len(words) < 2 or words[1] != "there":
+            self._draw_guide("Gaze at Clear all, then type 'Hello there' again", getattr(self, "_clearall_btn", None))
+            self._guide_job = self.after(150, self._update_edit_hello_guide)
+            return
+
+        if words[0] not in ("hello", "hi"):
+            self._draw_guide("Gaze at Clear all, then type 'Hello there' again", getattr(self, "_clearall_btn", None))
+            self._guide_job = self.after(150, self._update_edit_hello_guide)
+            return
+
+        if self.current_input and self.output_cursor != 0:
+            self._draw_guide("Gaze at backspace, then choose 'Hello'", getattr(self, "_backspace_btn", None))
+            self._guide_job = self.after(150, self._update_edit_hello_guide)
+            return
+
+        if self.current_input:
+            text, widget = self._expected_hi_target()
+            self._draw_guide(text, widget)
+            self._guide_job = self.after(150, self._update_edit_hello_guide)
+            return
+
+        if self.output_cursor == -1:
+            self._draw_guide("Gaze at left arrow to choose 'there'", self.keyboard_buttons[0])
+        elif self.output_cursor == 1:
+            self._draw_guide("Gaze at left arrow again to choose 'Hello'", self.keyboard_buttons[0])
+        elif self.output_cursor == 0:
+            text, widget = self._expected_hi_target()
+            self._draw_guide(text or "Type 'Hi'", widget or self.letters_frame)
+        else:
+            self._draw_guide("Gaze at right arrow to choose 'Hello'", self.keyboard_buttons[1])
+        self._guide_job = self.after(150, self._update_edit_hello_guide)
+
     def _update_tts_guide(self):
-        if self._tutorial_step != "tts":
+        self._cancel_guide_job()
+        if self._tutorial_step not in ("tts_hello", "tts_hi"):
             return
         btn = self.keyboard_buttons[4] if len(self.keyboard_buttons) >= 5 else None
-        self._draw_guide("Press text to speech", btn)
+        self._draw_guide("Gaze at text to speech", btn)
         self._guide_job = self.after(150, self._update_tts_guide)
+
+    def _start_save_sentence_intro(self):
+        self.output_cursor = -1
+        self.current_input = ""
+        self.update_display()
+        sentence = " ".join(self.output_words).strip()
+        if sentence and self.sentence_counts.get(sentence, 0) >= PREDEFINED_THRESHOLD:
+            self._tutorial_step = "clear_before_predefined"
+            self._show_ui_tutorial_text(
+                "This sentence is already saved.",
+                4000,
+                self._update_clear_before_predefined_guide,
+                target=None,
+            )
+            return
+        self._show_ui_tutorial_text(
+            "Good job!",
+            2500,
+            lambda: self._show_ui_tutorial_text(
+                "Now let's save 'Hi there' as a predefined sentence",
+                4500,
+                lambda: self._show_ui_tutorial_text(
+                    "Gaze at text to speech 3 times to save it",
+                    5000,
+                    self._update_save_sentence_guide,
+                    target=None,
+                ),
+                target=None,
+            ),
+            target=None,
+        )
+
+    def _update_save_sentence_guide(self):
+        self._cancel_guide_job()
+        if self._tutorial_step != "save_sentence":
+            return
+        if self._guide_back_to_keyboard_if_needed(self._update_save_sentence_guide):
+            return
+
+        sentence = " ".join(self.output_words).strip()
+        if not sentence:
+            self._show_ui_tutorial_text(
+                "Type a sentence first, then gaze at text to speech to save it.",
+                5000,
+                self._finish_tutorial_from_predefined,
+                target=None,
+            )
+            return
+
+        count = self.sentence_counts.get(sentence, 0)
+        if count >= PREDEFINED_THRESHOLD:
+            self._tutorial_step = "clear_before_predefined"
+            self._show_ui_tutorial_text(
+                "Saved. You can find it in predefined sentences.",
+                4500,
+                self._update_clear_before_predefined_guide,
+                target=None,
+            )
+            return
+
+        remaining = PREDEFINED_THRESHOLD - count
+        plural = "" if remaining == 1 else "s"
+        btn = self.keyboard_buttons[4] if len(self.keyboard_buttons) >= 5 else None
+        self._draw_guide(f"Gaze at text to speech {remaining} more time{plural}", btn)
+        self._guide_job = self.after(150, self._update_save_sentence_guide)
+
+    def _guide_back_to_keyboard_if_needed(self, next_callback):
+        if not self._in_predefined_mode:
+            return False
+        btn = self.keyboard_buttons[3] if len(self.keyboard_buttons) >= 4 else None
+        self._draw_guide("Gaze here to return to the keyboard", btn)
+        self._guide_job = self.after(150, next_callback)
+        return True
+
+    def _update_clear_before_predefined_guide(self):
+        self._cancel_guide_job()
+        if self._tutorial_step != "clear_before_predefined":
+            return
+        if self._in_predefined_mode:
+            btn = self.keyboard_buttons[3] if len(self.keyboard_buttons) >= 4 else None
+            self._draw_guide("Gaze here to return to the keyboard", btn)
+            self._guide_job = self.after(150, self._update_clear_before_predefined_guide)
+            return
+        if self.output_words or self.current_input:
+            self._draw_guide("Gaze at Clear all first", getattr(self, "_clearall_btn", None))
+            self._guide_job = self.after(150, self._update_clear_before_predefined_guide)
+            return
+        self._tutorial_step = "predefined"
+        self._start_predefined_intro()
+
+    def _start_edit_hello_intro(self):
+        self.output_cursor = -1
+        self.current_input = ""
+        self.update_display()
+        self._show_ui_tutorial_text(
+            "Great job!",
+            2500,
+            lambda: self._show_ui_tutorial_text(
+                "Now let's try editing 'Hello' to 'Hi'",
+                4000,
+                self._update_edit_hello_guide,
+                target=None,
+            ),
+            target=None,
+        )
+
+    def _start_predefined_intro(self):
+        self.output_cursor = -1
+        self.current_input = ""
+        self.update_display()
+        self._show_ui_tutorial_text(
+            "Great job!",
+            2500,
+            lambda: self._show_ui_tutorial_text(
+                "Now let's look at predefined sentences",
+                4000,
+                self._update_predefined_guide,
+                target=None,
+            ),
+            target=None,
+        )
+
+    def _update_predefined_guide(self):
+        self._cancel_guide_job()
+        if self._tutorial_step != "predefined":
+            return
+
+        if self._tutorial_predefined_selected:
+            self._show_ui_tutorial_text(
+                "Nice. That loaded a predefined sentence.",
+                4000,
+                self._finish_tutorial_from_predefined,
+                target=None,
+            )
+            return
+
+        if self._in_predefined_mode:
+            if not self.predefined_func_buttons:
+                self._show_ui_tutorial_text(
+                    "No predefined sentences yet. Gaze at text to speech 3 times to save one.",
+                    6000,
+                    self._finish_tutorial_from_predefined,
+                    target=None,
+                )
+                return
+            self._draw_guide("Gaze at a saved sentence", self.predefined_func_buttons[0])
+            self._guide_job = self.after(150, self._update_predefined_guide)
+            return
+
+        btn = self.keyboard_buttons[3] if len(self.keyboard_buttons) >= 4 else None
+        self._draw_guide("Gaze at predefined sentences", btn)
+        self._guide_job = self.after(150, self._update_predefined_guide)
+
+    def _finish_tutorial_from_predefined(self):
+        self._tutorial_step = "done"
+        if self._in_predefined_mode:
+            self.predefined_sentence()
+        self.output_cursor = -1
+        self.current_input = ""
+        self.update_display()
+        self._destroy_guide_overlay()
+        self._show_ui_tutorial_text("Nice. The keyboard is ready", 5000)
 
     def _tutorial_target_widget(self, target):
         if target == "keyboard":
@@ -460,6 +729,19 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                 pass
         return self.predictive_container
 
+    def _hide_tutorial_target_outline(self, widget):
+        if config.DWELL_MODE != "async" or widget is None:
+            return False
+        try:
+            active_btn = getattr(self, "_zoom_source_btn", None) or self.dwell_hovered
+            if active_btn is None:
+                return False
+            if widget is active_btn:
+                return self.dwell_hover_ms.get(id(active_btn), 0) > 0
+            return self._point_in_widget(active_btn, widget.winfo_rootx(), widget.winfo_rooty())
+        except Exception:
+            return False
+
     def _ensure_guide_overlay(self):
         if self._guide_overlay is not None:
             return
@@ -468,10 +750,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         overlay.overrideredirect(True)
         overlay.attributes("-topmost", True)
         overlay.configure(bg="#010203", cursor=self.pointer_cursor)
-        overlay.geometry(
-            f"{self.winfo_width()}x{self.winfo_height()}+"
-            f"{self.winfo_rootx()}+{self.winfo_rooty()}"
-        )
+        self._position_overlay(overlay)
         try:
             overlay.wm_attributes("-transparentcolor", "#010203")
         except Exception:
@@ -510,6 +789,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
 
     def _draw_guide(self, text, widget):
         self._ensure_guide_overlay()
+        self._position_overlay(self._guide_overlay)
         canvas = self._guide_canvas
         if canvas is None:
             return
@@ -535,6 +815,8 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             return
         if x2 <= x1 or y2 <= y1:
             return
+        if self._hide_tutorial_target_outline(widget):
+            return
         pad = 8
         canvas.create_rectangle(x1 - pad, y1 - pad, x2 + pad, y2 + pad,
                                 outline="#ffffff", width=5)
@@ -549,6 +831,8 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                            arrowshape=(28, 34, 12), smooth=True)
 
     def _show_ui_tutorial_text(self, text, duration_ms=5000, on_done=None, target=None):
+        self._cancel_guide_job()
+        self._destroy_guide_overlay()
         if self._tutorial_overlay is not None:
             return
         if self._tutorial_job is not None:
@@ -568,10 +852,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         overlay.attributes("-topmost", True)
         overlay.attributes("-alpha", 0.0)
         overlay.configure(bg="#000000", cursor=self.pointer_cursor)
-        overlay.geometry(
-            f"{self.winfo_width()}x{self.winfo_height()}+"
-            f"{self.winfo_rootx()}+{self.winfo_rooty()}"
-        )
+        self._position_overlay(overlay)
         try:
             overlay.grab_set()
         except Exception:
@@ -594,19 +875,19 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             w = max(1, canvas.winfo_width())
             h = max(1, canvas.winfo_height())
             font_size = max(38, min(72, w // 19))
-            canvas.create_text(
-                w // 2,
-                h // 2,
-                text=text,
-                fill="#ffffff",
-                font=("Segoe UI", font_size, "bold"),
-                width=max(800, w - 260),
-                justify="center",
-                anchor="center",
-            )
 
             widget = self._tutorial_target_widget(target)
             if widget is None:
+                canvas.create_text(
+                    w // 2,
+                    h // 2,
+                    text=text,
+                    fill="#ffffff",
+                    font=("Segoe UI", font_size, "bold"),
+                    width=max(800, w - 260),
+                    justify="center",
+                    anchor="center",
+                )
                 return
             try:
                 x1 = widget.winfo_rootx() - self.winfo_rootx()
@@ -618,6 +899,25 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             if x2 <= x1 or y2 <= y1:
                 return
 
+            text_y = h // 2
+            if target == "keyboard":
+                text_y = max(80, min(h // 4, y1 - 90))
+            elif target == "predictions":
+                text_y = min(h - 90, max((y2 + h) // 2, y2 + 120))
+            elif target == "tts":
+                text_y = min(h - 90, y2 + 120) if y2 < h // 2 else max(90, y1 - 120)
+
+            canvas.create_text(
+                w // 2,
+                text_y,
+                text=text,
+                fill="#ffffff",
+                font=("Segoe UI", font_size, "bold"),
+                width=max(800, w - 260),
+                justify="center",
+                anchor="center",
+            )
+
             pad = 10
             canvas.create_rectangle(
                 x1 - pad, y1 - pad, x2 + pad, y2 + pad,
@@ -628,9 +928,9 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             target_x = (x1 + x2) // 2
             target_y = (y1 + y2) // 2
             start_x = w // 2
-            start_y = h // 2 + 95
-            if target_y < h // 2:
-                start_y = h // 2 - 95
+            start_y = text_y + 95
+            if target_y < text_y:
+                start_y = text_y - 95
             canvas.create_line(
                 start_x, start_y, target_x, target_y,
                 fill="#ffffff",
@@ -643,6 +943,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         canvas.bind("<Configure>", draw_overlay)
         self.after(50, draw_overlay)
         self._tutorial_overlay = overlay
+        self._tutorial_overlay_canvas = canvas
         overlay.deiconify()
         overlay.lift()
         self._fade_ui_tutorial_overlay(0.86, on_done=lambda: self._schedule_ui_tutorial_hide(duration_ms, on_done))
@@ -697,6 +998,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         except Exception:
             pass
         self._tutorial_overlay = None
+        self._tutorial_overlay_canvas = None
         if self._tutorial_prev_dwell is not None:
             self.dwell_enabled = self._tutorial_prev_dwell
         self._tutorial_prev_dwell = None
@@ -1019,14 +1321,14 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             w.destroy()
 
         # ── Sentence buttons ──────────────────────────────────────────────────
-        sentences = self._get_predefined_sentences()
+        sentences = self._get_predefined_sentences()[:MAX_PREDEFINED_SENTENCES]
         content   = tk.Frame(parent, bg=theme["bg"])
         content.pack(fill="both", expand=True, padx=1, pady=1)
 
         if not sentences:
             tk.Label(
                 content,
-                text="No predefined sentences yet.\nSpeak a sentence 3× to auto-save it.",
+                text="No predefined sentences yet.\nGaze at text to speech 3x to auto-save one.",
                 font=("Segoe UI", 18), bg=theme["bg"], fg=theme["suggestion_fg"],
                 justify="center",
             ).pack(expand=True)
@@ -1052,9 +1354,12 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                 wraplength=380,
             )
             btn.grid(row=0, column=col, sticky="nsew", padx=4)
+            self.predefined_func_buttons.append(btn)
 
     def _speak_predefined(self, sentence):
         """Load a predefined sentence into the output and clear input."""
+        if self._tutorial_step == "predefined":
+            self._tutorial_predefined_selected = True
         self.output_words  = sentence.split()
         self.output_cursor = -1
         self.current_input = ""
@@ -1104,7 +1409,6 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     # =========================================================================
     def update_display(self):
         theme = self.themes[self.current_theme]
-
         # Fetch suggestions
         if self.current_input:
             ctx_words   = self.output_words[:self.output_cursor] if self.output_cursor != -1 else self.output_words
@@ -1175,7 +1479,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             handler = self.apply_prediction
             if (
                 self._ui_tutorial_enabled
-                and self._tutorial_step in ("type_hello", "select_there", "tts")
+                and self._tutorial_step in ("type_hello", "select_there", "tts_hello", "edit_hello", "tts_hi")
                 and [w.lower() for w in self.output_words] == ["hello"]
                 and "there" not in [w.lower() for w in words]
             ):
@@ -1269,7 +1573,10 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
 
     def enter(self):
         """🔊 — finalize current input, speak (TTS placeholder), track count, then clear."""
-        tutorial_tts = self._ui_tutorial_enabled and self._tutorial_step == "tts"
+        tutorial_tts = self._tutorial_step if (
+            self._ui_tutorial_enabled
+            and self._tutorial_step in ("tts_hello", "tts_hi")
+        ) else None
         if self.current_input:
             self.finalize_word()
         output_text = " ".join(self.output_words).strip()
@@ -1284,17 +1591,21 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             else:
                 remaining = max(0, PREDEFINED_THRESHOLD - count)
                 suffix = f" ({remaining} more to auto-save)" if remaining > 0 else ""
-                self.status_bar.config(text=f"Spoken and cleared{suffix}")
+                self.status_bar.config(text=f"Spoken{suffix}")
         else:
-            self.status_bar.config(text="Spoken and cleared")
-        self.output_words  = []
-        self.output_cursor = -1
-        self.current_input = ""
+            self.status_bar.config(text="Nothing to speak")
         self.update_display()
-        if tutorial_tts:
-            self._tutorial_step = "done"
+        if tutorial_tts == "tts_hello":
+            self._tutorial_step = "edit_hello"
             self._destroy_guide_overlay()
-            self._show_ui_tutorial_text("Nice. The keyboard is ready", 5000)
+            self._start_edit_hello_intro()
+        elif tutorial_tts == "tts_hi":
+            self._tutorial_step = "save_sentence"
+            self.output_cursor = -1
+            self.current_input = ""
+            self.update_display()
+            self._destroy_guide_overlay()
+            self._start_save_sentence_intro()
 
     def clear_all(self):
         self.output_words            = []

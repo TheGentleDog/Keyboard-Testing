@@ -561,6 +561,9 @@ class LauncherUI(tk.Tk):
 
     def _on_start(self, _event=None, tutorial=True):
         self._stop_setup_preview()
+        ui_layout = self._ui_layout_var.get()
+        if tutorial:
+            ui_layout = "ui2"
         self.result = {
             "camera":  self._camera_var.get(),
             "points":  self._points_var.get(),
@@ -569,7 +572,7 @@ class LauncherUI(tk.Tk):
             "pnoise":  self._pnoise_var.get(),
             "mnoise":  self._mnoise_var.get(),
             "dwell_mode": self._dwell_mode_var.get(),
-            "ui_layout": self._ui_layout_var.get(),
+            "ui_layout": ui_layout,
             "camera_window": self._camera_window_var.get(),
             "camera_debug": self._camera_debug_var.get(),
             "distance_panel": self._distance_var.get(),

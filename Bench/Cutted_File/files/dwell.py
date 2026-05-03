@@ -321,9 +321,8 @@ class DwellMixin:
                 self._zoom_popup.attributes('-topmost', True)
                 self._zoom_popup.configure(
                     cursor=getattr(self, "pointer_cursor", "arrow"),
-                    bg=theme["bg"],
-                    highlightbackground=theme.get("button_active_bg", theme["button_bg"]),
-                    highlightthickness=2,
+                    bg=bg,
+                    highlightthickness=0,
                 )
                 self._zoom_lbl = tk.Label(
                     self._zoom_popup,
@@ -346,12 +345,14 @@ class DwellMixin:
                     text=text,
                     font=("Segoe UI", font_sz, "bold"),
                     bg=bg, fg=fg,
+                    relief="flat",
+                    bd=0,
                     cursor=getattr(self, "pointer_cursor", "arrow"),
                 )
                 self._zoom_popup.configure(
                     cursor=getattr(self, "pointer_cursor", "arrow"),
-                    bg=theme["bg"],
-                    highlightbackground=theme.get("button_active_bg", theme["button_bg"]),
+                    bg=bg,
+                    highlightthickness=0,
                 )
 
             self._zoom_popup.geometry(f"{pw}x{ph}+{x}+{y}")
