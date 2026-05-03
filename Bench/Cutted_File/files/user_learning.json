@@ -1,15 +1,19 @@
 {
   "user_shortcuts": {
-    "m": "make",
+    "m": "man",
     "g": "grandmother",
     "w": "want",
-    "l": "looking"
+    "l": "looking",
+    "el": "election",
+    "n": "nurse"
   },
   "user_shortcut_usage": {
-    "m": 1,
+    "m": 2,
     "g": 1,
     "w": 2,
-    "l": 1
+    "l": 1,
+    "el": 1,
+    "n": 1
   },
   "new_words": [],
   "word_usage_history": [
@@ -53,6 +57,47 @@
       "i",
       [
         "iyo",
+        "i"
+      ]
+    ],
+    [
+      "election",
+      [
+        "election",
+        "is",
+        "man",
+        "i",
+        "am"
+      ]
+    ],
+    [
+      "is",
+      [
+        "election",
+        "is",
+        "man",
+        "i",
+        "am"
+      ]
+    ],
+    [
+      "man",
+      [
+        "election",
+        "is"
+      ]
+    ],
+    [
+      "i",
+      [
+        "is",
+        "man"
+      ]
+    ],
+    [
+      "am",
+      [
+        "man",
         "i"
       ]
     ]

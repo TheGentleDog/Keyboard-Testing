@@ -143,6 +143,13 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._ui_tutorial_enabled    = ui_tutorial and self.ui_layout == "ui2"
         self._tutorial_overlay       = None
         self._tutorial_prev_dwell    = None
+        self._tutorial_step          = None
+        self._tutorial_job           = None
+        self._guide_overlay          = None
+        self._guide_canvas           = None
+        self._guide_job              = None
+        self._ui2_group_buttons      = {}
+        self._ui2_letter_buttons     = {}
 
         self._dwell_init()
         self._load_sentence_counts()
@@ -152,13 +159,20 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._show_main_pointer()
         self.after(50, self._take_focus)
         if self._ui_tutorial_enabled:
-            self.after(700, lambda: self._show_ui_tutorial_text("Welcome to the keyboard", 5000))
+            self.after(700, self._start_ui2_tutorial)
 
     def _quit_keyboard(self, _event=None):
         self.destroy()
         return "break"
 
     def destroy(self):
+        if self._tutorial_job is not None:
+            try:
+                self.after_cancel(self._tutorial_job)
+            except Exception:
+                pass
+            self._tutorial_job = None
+        self._destroy_guide_overlay()
         self._hide_ui_tutorial_text()
         self._show_system_cursor()
         self._destroy_pointer_overlay()
@@ -332,9 +346,217 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         except Exception:
             pass
 
-    def _show_ui_tutorial_text(self, text, duration_ms=5000):
+    def _start_ui2_tutorial(self):
+        self._tutorial_messages = [
+            ("welcome", "Welcome to the keyboard", None),
+            ("type_hello", "Let's try inputting hello there", "keyboard"),
+        ]
+        self._run_ui2_tutorial_message(0)
+
+    def _run_ui2_tutorial_message(self, index):
+        if index >= len(self._tutorial_messages):
+            self._start_interactive_hello_guide()
+            return
+        step, message, target = self._tutorial_messages[index]
+        self._tutorial_step = step
+        self._show_ui_tutorial_text(
+            message,
+            5000,
+            lambda: self._run_ui2_tutorial_message(index + 1),
+            target=target,
+        )
+
+    def _start_interactive_hello_guide(self):
+        self._tutorial_step = "type_hello"
+        self._ensure_guide_overlay()
+        self._update_hello_guide()
+
+    def _expected_hello_target(self):
+        expected = "hello"
+        words = [w.lower() for w in self.output_words]
+        if words and words != ["hello"]:
+            return "Use Clear all, then type Hello manually", getattr(self, "_clearall_btn", None)
+        typed = self.current_input.lower()
+        if not expected.startswith(typed):
+            return "Use backspace to fix the word", getattr(self, "_backspace_btn", None)
+        if typed == expected:
+            return "Press space to input Hello", self.keyboard_buttons[2] if len(self.keyboard_buttons) >= 3 else None
+
+        next_ch = expected[len(typed)]
+        for group in self._ui2_groups:
+            if next_ch in group:
+                if next_ch in self._ui2_letter_buttons:
+                    return f"Choose {next_ch.upper()}", self._ui2_letter_buttons[next_ch]
+                return f"Open {group.upper()}", self._ui2_group_buttons.get(group)
+        return "", None
+
+    def _update_hello_guide(self):
+        if self._tutorial_step != "type_hello":
+            return
+        if self.output_words and self.output_words[0].lower() == "hello":
+            self._tutorial_step = "select_there"
+            self._show_ui_tutorial_text(
+                "When there appears in predictions, select it",
+                5000,
+                self._update_prediction_guide,
+                target="predictions",
+            )
+            return
+        text, widget = self._expected_hello_target()
+        self._draw_guide(text, widget)
+        self._guide_job = self.after(150, self._update_hello_guide)
+
+    def _update_prediction_guide(self):
+        if self._tutorial_step != "select_there":
+            return
+        words = [w.lower() for w in self.output_words]
+        if len(words) >= 2 and words[0] == "hello" and words[1] == "there":
+            self._tutorial_step = "tts"
+            self._show_ui_tutorial_text(
+                "Lastly, input the text to speech button",
+                5000,
+                self._update_tts_guide,
+                target="tts",
+            )
+            return
+        if words and words[0] != "hello":
+            self._draw_guide("Use Clear all, then type Hello manually", getattr(self, "_clearall_btn", None))
+            self._guide_job = self.after(150, self._update_prediction_guide)
+            return
+        if len(words) >= 2 and words[1] != "there":
+            self._draw_guide("Use Clear all, then try Hello there again", getattr(self, "_clearall_btn", None))
+            self._guide_job = self.after(150, self._update_prediction_guide)
+            return
+        if self.current_input:
+            self._draw_guide("Use backspace. Select there from predictions", getattr(self, "_backspace_btn", None))
+            self._guide_job = self.after(150, self._update_prediction_guide)
+            return
+        self._draw_guide("Select there", self._prediction_button("there"))
+        self._guide_job = self.after(150, self._update_prediction_guide)
+
+    def _update_tts_guide(self):
+        if self._tutorial_step != "tts":
+            return
+        btn = self.keyboard_buttons[4] if len(self.keyboard_buttons) >= 5 else None
+        self._draw_guide("Press text to speech", btn)
+        self._guide_job = self.after(150, self._update_tts_guide)
+
+    def _tutorial_target_widget(self, target):
+        if target == "keyboard":
+            return self.letters_frame
+        if target == "predictions":
+            return self.predictive_container
+        if target == "tts" and hasattr(self, "keyboard_buttons") and len(self.keyboard_buttons) >= 5:
+            return self.keyboard_buttons[4]
+        return None
+
+    def _prediction_button(self, word):
+        wanted = word.lower()
+        for child in self.predictive_container.winfo_children():
+            try:
+                if child.cget("text").lower() == wanted:
+                    return child
+            except Exception:
+                pass
+        return self.predictive_container
+
+    def _ensure_guide_overlay(self):
+        if self._guide_overlay is not None:
+            return
+        overlay = tk.Toplevel(self)
+        overlay.withdraw()
+        overlay.overrideredirect(True)
+        overlay.attributes("-topmost", True)
+        overlay.configure(bg="#010203", cursor=self.pointer_cursor)
+        overlay.geometry(
+            f"{self.winfo_width()}x{self.winfo_height()}+"
+            f"{self.winfo_rootx()}+{self.winfo_rooty()}"
+        )
+        try:
+            overlay.wm_attributes("-transparentcolor", "#010203")
+        except Exception:
+            pass
+        try:
+            overlay.wm_attributes("-disabled", True)
+        except Exception:
+            pass
+        canvas = tk.Canvas(
+            overlay,
+            bg="#010203",
+            highlightthickness=0,
+            bd=0,
+            cursor=self.pointer_cursor,
+        )
+        canvas.pack(fill="both", expand=True)
+        self._guide_overlay = overlay
+        self._guide_canvas = canvas
+        overlay.deiconify()
+        overlay.lift()
+
+    def _destroy_guide_overlay(self):
+        if self._guide_job is not None:
+            try:
+                self.after_cancel(self._guide_job)
+            except Exception:
+                pass
+            self._guide_job = None
+        if self._guide_overlay is not None:
+            try:
+                self._guide_overlay.destroy()
+            except Exception:
+                pass
+        self._guide_overlay = None
+        self._guide_canvas = None
+
+    def _draw_guide(self, text, widget):
+        self._ensure_guide_overlay()
+        canvas = self._guide_canvas
+        if canvas is None:
+            return
+        canvas.delete("all")
+        w = max(1, canvas.winfo_width())
+        h = max(1, canvas.winfo_height())
+        canvas.create_text(
+            w // 2,
+            90,
+            text=text,
+            fill="#ffffff",
+            font=("Segoe UI", 42, "bold"),
+            anchor="center",
+        )
+        if widget is None:
+            return
+        try:
+            x1 = widget.winfo_rootx() - self.winfo_rootx()
+            y1 = widget.winfo_rooty() - self.winfo_rooty()
+            x2 = x1 + widget.winfo_width()
+            y2 = y1 + widget.winfo_height()
+        except Exception:
+            return
+        if x2 <= x1 or y2 <= y1:
+            return
+        pad = 8
+        canvas.create_rectangle(x1 - pad, y1 - pad, x2 + pad, y2 + pad,
+                                outline="#ffffff", width=5)
+        target_x = (x1 + x2) // 2
+        target_y = (y1 + y2) // 2
+        start_x = w // 2
+        start_y = 140
+        if target_y < 180:
+            start_y = h // 2
+        canvas.create_line(start_x, start_y, target_x, target_y,
+                           fill="#ffffff", width=8, arrow=tk.LAST,
+                           arrowshape=(28, 34, 12), smooth=True)
+
+    def _show_ui_tutorial_text(self, text, duration_ms=5000, on_done=None, target=None):
         if self._tutorial_overlay is not None:
             return
+        if self._tutorial_job is not None:
+            try:
+                self.after_cancel(self._tutorial_job)
+            except Exception:
+                pass
+            self._tutorial_job = None
         self.update_idletasks()
         self._tutorial_prev_dwell = self.dwell_enabled
         self.dwell_enabled = False
@@ -344,7 +566,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         overlay.withdraw()
         overlay.overrideredirect(True)
         overlay.attributes("-topmost", True)
-        overlay.attributes("-alpha", 0.86)
+        overlay.attributes("-alpha", 0.0)
         overlay.configure(bg="#000000", cursor=self.pointer_cursor)
         overlay.geometry(
             f"{self.winfo_width()}x{self.winfo_height()}+"
@@ -358,21 +580,113 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         overlay.bind("<Motion>", lambda _e: "break")
         overlay.bind("<KeyPress>", lambda _e: "break")
 
-        label = tk.Label(
+        canvas = tk.Canvas(
             overlay,
-            text=text,
             bg="#000000",
-            fg="#ffffff",
-            font=("Segoe UI", 72, "bold"),
+            highlightthickness=0,
+            bd=0,
+            cursor=self.pointer_cursor,
         )
-        label.place(relx=0.5, rely=0.5, anchor="center")
+        canvas.pack(fill="both", expand=True)
+
+        def draw_overlay(_event=None):
+            canvas.delete("all")
+            w = max(1, canvas.winfo_width())
+            h = max(1, canvas.winfo_height())
+            font_size = max(38, min(72, w // 19))
+            canvas.create_text(
+                w // 2,
+                h // 2,
+                text=text,
+                fill="#ffffff",
+                font=("Segoe UI", font_size, "bold"),
+                width=max(800, w - 260),
+                justify="center",
+                anchor="center",
+            )
+
+            widget = self._tutorial_target_widget(target)
+            if widget is None:
+                return
+            try:
+                x1 = widget.winfo_rootx() - self.winfo_rootx()
+                y1 = widget.winfo_rooty() - self.winfo_rooty()
+                x2 = x1 + widget.winfo_width()
+                y2 = y1 + widget.winfo_height()
+            except Exception:
+                return
+            if x2 <= x1 or y2 <= y1:
+                return
+
+            pad = 10
+            canvas.create_rectangle(
+                x1 - pad, y1 - pad, x2 + pad, y2 + pad,
+                outline="#ffffff",
+                width=4,
+            )
+
+            target_x = (x1 + x2) // 2
+            target_y = (y1 + y2) // 2
+            start_x = w // 2
+            start_y = h // 2 + 95
+            if target_y < h // 2:
+                start_y = h // 2 - 95
+            canvas.create_line(
+                start_x, start_y, target_x, target_y,
+                fill="#ffffff",
+                width=8,
+                arrow=tk.LAST,
+                arrowshape=(28, 34, 12),
+                smooth=True,
+            )
+
+        canvas.bind("<Configure>", draw_overlay)
+        self.after(50, draw_overlay)
         self._tutorial_overlay = overlay
         overlay.deiconify()
         overlay.lift()
-        self.after(duration_ms, self._hide_ui_tutorial_text)
+        self._fade_ui_tutorial_overlay(0.86, on_done=lambda: self._schedule_ui_tutorial_hide(duration_ms, on_done))
 
-    def _hide_ui_tutorial_text(self):
+    def _fade_ui_tutorial_overlay(self, target_alpha, on_done=None, duration_ms=350, steps=12):
         if self._tutorial_overlay is None:
+            if on_done:
+                on_done()
+            return
+        try:
+            start_alpha = float(self._tutorial_overlay.attributes("-alpha"))
+        except Exception:
+            start_alpha = 0.86
+        delta = (target_alpha - start_alpha) / max(steps, 1)
+
+        def tick(i=0):
+            if self._tutorial_overlay is None:
+                return
+            alpha = target_alpha if i >= steps else start_alpha + delta * i
+            try:
+                self._tutorial_overlay.attributes("-alpha", max(0.0, min(0.86, alpha)))
+            except Exception:
+                pass
+            if i >= steps:
+                if on_done:
+                    on_done()
+                return
+            self._tutorial_job = self.after(max(1, duration_ms // steps), lambda: tick(i + 1))
+
+        tick()
+
+    def _schedule_ui_tutorial_hide(self, duration_ms, on_done=None):
+        self._tutorial_job = self.after(
+            duration_ms,
+            lambda: self._fade_ui_tutorial_overlay(
+                0.0,
+                on_done=lambda: self._hide_ui_tutorial_text(on_done),
+            ),
+        )
+
+    def _hide_ui_tutorial_text(self, on_done=None):
+        if self._tutorial_overlay is None:
+            if on_done:
+                on_done()
             return
         try:
             self._tutorial_overlay.grab_release()
@@ -387,6 +701,9 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             self.dwell_enabled = self._tutorial_prev_dwell
         self._tutorial_prev_dwell = None
         self._dwell_reset_all()
+        self._tutorial_job = None
+        if on_done:
+            on_done()
 
     # =========================================================================
     # WIDGET SETUP
@@ -589,6 +906,8 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         """UI2 Design 6: grouped letter blocks."""
         theme = self.themes[self.current_theme]
         self._unregister_widgets(parent)
+        self._ui2_group_buttons = {}
+        self._ui2_letter_buttons = {}
 
         def btn_kw(**extra):
             return dict(
@@ -631,6 +950,8 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                 self._backspace_btn = btn
             elif text == "Clear all":
                 self._clearall_btn = btn
+            else:
+                self._ui2_group_buttons[text.lower()] = btn
 
         self._dwell_reset_all()
 
@@ -638,6 +959,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         """UI2 Design 7: large individual letter choices for a selected group."""
         theme = self.themes[self.current_theme]
         self._unregister_widgets(self.letters_frame)
+        self._ui2_letter_buttons = {}
 
         main = tk.Frame(self.letters_frame, bg=theme["bg"])
         main.pack(fill="both", expand=True)
@@ -654,6 +976,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             )
             btn.grid(row=0, column=col, sticky="nsew", padx=2, pady=2)
             self.keyboard_buttons.append(btn)
+            self._ui2_letter_buttons[ch] = btn
 
         self._dwell_reset_all()
         self.status_bar.config(text=f"UI2 letter group: {letters.upper()}")
@@ -850,6 +1173,13 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             context = self.output_words[-2:] if len(self.output_words) >= 2 else self.output_words
             words   = ngram_model.get_next_word_suggestions(context, max_results=4, language=lang)
             handler = self.apply_prediction
+            if (
+                self._ui_tutorial_enabled
+                and self._tutorial_step in ("type_hello", "select_there", "tts")
+                and [w.lower() for w in self.output_words] == ["hello"]
+                and "there" not in [w.lower() for w in words]
+            ):
+                words = ["there"] + words[:3]
 
         theme = self.themes[self.current_theme]
         for word in words:
@@ -939,6 +1269,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
 
     def enter(self):
         """🔊 — finalize current input, speak (TTS placeholder), track count, then clear."""
+        tutorial_tts = self._ui_tutorial_enabled and self._tutorial_step == "tts"
         if self.current_input:
             self.finalize_word()
         output_text = " ".join(self.output_words).strip()
@@ -960,6 +1291,10 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self.output_cursor = -1
         self.current_input = ""
         self.update_display()
+        if tutorial_tts:
+            self._tutorial_step = "done"
+            self._destroy_guide_overlay()
+            self._show_ui_tutorial_text("Nice. The keyboard is ready", 5000)
 
     def clear_all(self):
         self.output_words            = []

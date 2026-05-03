@@ -141,7 +141,7 @@ class LauncherUI(tk.Tk):
         canvas.bind("<Leave>", lambda _e: canvas.unbind_all("<MouseWheel>"))
 
         # ────────────────────────────────────────────────────────
-        #  CALIBRATION
+        #  CALIBRATIONq
         # ────────────────────────────────────────────────────────
         calib = self._section(body, "CALIBRATION",
                               "Grid density and sample count affect precision and startup time.")
