@@ -331,6 +331,149 @@ CATEGORY_MAP = {
     "daily_life":   "verbs",
 }
 
+# ─────────────────────────────────────────────
+# FILTER SETS — applied after vocabulary generation
+# ─────────────────────────────────────────────
+
+# Any proper noun — people (politicians, religious, celebrities, common first
+# names), places (countries, cities, continents), and religions/deities.
+# The model frequently predicts these in person/place slots and they should
+# not appear as general vocabulary words.
+ENGLISH_PROPER_NAMES = {
+    # ── US politicians & presidents ──────────────────────────────────────
+    "trump", "biden", "obama", "clinton", "bush", "reagan", "carter",
+    "lincoln", "washington", "jefferson", "kennedy", "nixon", "johnson",
+    "harris", "pence", "cheney", "pelosi", "mcconnell", "schumer",
+    "sanders", "warren", "aoc", "desantis", "newsom", "abbott",
+    "roosevelt", "eisenhower", "truman", "wilson", "adams", "monroe",
+    # ── UK politicians ───────────────────────────────────────────────────
+    "sunak", "starmer", "thatcher", "blair", "cameron", "brown",
+    "major", "heath", "callaghan", "attlee", "churchill",
+    # ── International politicians ────────────────────────────────────────
+    "putin", "zelensky", "xi", "jinping", "modi", "trudeau", "macron",
+    "scholz", "meloni", "kim", "netanyahu", "erdogan", "bolsonaro",
+    "lula", "milei", "orban", "lukashenko", "marcos", "duterte",
+    "mandela", "gandhi", "hitler", "mussolini", "stalin", "mao",
+    "castro", "chavez", "pinochet", "franco",
+    # ── Religious figures & deities ──────────────────────────────────────
+    "jesus", "christ", "god", "allah", "buddha", "muhammad", "moses",
+    "abraham", "noah", "adam", "eve", "satan", "lucifer", "devil",
+    "mary", "joseph", "peter", "paul", "john", "matthew", "mark",
+    "luke", "james", "thomas", "andrew", "philip", "judas", "david",
+    "solomon", "elijah", "elias", "gabriel", "michael", "raphael",
+    "vishnu", "shiva", "krishna", "rama", "brahma", "zeus", "apollo",
+    "thor", "odin", "hercules", "poseidon", "athena", "hera",
+    # ── Common Western first names ───────────────────────────────────────
+    "james", "john", "robert", "michael", "william", "richard", "charles",
+    "joseph", "thomas", "christopher", "daniel", "matthew", "anthony",
+    "joshua", "andrew", "ryan", "jacob", "nicholas", "eric", "stephen",
+    "mary", "patricia", "jennifer", "linda", "barbara", "elizabeth",
+    "susan", "jessica", "sarah", "karen", "lisa", "nancy", "betty",
+    "margaret", "sandra", "ashley", "dorothy", "kimberly", "emily",
+    "donna", "michelle", "carol", "amanda", "melissa", "deborah",
+    "stephanie", "rebecca", "sharon", "laura", "cynthia", "kathleen",
+    "amy", "angela", "shirley", "anna", "brenda", "pamela", "emma",
+    "nicole", "helen", "samantha", "katherine", "christine", "debra",
+    "rachel", "carolyn", "janet", "catherine", "maria", "heather",
+    "diane", "julie", "joyce", "victoria", "kelly", "christina",
+    "joan", "evelyn", "lauren", "judith", "olivia", "alice", "julia",
+    "ryan", "brandon", "adam", "tyler", "zachary", "austin", "kevin",
+    "jason", "jeff", "gary", "timothy", "jose", "larry", "jeffrey",
+    "frank", "scott", "eric", "stephen", "raymond", "gregory", "samuel",
+    "benjamin", "patrick", "jack", "dennis", "jerry", "walter", "peter",
+    "henry", "harold", "douglas", "arthur", "lawrence", "roger",
+    # ── Common Filipino first names ──────────────────────────────────────
+    "juan", "pedro", "jose", "maria", "ana", "rosa", "luz", "grace",
+    "amor", "joy", "faith", "hope", "carlo", "miguel", "angelo",
+    "danilo", "mario", "mario", "rodrigo", "ferdinand", "imelda",
+    "nena", "neneng", "lita", "nora", "vilma", "sharon", "maricel",
+    "edgar", "ernesto", "renato", "rolando", "romeo", "eduardo",
+    # ── Countries ────────────────────────────────────────────────────────
+    "philippines", "america", "usa", "uk", "china", "japan", "korea",
+    "india", "russia", "france", "germany", "italy", "spain", "brazil",
+    "canada", "australia", "mexico", "indonesia", "thailand", "vietnam",
+    "singapore", "malaysia", "taiwan", "hongkong", "israel", "iran",
+    "iraq", "ukraine", "turkey", "egypt", "nigeria", "kenya", "ghana",
+    "pakistan", "bangladesh", "srilanka", "nepal", "myanmar", "cambodia",
+    "laos", "brunei", "timor", "argentina", "colombia", "peru", "chile",
+    "venezuela", "cuba", "haiti", "jamaica", "panama", "sweden", "norway",
+    "denmark", "finland", "netherlands", "belgium", "switzerland",
+    "austria", "portugal", "greece", "poland", "czechia", "hungary",
+    "romania", "bulgaria", "serbia", "croatia", "slovakia", "ukraine",
+    "newzealand", "southafrica", "morocco", "ethiopia", "somalia",
+    # ── Cities / places ──────────────────────────────────────────────────
+    "manila", "cebu", "davao", "quezon", "makati", "pasig", "taguig",
+    "london", "paris", "berlin", "rome", "madrid", "tokyo", "beijing",
+    "shanghai", "delhi", "mumbai", "sydney", "toronto", "chicago",
+    "houston", "phoenix", "losangeles", "newyork", "boston", "seattle",
+    "miami", "dallas", "denver", "atlanta", "lasvegas", "singapore",
+    "dubai", "istanbul", "moscow", "amsterdam", "barcelona", "vienna",
+    "brussels", "stockholm", "oslo", "copenhagen", "zurich", "prague",
+    "warsaw", "budapest", "athens", "lisbon", "dublin", "edinburgh",
+    "cairo", "nairobi", "lagos", "johannesburg", "casablanca",
+    # ── Continents / major regions ───────────────────────────────────────
+    "asia", "europe", "africa", "america", "oceania", "antarctica",
+    "middleeast", "caribbean", "scandinavia", "balkans",
+    # ── Religions / religious institutions ──────────────────────────────
+    "christianity", "islam", "hinduism", "buddhism", "judaism",
+    "catholicism", "protestantism", "baptist", "mormon", "scientology",
+    "quaker", "methodist", "lutheran", "calvinist", "jehovah",
+    "vatican", "mosque", "synagogue", "temple",
+    # ── Celebrities / public figures (non-political) ─────────────────────
+    "oprah", "ellen", "beyonce", "rihanna", "adele", "taylor", "swift",
+    "bieber", "kardashian", "jenner", "kanye", "drake", "eminem",
+    "madonna", "britney", "spears", "shakira", "ariana", "grande",
+    "elon", "musk", "bezos", "zuckerberg", "gates", "buffett", "jobs",
+    "einstein", "newton", "darwin", "freud", "socrates", "plato",
+    "aristotle", "shakespeare", "tolkien", "rowling", "spielberg",
+    "scorsese", "tarantino", "kubrick", "chaplin", "eastwood",
+    "pacquiao", "lebron", "jordan", "messi", "ronaldo", "neymar",
+    "federer", "nadal", "djokovic", "tyson", "ali", "mayweather",
+}
+
+# Vulgar / sexually explicit / crude English words
+ENGLISH_VULGAR = {
+    # Strong profanity
+    "fuck", "fucking", "fucked", "fucker", "fucks",
+    "shit", "shitty", "bullshit", "horseshit",
+    "bitch", "bitches", "bastard", "bastards",
+    "ass", "asses", "asshole", "assholes",
+    "damn", "damned", "goddamn",
+    "crap", "crappy", "cunt", "cunts",
+    "dick", "dicks", "cock", "cocks", "prick",
+    "pussy", "pussies", "whore", "whores", "slut", "slutty",
+    "nigger", "nigga", "chink", "spic", "kike", "faggot", "dyke",
+    # Explicit sexual
+    "porn", "porno", "sex", "sexy", "horny", "nude", "naked",
+    "penis", "vagina", "boobs", "breast", "nipple", "orgasm",
+    "masturbate", "ejaculate", "erect", "aroused",
+}
+
+# Filipino/Tagalog words that don't belong in an English vocabulary
+ENGLISH_FILIPINO_WORDS = {
+    # Pronouns & particles
+    "ako", "ikaw", "siya", "tayo", "kami", "kayo", "sila",
+    "ito", "iyon", "iyan", "dito", "doon", "diyan",
+    "na", "ba", "pa", "nga", "po", "ho", "din", "rin", "lang", "naman",
+    "kasi", "kung", "kahit", "para", "pero", "at", "ay", "ni", "ng",
+    "nang", "sa", "kay", "pag", "kapag", "habang", "dahil",
+    # Common words
+    "hindi", "wala", "may", "mayroon", "yung", "yun", "diba",
+    "bakit", "paano", "sana", "talaga", "grabe", "nandito",
+    "nandoon", "ngayon", "kahapon", "bukas", "mamaya", "kanina",
+    "gutom", "uhaw", "tulog", "gising", "pagkain", "tubig",
+    "bahay", "trabaho", "paaralan", "ospital", "tindahan",
+    "kumain", "uminom", "matulog", "pumunta", "bumalik",
+    "masaya", "malungkot", "maganda", "pangit", "mahal", "mura",
+    "malaki", "maliit", "bago", "luma", "mainit", "malamig",
+    "salamat", "pakiusap", "paumanhin", "sandali", "halika",
+    "siguro", "medyo", "sobra", "masyado", "konti", "marami",
+    "oo", "huwag", "pwede", "kailangan", "gusto", "ayaw",
+}
+
+# Combined English blocklist
+ENGLISH_BLOCKLIST = ENGLISH_PROPER_NAMES | ENGLISH_VULGAR | ENGLISH_FILIPINO_WORDS
+
 SHORTCUTS = {
     "u": "you", "ur": "your", "r": "are", "b": "be",
     "y": "why", "bc": "because", "bcz": "because",
@@ -352,8 +495,10 @@ SHORTCUTS = {
     "g2g": "got to go", "gtg": "got to go",
     "ttyl": "talk to you later", "ttys": "talk to you soon",
     "hmu": "hit me up", "dm": "direct message", "pm": "private message",
-    "np": "no problem", "ty": "thank you",
-    "thx": "thanks", "thnx": "thanks",
+    "np": "no problem", "ty": "thank you", "tq": "thank you", "tysm": "thank you so much",
+    "thx": "thanks", "thnx": "thanks", "tha": "thank", "thk": "thank",
+    "yw": "you're welcome", "wb": "welcome back",
+    "ofc": "of course", "nbd": "no big deal", "def": "definitely",
     "pls": "please", "plz": "please",
     "ok": "okay", "k": "okay",
     "gr8": "great", "l8r": "later",
@@ -453,16 +598,24 @@ def generate(output_file: str = OUTPUT_FILE):
     print("✓ Done.\n")
 
     # ── Post-process vocabulary ───────────────────────────────────────────────
+    print("🔎 Filtering vocabulary (politicians, vulgar, Filipino words)...")
     vocabulary     = {}
     all_words_flat = set()
+    removed        = []
     for cat, counter in category_words.items():
         mapped = CATEGORY_MAP.get(cat, cat)
         if mapped not in vocabulary:
             vocabulary[mapped] = []
         for w in top_words(counter, n=100):
+            if w in ENGLISH_BLOCKLIST:
+                removed.append(w)
+                continue
             if w not in all_words_flat:
                 vocabulary[mapped].append(w)
                 all_words_flat.add(w)
+    if removed:
+        print(f"   ✗ Removed {len(removed)} blocked words: {', '.join(sorted(set(removed))[:20])}"
+              + (" ..." if len(set(removed)) > 20 else ""))
 
     # ── communication_corpus: deduplicated phrase strings (legacy / display)
     seen_phrases = set()
