@@ -150,7 +150,9 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._guide_overlay          = None
         self._guide_canvas           = None
         self._guide_job              = None
+        self._finish_tutorial_btn    = None
         self._tutorial_predefined_selected = False
+        self._tutorial_input_paused  = False
         self._ui2_group_buttons      = {}
         self._ui2_letter_buttons     = {}
 
@@ -177,6 +179,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             self._tutorial_job = None
         self._destroy_guide_overlay()
         self._hide_ui_tutorial_text()
+        self._hide_finish_tutorial_button()
         self._show_system_cursor()
         self._destroy_pointer_overlay()
         super().destroy()
@@ -553,27 +556,33 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self.current_input = ""
         self.update_display()
         sentence = " ".join(self.output_words).strip()
-        if sentence and self.sentence_counts.get(sentence, 0) >= PREDEFINED_THRESHOLD:
-            self._tutorial_step = "clear_before_predefined"
+
+        already_saved = bool(sentence and self.sentence_counts.get(sentence, 0) >= PREDEFINED_THRESHOLD)
+
+        def after_save_intro():
+            if already_saved:
+                self._tutorial_step = "clear_before_predefined"
+                self._show_ui_tutorial_text(
+                    "This sentence is already saved.",
+                    4000,
+                    self._update_clear_before_predefined_guide,
+                    target=None,
+                )
+                return
             self._show_ui_tutorial_text(
-                "This sentence is already saved.",
-                4000,
-                self._update_clear_before_predefined_guide,
+                "Gaze at text to speech 3 times to save it",
+                5000,
+                self._update_save_sentence_guide,
                 target=None,
             )
-            return
+
         self._show_ui_tutorial_text(
             "Good job!",
             2500,
             lambda: self._show_ui_tutorial_text(
                 "Now let's save 'Hi there' as a predefined sentence",
                 4500,
-                lambda: self._show_ui_tutorial_text(
-                    "Gaze at text to speech 3 times to save it",
-                    5000,
-                    self._update_save_sentence_guide,
-                    target=None,
-                ),
+                after_save_intro,
                 target=None,
             ),
             target=None,
@@ -701,14 +710,68 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._guide_job = self.after(150, self._update_predefined_guide)
 
     def _finish_tutorial_from_predefined(self):
-        self._tutorial_step = "done"
+        self._tutorial_step = "familiarize"
+        self._tutorial_input_paused = True
         if self._in_predefined_mode:
             self.predefined_sentence()
         self.output_cursor = -1
         self.current_input = ""
         self.update_display()
+        if hasattr(self, "status_bar"):
+            self.status_bar.config(text="Tutorial familiarization: input is paused")
         self._destroy_guide_overlay()
-        self._show_ui_tutorial_text("Nice. The keyboard is ready", 5000)
+        self._show_ui_tutorial_text(
+            "Now familiarize yourself with the keyboard",
+            5000,
+            lambda: self._show_ui_tutorial_text(
+                "Input is paused for now",
+                5000,
+                lambda: self.after(10000, self._show_finish_tutorial_button),
+                target=None,
+            ),
+            target=None,
+        )
+
+    def _show_finish_tutorial_button(self):
+        if self._finish_tutorial_btn is not None:
+            return
+        self._tutorial_step = "finish"
+        btn = self._make_dwell_btn(
+            self,
+            self._finish_ui2_tutorial,
+            text="Finish Tutorial",
+            font=("Segoe UI", 14, "bold"),
+            bg="#5865f2",
+            fg="#ffffff",
+            relief="raised",
+            bd=2,
+            cursor="hand2",
+        )
+        btn.place(x=self._frame_gap(), y=self._frame_gap(), width=190, height=54)
+        btn.lift()
+        self._finish_tutorial_btn = btn
+        self._dwell_reset_all()
+
+    def _hide_finish_tutorial_button(self):
+        if self._finish_tutorial_btn is None:
+            return
+        bid = id(self._finish_tutorial_btn)
+        self.dwell_btn_meta.pop(bid, None)
+        self.dwell_hover_ms.pop(bid, None)
+        self.dwell_overlays.pop(bid, None)
+        if self.dwell_hovered is self._finish_tutorial_btn:
+            self.dwell_hovered = None
+        try:
+            self._finish_tutorial_btn.destroy()
+        except Exception:
+            pass
+        self._finish_tutorial_btn = None
+
+    def _finish_ui2_tutorial(self):
+        self._tutorial_input_paused = False
+        self._hide_finish_tutorial_button()
+        self._tutorial_step = "done"
+        self._show_ui_tutorial_text("Great! The keyboard is now ready\nGood luck!", 5000)
 
     def _tutorial_target_widget(self, target):
         if target == "keyboard":

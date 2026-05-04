@@ -158,6 +158,12 @@ class DwellMixin:
 
     def _dwell_target_at(self, px, py):
         """Return the registered dwell button at screen point px/py."""
+        if getattr(self, "_tutorial_input_paused", False):
+            finish_btn = getattr(self, "_finish_tutorial_btn", None)
+            if finish_btn is not None and self._point_in_widget(finish_btn, px, py):
+                return finish_btn
+            return None
+
         if self._point_in_zoom_popup(px, py):
             return self._zoom_source_btn
 

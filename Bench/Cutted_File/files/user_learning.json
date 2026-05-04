@@ -5,7 +5,8 @@
     "w": "want",
     "l": "looking",
     "el": "election",
-    "n": "nurse"
+    "n": "nurse",
+    "h": "husband"
   },
   "user_shortcut_usage": {
     "m": 2,
@@ -13,7 +14,8 @@
     "w": 2,
     "l": 1,
     "el": 1,
-    "n": 1
+    "n": 1,
+    "h": 1
   },
   "new_words": [],
   "word_usage_history": [
@@ -100,6 +102,24 @@
         "man",
         "i"
       ]
+    ],
+    [
+      "hello",
+      [
+        "hi",
+        "there"
+      ]
+    ],
+    [
+      "there",
+      [
+        "hi",
+        "there"
+      ]
+    ],
+    [
+      "hi",
+      []
     ]
   ]
 }
