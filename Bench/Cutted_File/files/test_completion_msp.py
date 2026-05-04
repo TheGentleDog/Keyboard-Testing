@@ -16,6 +16,7 @@
 #   python3 ../test_completion_msp.py --lang tagalog
 #   python3 ../test_completion_msp.py --lang both --top-k 5
 #   python3 ../test_completion_msp.py --output msp_results.json
+#   python3 ../test_completion_msp.py --graph-output msp_graph.png
 # =============================================================================
 
 import os
@@ -448,7 +449,7 @@ def show_msp_table(
 
 
 # =============================================================================
-# 8. JSON EXPORT
+# 8. JSON EXPORT + GRAPHING
 # =============================================================================
 
 def save_results(
@@ -488,6 +489,94 @@ def save_results(
     print(f"     ({len(word_results):,} words documented)")
 
 
+def save_graph(
+    output_path: str,
+    word_results: list[dict],
+    en_stats: dict | None,
+    fil_stats: dict | None,
+    top_k: int,
+):
+    """
+    Save a PNG chart from the current MSP run:
+      - bar chart for aggregate Appearance Rate, Hit@1, and Avg MSP
+    """
+    if not output_path:
+        return
+
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        print("\n  ! matplotlib not installed - skipping graph output.")
+        print("     Install it with: pip install matplotlib")
+        return
+
+    if not word_results:
+        print("\n  ! No word results available - skipping graph output.")
+        return
+
+    groups = []
+    if en_stats:
+        groups.append(("English", en_stats, "#3b82f6"))
+    if fil_stats:
+        groups.append(("Tagalog", fil_stats, "#ef4444"))
+    if not groups:
+        label = word_results[0].get("lang", "words").capitalize()
+        groups.append((label, aggregate(word_results), "#10b981"))
+
+    fig, ax_bar = plt.subplots(figsize=(10, 5.8), constrained_layout=True)
+    fig.suptitle(f"Word Completion MSP Evaluation (Top-{top_k})", fontsize=15, fontweight="bold")
+
+    metrics = [
+        ("Appearance Rate", "appearance_rate", 100.0, "%"),
+        ("Hit@1 Rate", "hit_at_1_rate", 100.0, "%"),
+        ("Avg MSP", "avg_msp", 1.0, ""),
+    ]
+    x = list(range(len(metrics)))
+    bar_width = 0.36 if len(groups) > 1 else 0.5
+    offsets = [-bar_width / 2, bar_width / 2] if len(groups) > 1 else [0]
+
+    for offset, (label, stats, color) in zip(offsets, groups):
+        values = [(stats.get(key) or 0) * scale for _, key, scale, _ in metrics]
+        bars = ax_bar.bar(
+            [i + offset for i in x],
+            values,
+            width=bar_width,
+            label=label,
+            color=color,
+            alpha=0.88,
+        )
+        for bar, (_, key, _, suffix) in zip(bars, metrics):
+            raw = stats.get(key)
+            if raw is None:
+                text = "n/a"
+            elif suffix:
+                text = f"{bar.get_height():.1f}{suffix}"
+            else:
+                text = f"{raw:.3f}"
+            ax_bar.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                text,
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )
+
+    ax_bar.set_title("Aggregate Metrics")
+    ax_bar.set_xticks(x)
+    ax_bar.set_xticklabels([m[0] for m in metrics])
+    ax_bar.set_ylim(0, max(1.0, ax_bar.get_ylim()[1] * 1.15))
+    ax_bar.grid(axis="y", linestyle="--", alpha=0.25)
+    ax_bar.legend()
+
+    fig.savefig(output_path, dpi=160)
+    plt.close(fig)
+
+    print(f"\n  Graph saved -> {output_path}")
+
+
 # =============================================================================
 # 9. MAIN
 # =============================================================================
@@ -506,13 +595,22 @@ def parse_args():
                    help="Cap words per language when using full vocab (default: 100)")
     p.add_argument("--drill",     type=str,  default=None,               metavar="WORD",
                    help="Print per-prefix breakdown for one specific word")
-    p.add_argument("--output",    type=str,  default="msp_results.json", metavar="FILE",
-                   help="Output JSON file (default: msp_results.json)")
+    p.add_argument("--output",    type=str,  default=None, metavar="FILE",
+                   help="Output JSON file (default: msp_results_<lang>.json)")
+    p.add_argument("--graph-output", type=str, default=None, metavar="PNG",
+                   help="Output PNG graph file (default: msp_graph_<lang>.png)")
+    p.add_argument("--no-graph", action="store_true",
+                   help="Skip PNG graph generation")
     return p.parse_args()
 
 
 def main():
     args = parse_args()
+
+    if args.output is None:
+        args.output = f"msp_results_{args.lang}.json"
+    if args.graph_output is None:
+        args.graph_output = f"msp_graph_{args.lang}.png"
 
     print(BOLD(CYAN("\n╔══════════════════════════════════════════════════════════════════╗")))
     print(BOLD(CYAN("║   WORD COMPLETION — MSP EVALUATION                              ║")))
@@ -586,6 +684,16 @@ def main():
 
     # ── Save JSON ─────────────────────────────────────────────────────────────
     save_results(args.output, args, all_results, en_stats, fil_stats)
+
+    # ── Save graph ────────────────────────────────────────────────────────────
+    if not args.no_graph:
+        save_graph(
+            args.graph_output,
+            all_results,
+            en_stats,
+            fil_stats,
+            args.top_k,
+        )
 
     # ── GUI summary table ─────────────────────────────────────────────────────
     print(f"\n  📊 Opening summary table window…")

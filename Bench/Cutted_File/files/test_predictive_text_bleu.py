@@ -10,6 +10,8 @@
 #   python3 ../test_predictive_text_bleu.py --lang english
 #   python3 ../test_predictive_text_bleu.py --lang tagalog
 #   python3 ../test_predictive_text_bleu.py --top-k 3
+#   python3 ../test_predictive_text_bleu.py --lang both --max-cases 500
+#   python3 ../test_predictive_text_bleu.py --graph-output bleu_graph_both.png
 # =============================================================================
 
 import os
@@ -855,6 +857,129 @@ def save_results(
     print(f"     ({total_cases:,} test cases documented)")
 
 
+def save_graph(
+    output_path: str,
+    en_metrics,
+    fil_metrics,
+    top_k: int,
+    lang: str,
+    max_line_cases: int = 40,
+):
+    """
+    Save a PNG chart from the current BLEU run:
+      - bar chart for aggregate Hit@1, Hit@K, MRR, and BLEU metrics
+      - line chart for per-case BLEU oracle across the first N test cases
+    """
+    if not output_path:
+        return
+
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        print("\n  ! matplotlib not installed - skipping graph output.")
+        print("     Install it with: pip install matplotlib")
+        return
+
+    groups = []
+    if en_metrics:
+        groups.append(("English", en_metrics, "#3b82f6"))
+    if fil_metrics:
+        groups.append(("Tagalog", fil_metrics, "#ef4444"))
+
+    if not groups:
+        print("\n  ! No metrics available - skipping graph output.")
+        return
+
+    fig, (ax_bar, ax_line) = plt.subplots(
+        2, 1, figsize=(12, 8), constrained_layout=True
+    )
+    lang_title = {
+        "english": "English",
+        "tagalog": "Tagalog",
+        "both": "English + Tagalog",
+    }.get(lang, lang.capitalize())
+    fig.suptitle(
+        f"Predictive Text BLEU Evaluation - {lang_title} (Top-{top_k})",
+        fontsize=15,
+        fontweight="bold",
+    )
+
+    metric_keys = [
+        ("Hit@1", "hit@1"),
+        (f"Hit@{top_k}", f"hit@{top_k}"),
+        ("MRR", "MRR"),
+        ("BLEU Top-1", "avg_bleu_top1"),
+        ("BLEU Oracle", "avg_bleu_oracle"),
+        ("Corpus BLEU", "corpus_bleu"),
+    ]
+    x = list(range(len(metric_keys)))
+    bar_width = 0.36 if len(groups) > 1 else 0.5
+    offsets = [-bar_width / 2, bar_width / 2] if len(groups) > 1 else [0]
+
+    for offset, (label, metrics, color) in zip(offsets, groups):
+        values = [metrics.get(key, 0.0) * 100.0 for _, key in metric_keys]
+        bars = ax_bar.bar(
+            [i + offset for i in x],
+            values,
+            width=bar_width,
+            label=label,
+            color=color,
+            alpha=0.88,
+        )
+        for bar in bars:
+            ax_bar.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                f"{bar.get_height():.1f}%",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+            )
+
+    ax_bar.set_title("Aggregate Metrics")
+    ax_bar.set_ylabel("Score")
+    ax_bar.set_ylim(0, max(1.0, ax_bar.get_ylim()[1] * 1.15))
+    ax_bar.set_xticks(x)
+    ax_bar.set_xticklabels([label for label, _ in metric_keys], rotation=20, ha="right")
+    ax_bar.grid(axis="y", linestyle="--", alpha=0.25)
+    ax_bar.legend()
+
+    plotted = False
+    for label, metrics, color in groups:
+        records = metrics.get("all_records", [])[:max_line_cases]
+        if not records:
+            continue
+        plotted = True
+        xs = list(range(1, len(records) + 1))
+        oracle = [r.get("bleu_oracle", 0.0) * 100.0 for r in records]
+        top1 = [r.get("bleu_top1", 0.0) * 100.0 for r in records]
+        ax_line.plot(xs, oracle, label=f"{label} BLEU oracle", color=color, linewidth=1.8)
+        ax_line.plot(xs, top1, label=f"{label} BLEU top-1", color=color, linewidth=1.1, linestyle="--", alpha=0.75)
+
+    if plotted:
+        ax_line.set_title(f"Per-Case BLEU Line (first {max_line_cases} cases per language)")
+        ax_line.set_xlabel("Test case")
+        ax_line.set_ylabel("BLEU")
+        ax_line.set_ylim(0, 105)
+        ax_line.grid(axis="y", linestyle="--", alpha=0.25)
+        ax_line.legend()
+    else:
+        ax_line.text(
+            0.5, 0.5,
+            "No test-case records available; no BLEU line to plot.",
+            ha="center",
+            va="center",
+        )
+        ax_line.set_axis_off()
+
+    fig.savefig(output_path, dpi=160)
+    plt.close(fig)
+
+    print(f"\n  Graph saved -> {output_path}")
+
+
 # =============================================================================
 # 8. MAIN
 # =============================================================================
@@ -885,10 +1010,12 @@ def parse_args():
     )
     p.add_argument(
         "--max-cases",
+        "--max-words",
         type=int,
         default=None,
+        dest="max_cases",
         metavar="N",
-        help="Cap total test cases per language (default: unlimited)",
+        help="Cap total test cases per language (alias: --max-words; default: unlimited)",
     )
     p.add_argument(
         "--verbose",
@@ -898,9 +1025,28 @@ def parse_args():
     p.add_argument(
         "--output",
         type=str,
-        default="bleu_test_results.json",
+        default=None,
         metavar="FILE",
-        help="Path for the JSON results file (default: bleu_test_results.json)",
+        help="Path for the JSON results file (default: bleu_test_results_<lang>.json)",
+    )
+    p.add_argument(
+        "--graph-output",
+        type=str,
+        default=None,
+        metavar="PNG",
+        help="Path for the PNG graph file (default: bleu_graph_<lang>.png)",
+    )
+    p.add_argument(
+        "--graph-cases",
+        type=int,
+        default=40,
+        metavar="N",
+        help="How many test cases per language to draw in the line graph (default: 40)",
+    )
+    p.add_argument(
+        "--no-graph",
+        action="store_true",
+        help="Skip PNG graph generation",
     )
     return p.parse_args()
 
@@ -948,6 +1094,11 @@ def run_evaluation(
 def main():
     args = parse_args()
 
+    if args.output is None:
+        args.output = f"bleu_test_results_{args.lang}.json"
+    if args.graph_output is None:
+        args.graph_output = f"bleu_graph_{args.lang}.png"
+
     print(BOLD(CYAN("\n╔══════════════════════════════════════════════════════════════════╗")))
     print(BOLD(CYAN("║   PREDICTIVE TEXT / NEXT-WORD PREDICTION — BLEU EVALUATION      ║")))
     print(BOLD(CYAN("║   Languages: English & Tagalog (Filipino)                        ║")))
@@ -984,6 +1135,17 @@ def main():
 
     # ── Save JSON results ─────────────────────────────────────────────────────
     save_results(args.output, args, en_metrics, fil_metrics, args.top_k)
+
+    # ── Save graph ────────────────────────────────────────────────────────────
+    if not args.no_graph:
+        save_graph(
+            args.graph_output,
+            en_metrics,
+            fil_metrics,
+            args.top_k,
+            args.lang,
+            max_line_cases=args.graph_cases,
+        )
 
     # ── GUI summary table ─────────────────────────────────────────────────────
     if en_metrics or fil_metrics:

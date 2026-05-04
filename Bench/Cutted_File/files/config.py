@@ -29,4 +29,4 @@ DWELL_MODE     = "sync"
 # "both"     = Filipino + English suggestions mixed
 # "filipino" = Filipino words only
 # "english"  = English words only
-PREDICTION_LANGUAGE = "english"
+PREDICTION_LANGUAGE = "filipino"
