@@ -3,3 +3,6 @@ Thesis/Test4.py
 Thesis/Test5.py
 Thesis/Test6(DO NOT USE YET).py
 Thesis/Test3.py
+./venv/
+venv/
+__pycache__/
