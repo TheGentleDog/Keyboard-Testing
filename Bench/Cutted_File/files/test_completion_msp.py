@@ -24,6 +24,7 @@ import sys
 import json
 import argparse
 import warnings
+import random
 from collections import defaultdict
 
 # ---------------------------------------------------------------------------
@@ -498,7 +499,8 @@ def save_graph(
 ):
     """
     Save a PNG chart from the current MSP run:
-      - bar chart for aggregate Appearance Rate, Hit@1, and Avg MSP
+      - scatterplot of baseline word length vs decimal MSP
+      - horizontal baseline line where MSP equals 1.0
     """
     if not output_path:
         return
@@ -507,6 +509,7 @@ def save_graph(
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
+        from matplotlib.ticker import MaxNLocator
     except ImportError:
         print("\n  ! matplotlib not installed - skipping graph output.")
         print("     Install it with: pip install matplotlib")
@@ -518,63 +521,388 @@ def save_graph(
 
     groups = []
     if en_stats:
-        groups.append(("English", en_stats, "#3b82f6"))
+        groups.append(("English", "english", "#3266ad", "o", 40))
     if fil_stats:
-        groups.append(("Tagalog", fil_stats, "#ef4444"))
+        groups.append(("Tagalog", "tagalog", "#d85a30", "^", 50))
     if not groups:
-        label = word_results[0].get("lang", "words").capitalize()
-        groups.append((label, aggregate(word_results), "#10b981"))
+        lang = word_results[0].get("lang", "words")
+        groups.append((lang.capitalize(), lang, "#3266ad", "o", 40))
 
-    fig, ax_bar = plt.subplots(figsize=(10, 5.8), constrained_layout=True)
-    fig.suptitle(f"Word Completion MSP Evaluation (Top-{top_k})", fontsize=15, fontweight="bold")
+    fig, ax = plt.subplots(figsize=(9, 7))
 
-    metrics = [
-        ("Appearance Rate", "appearance_rate", 100.0, "%"),
-        ("Hit@1 Rate", "hit_at_1_rate", 100.0, "%"),
-        ("Avg MSP", "avg_msp", 1.0, ""),
-    ]
-    x = list(range(len(metrics)))
-    bar_width = 0.36 if len(groups) > 1 else 0.5
-    offsets = [-bar_width / 2, bar_width / 2] if len(groups) > 1 else [0]
+    rng = random.Random(42)
+    plotted_results = []
+    for label, lang_key, color, marker, size in groups:
+        lang_results = [
+            r for r in word_results
+            if r.get("lang", lang_key) == lang_key and r.get("msp") is not None
+        ]
+        if not lang_results:
+            continue
 
-    for offset, (label, stats, color) in zip(offsets, groups):
-        values = [(stats.get(key) or 0) * scale for _, key, scale, _ in metrics]
-        bars = ax_bar.bar(
-            [i + offset for i in x],
-            values,
-            width=bar_width,
-            label=label,
+        plotted_results.extend(lang_results)
+        x_vals = [
+            max(1.0, r["baseline"] + rng.uniform(-0.25, 0.25))
+            for r in lang_results
+        ]
+        y_vals = [
+            min(1.05, max(0.0, r["msp"] + rng.uniform(-0.01, 0.01)))
+            for r in lang_results
+        ]
+        ax.scatter(
+            x_vals,
+            y_vals,
+            marker=marker,
             color=color,
-            alpha=0.88,
+            alpha=0.25,
+            edgecolors=color,
+            linewidths=0.5,
+            s=size,
+            label=label,
+            zorder=3,
         )
-        for bar, (_, key, _, suffix) in zip(bars, metrics):
-            raw = stats.get(key)
-            if raw is None:
-                text = "n/a"
-            elif suffix:
-                text = f"{bar.get_height():.1f}{suffix}"
-            else:
-                text = f"{raw:.3f}"
-            ax_bar.text(
-                bar.get_x() + bar.get_width() / 2,
-                bar.get_height(),
-                text,
-                ha="center",
-                va="bottom",
-                fontsize=9,
-            )
 
-    ax_bar.set_title("Aggregate Metrics")
-    ax_bar.set_xticks(x)
-    ax_bar.set_xticklabels([m[0] for m in metrics])
-    ax_bar.set_ylim(0, max(1.0, ax_bar.get_ylim()[1] * 1.15))
-    ax_bar.grid(axis="y", linestyle="--", alpha=0.25)
-    ax_bar.legend()
+    if not plotted_results:
+        print("\n  ! No words have MSP values - skipping graph output.")
+        plt.close(fig)
+        return
 
-    fig.savefig(output_path, dpi=160)
+    max_baseline = max(r.get("baseline", 0) for r in plotted_results)
+    max_msp = max(r.get("msp", 0) for r in plotted_results)
+    y_max = max(1.05, max_msp + 0.05)
+
+    ax.plot(
+        [1, max_baseline],
+        [1.0, 1.0],
+        linestyle="--",
+        color="#888780",
+        linewidth=1.2,
+        alpha=0.6,
+        label="MSP = 1.0 baseline",
+        zorder=2,
+    )
+
+    never_count = sum(1 for r in word_results if r.get("selection_point") is None)
+    if never_count:
+        ax.text(
+            0.99,
+            0.02,
+            f"{never_count:,} word(s) never appeared",
+            transform=ax.transAxes,
+            ha="right",
+            va="bottom",
+            fontsize=9,
+            color="#888780",
+        )
+
+    ax.set_xlabel("Baseline (word length)", fontsize=12, color="#444441")
+    ax.set_ylabel("MSP", fontsize=12, color="#444441")
+    ax.set_title(
+        f"Baseline vs MSP (Top-{top_k})",
+        fontsize=14,
+        fontweight="medium",
+        color="#2c2c2a",
+        pad=14,
+    )
+    ax.set_xlim(1, max_baseline + 1)
+    ax.set_ylim(0, y_max)
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.yaxis.set_major_locator(MaxNLocator(nbins=8))
+    ax.grid(color="#d3d1c7", linestyle="-", linewidth=0.5, alpha=0.7, zorder=1)
+    ax.set_facecolor("#fafaf9")
+    fig.patch.set_facecolor("#ffffff")
+
+    for spine in ax.spines.values():
+        spine.set_edgecolor("#b4b2a9")
+        spine.set_linewidth(0.8)
+
+    ax.tick_params(colors="#5f5e5a", labelsize=10)
+    ax.legend(fontsize=10, framealpha=0.9, edgecolor="#d3d1c7", facecolor="#ffffff")
+
+    n_english = sum(1 for r in word_results if r.get("lang") == "english")
+    n_tagalog = sum(1 for r in word_results if r.get("lang") == "tagalog")
+    fig.text(
+        0.13,
+        0.01,
+        f"n = {n_english:,} English words, {n_tagalog:,} Tagalog words",
+        fontsize=9,
+        color="#888780",
+    )
+
+    plt.tight_layout()
+    fig.savefig(output_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
     print(f"\n  Graph saved -> {output_path}")
+
+
+PREDICTION_MODE_COLUMNS = [
+    ("tagalog mode", "filipino"),
+    ("english mode", "english"),
+    ("both mode", "both"),
+]
+
+
+def _fmt_mode_value(stats: dict | None, key: str, is_pct: bool, lower_is_better: bool = False) -> str:
+    if not stats:
+        return "n/a"
+    value = stats.get(key)
+    if value is None:
+        return "n/a"
+    if is_pct:
+        return f"{value * 100:.2f}%"
+    if isinstance(value, float):
+        return f"{value:.4f}"
+    return f"{int(value):,}"
+
+
+def print_prediction_mode_table(matrix: dict, top_k: int):
+    """Print one table comparing each corpus language across prediction modes."""
+    print_header("MSP PREDICTION-MODE COMPARISON")
+
+    col_labels = []
+    for lang_label, lang_key in (("Filipino/Tagalog", "tagalog"), ("English", "english")):
+        if lang_key in matrix:
+            for mode_label, mode_key in PREDICTION_MODE_COLUMNS:
+                col_labels.append((lang_label, mode_label, lang_key, mode_key))
+
+    metric_rows = [
+        ("Appearance Rate", "appearance_rate", True, False),
+        ("Hit@1 Rate", "hit_at_1_rate", True, False),
+        ("Avg MSP", "avg_msp", False, True),
+        ("Words", "n_words", False, False),
+    ]
+
+    cell_w = 21
+    print(f"\n  {'':<18}" + "".join(f"{lang:<{cell_w}}" for lang, _, _, _ in col_labels))
+    print(f"  {'Metric':<18}" + "".join(f"{mode:<{cell_w}}" for _, mode, _, _ in col_labels))
+    print("  " + "-" * (18 + cell_w * len(col_labels)))
+
+    for label, key, is_pct, lower_is_better in metric_rows:
+        row = f"  {label:<18}"
+        for _, _, lang_key, mode_key in col_labels:
+            row += f"{_fmt_mode_value(matrix[lang_key].get(mode_key), key, is_pct, lower_is_better):>{cell_w}}"
+        print(row)
+
+    print(f"\n  Lower Avg MSP is better. Other rates are higher-is-better. Top-{top_k} suggestions.")
+
+
+def show_prediction_mode_table(matrix: dict, top_k: int):
+    """Show the prediction-mode comparison as one Tkinter table."""
+    try:
+        import tkinter as tk
+        from tkinter import font as tkfont
+    except ImportError:
+        print("  ! tkinter not available - skipping comparison table window.")
+        return
+
+    if not matrix:
+        return
+
+    columns = []
+    for lang_label, lang_key in (("Filipino/Tagalog", "tagalog"), ("English", "english")):
+        if lang_key in matrix:
+            for mode_label, mode_key in PREDICTION_MODE_COLUMNS:
+                columns.append((lang_label, mode_label, lang_key, mode_key))
+
+    rows = [
+        ("Appearance Rate", "appearance_rate", True),
+        ("Hit@1 Rate", "hit_at_1_rate", True),
+        ("Avg MSP", "avg_msp", False),
+        ("Words", "n_words", False),
+    ]
+
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        print(f"  ! tkinter could not open comparison table - skipping UI ({exc})")
+        return
+    root.title("MSP Prediction-Mode Comparison")
+    root.configure(bg="#1e1e2e")
+    root.resizable(False, False)
+
+    title_font = tkfont.Font(family="Segoe UI", size=13, weight="bold")
+    header_font = tkfont.Font(family="Segoe UI", size=9, weight="bold")
+    cell_font = tkfont.Font(family="Segoe UI", size=9)
+
+    BG = "#1e1e2e"
+    HEADER_BG = "#313244"
+    ROW_A = "#292938"
+    ROW_B = "#1e1e2e"
+    FG = "#cdd6f4"
+    DIM_FG = "#a6adc8"
+    ACCENT = "#89b4fa"
+
+    tk.Label(
+        root,
+        text=f"MSP Prediction-Mode Comparison - Top-{top_k}",
+        bg=BG,
+        fg=ACCENT,
+        font=title_font,
+        pady=12,
+    ).pack(fill="x")
+
+    frame = tk.Frame(root, bg=BG, padx=14, pady=8)
+    frame.pack(fill="both", expand=True)
+
+    tk.Label(frame, text="Metric", width=18, bg=HEADER_BG, fg=ACCENT, font=header_font, padx=8, pady=7).grid(row=0, column=0, rowspan=2, sticky="nsew", padx=1, pady=1)
+
+    col = 1
+    grouped = []
+    for lang_label, _, lang_key, _ in columns:
+        if not grouped or grouped[-1][0] != lang_key:
+            grouped.append((lang_key, lang_label, 1))
+        else:
+            grouped[-1] = (grouped[-1][0], grouped[-1][1], grouped[-1][2] + 1)
+
+    for _, lang_label, span in grouped:
+        tk.Label(frame, text=lang_label, bg=HEADER_BG, fg=ACCENT, font=header_font, padx=8, pady=7).grid(row=0, column=col, columnspan=span, sticky="nsew", padx=1, pady=1)
+        col += span
+
+    for idx, (_, mode_label, _, _) in enumerate(columns, start=1):
+        tk.Label(frame, text=mode_label, width=17, bg=HEADER_BG, fg=DIM_FG, font=header_font, padx=8, pady=7).grid(row=1, column=idx, sticky="nsew", padx=1, pady=1)
+
+    for row_idx, (label, key, is_pct) in enumerate(rows, start=2):
+        bg = ROW_A if row_idx % 2 == 0 else ROW_B
+        tk.Label(frame, text=label, bg=bg, fg=FG, font=cell_font, anchor="w", padx=8, pady=7).grid(row=row_idx, column=0, sticky="nsew", padx=1, pady=1)
+        for col_idx, (_, _, lang_key, mode_key) in enumerate(columns, start=1):
+            text = _fmt_mode_value(matrix[lang_key].get(mode_key), key, is_pct)
+            tk.Label(frame, text=text, bg=bg, fg=FG, font=cell_font, padx=8, pady=7).grid(row=row_idx, column=col_idx, sticky="nsew", padx=1, pady=1)
+
+    tk.Label(
+        root,
+        text="Lower Avg MSP is better. Other rates are higher-is-better.",
+        bg=BG,
+        fg=DIM_FG,
+        font=("Segoe UI", 8),
+        pady=8,
+    ).pack(fill="x")
+
+    tk.Button(root, text="Close", command=root.destroy, bg=HEADER_BG, fg=FG, relief="flat", padx=18, pady=6).pack(pady=(0, 12))
+    root.mainloop()
+
+
+def save_prediction_mode_comparison(output_path: str, args, matrix: dict):
+    if not output_path:
+        return
+
+    import datetime
+
+    doc = {
+        "meta": {
+            "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
+            "top_k": args.top_k,
+            "languages": args.lang,
+            "max_words": args.max_words,
+            "comparison": "MSP by test language and prediction mode",
+        },
+        "results": matrix,
+    }
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(doc, f, indent=2, ensure_ascii=False)
+
+    print(f"\n  Comparison results saved -> {output_path}")
+
+
+def save_prediction_mode_comparison_full(output_path: str, args, matrix: dict, records: dict):
+    if not output_path:
+        return
+
+    import datetime
+
+    def summarise_word(r):
+        return {k: v for k, v in r.items() if k != "prefix_details"}
+
+    doc = {
+        "meta": {
+            "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
+            "top_k": args.top_k,
+            "languages": args.lang,
+            "max_words": args.max_words,
+            "comparison": "MSP by test language and prediction mode",
+        },
+        "summary": matrix,
+        "test_cases": {},
+    }
+
+    for lang, modes in records.items():
+        doc["test_cases"][lang] = {}
+        for mode, results in modes.items():
+            doc["test_cases"][lang][mode] = {
+                "word_results": [summarise_word(r) for r in results],
+                "word_results_full": results,
+            }
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(doc, f, indent=2, ensure_ascii=False)
+
+    print(f"\n  Comparison results saved -> {output_path}")
+
+
+def prediction_mode_graph_path(base_path: str, prediction_language: str) -> str:
+    root, ext = os.path.splitext(base_path)
+    ext = ext or ".png"
+    return f"{root}_{prediction_language}_mode{ext}"
+
+
+def run_prediction_mode_comparison(model: NgramModel, args):
+    selected_langs = ["tagalog", "english"] if args.lang == "both" else [args.lang]
+    matrix = {}
+    records = {}
+    graph_data = {
+        prediction_language: {
+            "word_results": [],
+            "english": None,
+            "tagalog": None,
+        }
+        for _, prediction_language in PREDICTION_MODE_COLUMNS
+    }
+
+    for lang in selected_langs:
+        matrix[lang] = {}
+        records[lang] = {}
+        display = "Tagalog" if lang == "tagalog" else "English"
+        if args.words:
+            words = [w.strip().lower() for w in args.words.split(",") if w.strip()]
+        else:
+            words = load_vocab_words(lang)
+            if args.max_words:
+                import random
+                random.seed(42)
+                words = random.sample(words, min(args.max_words, len(words)))
+
+        for mode_label, prediction_language in PREDICTION_MODE_COLUMNS:
+            print_header(f"{display.upper()} WORDS - {mode_label.upper()}")
+            results = evaluate_word_list(
+                model,
+                words,
+                top_k=args.top_k,
+                lang=lang,
+                language=prediction_language,
+            )
+            stats = aggregate(results)
+            matrix[lang][prediction_language] = stats
+            records[lang][prediction_language] = results
+            graph_data[prediction_language]["word_results"].extend(results)
+            graph_data[prediction_language][lang] = stats
+            print_aggregate(stats, f"{display} words - {mode_label}")
+
+    print_prediction_mode_table(matrix, args.top_k)
+    save_prediction_mode_comparison_full(args.output, args, matrix, records)
+
+    if not args.no_graph:
+        for _, prediction_language in PREDICTION_MODE_COLUMNS:
+            data = graph_data[prediction_language]
+            save_graph(
+                prediction_mode_graph_path(args.graph_output, prediction_language),
+                data["word_results"],
+                data["english"],
+                data["tagalog"],
+                args.top_k,
+            )
+
+    show_prediction_mode_table(matrix, args.top_k)
 
 
 # =============================================================================
@@ -593,6 +921,8 @@ def parse_args():
                    help="Suggestion bar size (default: 5)")
     p.add_argument("--max-words", type=int,  default=100,                metavar="N",
                    help="Cap words per language when using full vocab (default: 100)")
+    p.add_argument("--compare-prediction-modes", action="store_true",
+                   help="Compare tagalog, english, and both prediction modes in one table")
     p.add_argument("--drill",     type=str,  default=None,               metavar="WORD",
                    help="Print per-prefix breakdown for one specific word")
     p.add_argument("--output",    type=str,  default=None, metavar="FILE",
@@ -607,7 +937,9 @@ def parse_args():
 def main():
     args = parse_args()
 
-    if args.output is None:
+    if args.output is None and args.compare_prediction_modes:
+        args.output = f"msp_mode_comparison_{args.lang}.json"
+    elif args.output is None:
         args.output = f"msp_results_{args.lang}.json"
     if args.graph_output is None:
         args.graph_output = f"msp_graph_{args.lang}.png"
@@ -630,6 +962,11 @@ def main():
 
     print_header("LOADING MODEL")
     model = load_model()
+
+    if args.compare_prediction_modes:
+        run_prediction_mode_comparison(model, args)
+        print(GREEN(BOLD("\n✓ MSP prediction-mode comparison complete.\n")))
+        return
 
     all_results = []
     en_stats    = None

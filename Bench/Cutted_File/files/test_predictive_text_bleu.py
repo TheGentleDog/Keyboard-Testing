@@ -61,6 +61,23 @@ from nltk.translate.bleu_score import (
 # ---------------------------------------------------------------------------
 from model import NgramModel
 
+try:
+    from config import PREDICTION_LANGUAGE as _CFG_PREDICTION_LANGUAGE
+except Exception:
+    _CFG_PREDICTION_LANGUAGE = "both"
+
+_LANG_MAP = {
+    "both": "both",
+    "english": "english",
+    "tagalog": "filipino",
+    "filipino": "filipino",
+}
+
+CONFIG_PREDICTION_LANGUAGE = _LANG_MAP.get(
+    str(_CFG_PREDICTION_LANGUAGE).lower(),
+    "both",
+)
+
 # ---------------------------------------------------------------------------
 # ANSI colours (disabled on Windows)
 # ---------------------------------------------------------------------------
@@ -148,12 +165,17 @@ def predict_next_words(
     model: NgramModel,
     context: list[str],
     top_k: int = 5,
+    language: str = "both",
 ) -> list[str]:
     """
     Ask the model for the top-k next-word predictions given a context.
     Uses get_next_word_suggestions (trigram → bigram → unigram fallback).
     """
-    return model.get_next_word_suggestions(context=context, max_results=top_k)
+    return model.get_next_word_suggestions(
+        context=context,
+        max_results=top_k,
+        language=language,
+    )
 
 
 # =============================================================================
@@ -228,6 +250,7 @@ def evaluate(
     model:   NgramModel,
     cases:   list[tuple[list[str], str]],
     top_k:   int = 5,
+    language: str = "both",
     verbose: bool = False,
     sample_n: int = 10,
 ) -> dict:
@@ -252,7 +275,7 @@ def evaluate(
     sample_records = []
 
     for idx, (context, ref) in enumerate(cases):
-        preds = predict_next_words(model, context, top_k=top_k)
+        preds = predict_next_words(model, context, top_k=top_k, language=language)
 
         # Hit metrics
         rank = None
@@ -305,6 +328,7 @@ def evaluate(
         "avg_bleu_top1":   bleu1_sum / n,
         "avg_bleu_oracle": bleu_oracle_sum / n,
         "corpus_bleu":     corp_bleu,
+        "prediction_language": language,
         "samples":         sample_records,
         "all_records":     all_records,
     }
@@ -318,6 +342,7 @@ def evaluate_by_context_len(
     model:  NgramModel,
     cases:  list[tuple[list[str], str]],
     top_k:  int = 5,
+    language: str = "both",
 ) -> dict:
     """Break down hit@1 and avg_bleu_oracle by context length (1, 2, 3+)."""
     buckets = defaultdict(list)
@@ -331,7 +356,7 @@ def evaluate_by_context_len(
         hits = 0
         bleu = 0.0
         for context, ref in bucket_cases:
-            preds = predict_next_words(model, context, top_k=top_k)
+            preds = predict_next_words(model, context, top_k=top_k, language=language)
             hits  += any(p == ref for p in preds[:1])
             bleu  += top_k_bleu(ref, preds)
         n = len(bucket_cases)
@@ -423,6 +448,284 @@ def print_comparison(en_metrics: dict, fil_metrics: dict, top_k: int):
         winner = "English" if ev > fv else ("Tagalog" if fv > ev else "Tie")
         wc     = GREEN if winner == "English" else (CYAN if winner == "Tagalog" else YELLOW)
         print(f"  {label:<26} {ev*100:>9.2f}%  {fv*100:>9.2f}%  {wc(winner):>10}")
+
+
+PREDICTION_MODE_COLUMNS = [
+    ("tagalog mode", "filipino"),
+    ("english mode", "english"),
+    ("both mode", "both"),
+]
+
+
+def _fmt_mode_metric(metrics: dict | None, key: str, is_pct: bool = True) -> str:
+    if not metrics:
+        return "n/a"
+    value = metrics.get(key)
+    if value is None:
+        return "n/a"
+    if is_pct:
+        return f"{value * 100:.2f}%"
+    if isinstance(value, float):
+        return f"{value:.4f}"
+    return f"{int(value):,}"
+
+
+def print_prediction_mode_table(matrix: dict, top_k: int):
+    """Print one table comparing each test language across prediction modes."""
+    print_header("BLEU PREDICTION-MODE COMPARISON")
+
+    col_labels = []
+    for lang_label, lang_key in (("Filipino/Tagalog", "tagalog"), ("English", "english")):
+        if lang_key in matrix:
+            for mode_label, mode_key in PREDICTION_MODE_COLUMNS:
+                col_labels.append((lang_label, mode_label, lang_key, mode_key))
+
+    metric_rows = [
+        ("Hit@1", "hit@1", True),
+        (f"Hit@{top_k}", f"hit@{top_k}", True),
+        ("MRR", "MRR", True),
+        ("Avg BLEU oracle", "avg_bleu_oracle", True),
+        ("Corpus BLEU", "corpus_bleu", True),
+        ("Cases", "n_cases", False),
+    ]
+
+    cell_w = 21
+    print(f"\n  {'':<18}" + "".join(f"{lang:<{cell_w}}" for lang, _, _, _ in col_labels))
+    print(f"  {'Metric':<18}" + "".join(f"{mode:<{cell_w}}" for _, mode, _, _ in col_labels))
+    print("  " + "-" * (18 + cell_w * len(col_labels)))
+
+    for label, key, is_pct in metric_rows:
+        row = f"  {label:<18}"
+        for _, _, lang_key, mode_key in col_labels:
+            row += f"{_fmt_mode_metric(matrix[lang_key].get(mode_key), key, is_pct):>{cell_w}}"
+        print(row)
+
+    print(f"\n  Higher is better for BLEU, Hit@K, and MRR. Top-{top_k} predictions.")
+
+
+def show_prediction_mode_table(matrix: dict, top_k: int):
+    """Show the prediction-mode comparison as one Tkinter table."""
+    try:
+        import tkinter as tk
+        from tkinter import font as tkfont
+    except ImportError:
+        print("  ! tkinter not available - skipping comparison table window.")
+        return
+
+    if not matrix:
+        return
+
+    columns = []
+    for lang_label, lang_key in (("Filipino/Tagalog", "tagalog"), ("English", "english")):
+        if lang_key in matrix:
+            for mode_label, mode_key in PREDICTION_MODE_COLUMNS:
+                columns.append((lang_label, mode_label, lang_key, mode_key))
+
+    rows = [
+        ("Hit@1", "hit@1", True),
+        (f"Hit@{top_k}", f"hit@{top_k}", True),
+        ("MRR", "MRR", True),
+        ("Avg BLEU Oracle", "avg_bleu_oracle", True),
+        ("Corpus BLEU", "corpus_bleu", True),
+        ("Cases", "n_cases", False),
+    ]
+
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        print(f"  ! tkinter could not open comparison table - skipping UI ({exc})")
+        return
+    root.title("BLEU Prediction-Mode Comparison")
+    root.configure(bg="#1e1e2e")
+    root.resizable(False, False)
+
+    title_font = tkfont.Font(family="Segoe UI", size=13, weight="bold")
+    header_font = tkfont.Font(family="Segoe UI", size=9, weight="bold")
+    cell_font = tkfont.Font(family="Segoe UI", size=9)
+
+    BG = "#1e1e2e"
+    HEADER_BG = "#313244"
+    ROW_A = "#292938"
+    ROW_B = "#1e1e2e"
+    FG = "#cdd6f4"
+    DIM_FG = "#a6adc8"
+    ACCENT = "#89b4fa"
+
+    tk.Label(
+        root,
+        text=f"BLEU Prediction-Mode Comparison - Top-{top_k}",
+        bg=BG,
+        fg=ACCENT,
+        font=title_font,
+        pady=12,
+    ).pack(fill="x")
+
+    frame = tk.Frame(root, bg=BG, padx=14, pady=8)
+    frame.pack(fill="both", expand=True)
+
+    tk.Label(frame, text="Metric", width=18, bg=HEADER_BG, fg=ACCENT, font=header_font, padx=8, pady=7).grid(row=0, column=0, rowspan=2, sticky="nsew", padx=1, pady=1)
+
+    col = 1
+    grouped = []
+    for lang_label, _, lang_key, _ in columns:
+        if not grouped or grouped[-1][0] != lang_key:
+            grouped.append((lang_key, lang_label, 1))
+        else:
+            grouped[-1] = (grouped[-1][0], grouped[-1][1], grouped[-1][2] + 1)
+
+    for _, lang_label, span in grouped:
+        tk.Label(frame, text=lang_label, bg=HEADER_BG, fg=ACCENT, font=header_font, padx=8, pady=7).grid(row=0, column=col, columnspan=span, sticky="nsew", padx=1, pady=1)
+        col += span
+
+    for idx, (_, mode_label, _, _) in enumerate(columns, start=1):
+        tk.Label(frame, text=mode_label, width=17, bg=HEADER_BG, fg=DIM_FG, font=header_font, padx=8, pady=7).grid(row=1, column=idx, sticky="nsew", padx=1, pady=1)
+
+    for row_idx, (label, key, is_pct) in enumerate(rows, start=2):
+        bg = ROW_A if row_idx % 2 == 0 else ROW_B
+        tk.Label(frame, text=label, bg=bg, fg=FG, font=cell_font, anchor="w", padx=8, pady=7).grid(row=row_idx, column=0, sticky="nsew", padx=1, pady=1)
+        for col_idx, (_, _, lang_key, mode_key) in enumerate(columns, start=1):
+            text = _fmt_mode_metric(matrix[lang_key].get(mode_key), key, is_pct)
+            tk.Label(frame, text=text, bg=bg, fg=FG, font=cell_font, padx=8, pady=7).grid(row=row_idx, column=col_idx, sticky="nsew", padx=1, pady=1)
+
+    tk.Label(
+        root,
+        text="Higher is better for BLEU, Hit@K, and MRR.",
+        bg=BG,
+        fg=DIM_FG,
+        font=("Segoe UI", 8),
+        pady=8,
+    ).pack(fill="x")
+
+    tk.Button(root, text="Close", command=root.destroy, bg=HEADER_BG, fg=FG, relief="flat", padx=18, pady=6).pack(pady=(0, 12))
+    root.mainloop()
+
+
+def save_prediction_mode_comparison(output_path: str, args, matrix: dict, top_k: int):
+    if not output_path:
+        return
+
+    import datetime
+
+    doc = {
+        "meta": {
+            "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
+            "top_k": top_k,
+            "min_seq_len": args.min_seq_len,
+            "max_cases": args.max_cases,
+            "languages": args.lang,
+            "comparison": "BLEU by test language and prediction mode",
+        },
+        "results": matrix,
+    }
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(doc, f, indent=2, ensure_ascii=False)
+
+    print(f"\n  Comparison results saved -> {output_path}")
+
+
+def save_prediction_mode_comparison_full(output_path: str, args, matrix: dict, records: dict, top_k: int):
+    if not output_path:
+        return
+
+    import datetime
+
+    doc = {
+        "meta": {
+            "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
+            "top_k": top_k,
+            "min_seq_len": args.min_seq_len,
+            "max_cases": args.max_cases,
+            "languages": args.lang,
+            "comparison": "BLEU by test language and prediction mode",
+        },
+        "summary": matrix,
+        "test_cases": records,
+    }
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(doc, f, indent=2, ensure_ascii=False)
+
+    print(f"\n  Comparison results saved -> {output_path}")
+
+
+def prediction_mode_graph_path(base_path: str, prediction_language: str) -> str:
+    root, ext = os.path.splitext(base_path)
+    ext = ext or ".png"
+    return f"{root}_{prediction_language}_mode{ext}"
+
+
+def graph_variant_path(base_path: str, suffix: str) -> str:
+    root, ext = os.path.splitext(base_path)
+    ext = ext or ".png"
+    return f"{root}_{suffix}{ext}"
+
+
+def compact_metrics(metrics: dict) -> dict:
+    return {
+        k: v
+        for k, v in metrics.items()
+        if k not in ("samples", "all_records", "breakdown")
+    }
+
+
+def run_prediction_mode_comparison(model: NgramModel, args):
+    selected_langs = ["tagalog", "english"] if args.lang == "both" else [args.lang]
+    matrix = {}
+    records = {}
+    graph_data = {
+        prediction_language: {
+            "english": None,
+            "tagalog": None,
+        }
+        for _, prediction_language in PREDICTION_MODE_COLUMNS
+    }
+
+    for lang in selected_langs:
+        display = "Tagalog (Filipino)" if lang == "tagalog" else "English"
+        print_header(f"LOADING {display.upper()} TEST CASES")
+        sequences = load_sequences(lang)
+        cases = build_test_cases(sequences, min_len=args.min_seq_len)
+        print(f"  Generated {len(cases):,} test cases")
+
+        if args.max_cases and len(cases) > args.max_cases:
+            import random
+            random.seed(42)
+            cases = random.sample(cases, args.max_cases)
+            print(f"  Capped to {args.max_cases:,} cases")
+
+        matrix[lang] = {}
+        records[lang] = {}
+        for mode_label, prediction_language in PREDICTION_MODE_COLUMNS:
+            print_header(f"{display.upper()} CASES - {mode_label.upper()}")
+            metrics = evaluate(
+                model,
+                cases,
+                top_k=args.top_k,
+                language=prediction_language,
+                verbose=False,
+            )
+            graph_data[prediction_language][lang] = metrics
+            matrix[lang][prediction_language] = compact_metrics(metrics)
+            records[lang][prediction_language] = metrics.get("all_records", [])
+            print_metrics(f"{display} cases - {mode_label}", metrics, args.top_k)
+
+    print_prediction_mode_table(matrix, args.top_k)
+    save_prediction_mode_comparison_full(args.output, args, matrix, records, args.top_k)
+
+    if not args.no_graph:
+        for _, prediction_language in PREDICTION_MODE_COLUMNS:
+            data = graph_data[prediction_language]
+            save_graph(
+                prediction_mode_graph_path(args.graph_output, prediction_language),
+                data["english"],
+                data["tagalog"],
+                args.top_k,
+                args.lang,
+                max_line_cases=None,
+            )
+
+    show_prediction_mode_table(matrix, args.top_k)
 
 
 # =============================================================================
@@ -791,8 +1094,11 @@ def save_results(
     import datetime
 
     def _strip(metrics):
-        summary    = {k: round(v, 6) for k, v in metrics.items()
-                      if k not in ("samples", "all_records", "breakdown")}
+        summary = {}
+        for k, v in metrics.items():
+            if k in ("samples", "all_records", "breakdown"):
+                continue
+            summary[k] = round(v, 6) if isinstance(v, (int, float)) else v
         breakdown  = metrics.get("breakdown", {})
         test_cases = metrics.get("all_records", [])
         return summary, breakdown, test_cases
@@ -804,6 +1110,8 @@ def save_results(
             "min_seq_len":  args.min_seq_len,
             "max_cases":    args.max_cases,
             "languages":    args.lang,
+            "prediction_language": resolve_prediction_language(args.prediction_language),
+            "prediction_language_source": args.prediction_language,
             "model_cache":  "ngram_model_standalone.json",
         }
     }
@@ -863,12 +1171,12 @@ def save_graph(
     fil_metrics,
     top_k: int,
     lang: str,
-    max_line_cases: int = 40,
+    max_line_cases: int | None = 40,
 ):
     """
     Save a PNG chart from the current BLEU run:
-      - bar chart for aggregate Hit@1, Hit@K, MRR, and BLEU metrics
-      - line chart for per-case BLEU oracle across the first N test cases
+      - one aggregate bar chart
+      - one per-case BLEU line chart
     """
     if not output_path:
         return
@@ -892,16 +1200,18 @@ def save_graph(
         print("\n  ! No metrics available - skipping graph output.")
         return
 
-    fig, (ax_bar, ax_line) = plt.subplots(
-        2, 1, figsize=(12, 8), constrained_layout=True
-    )
     lang_title = {
         "english": "English",
         "tagalog": "Tagalog",
         "both": "English + Tagalog",
     }.get(lang, lang.capitalize())
-    fig.suptitle(
-        f"Predictive Text BLEU Evaluation - {lang_title} (Top-{top_k})",
+
+    aggregate_path = graph_variant_path(output_path, "aggregate")
+    per_case_path = graph_variant_path(output_path, "per_case")
+
+    fig_bar, ax_bar = plt.subplots(figsize=(12, 4.8), constrained_layout=True)
+    fig_bar.suptitle(
+        f"Predictive Text BLEU Aggregate Scores - {lang_title} (Top-{top_k})",
         fontsize=15,
         fontweight="bold",
     )
@@ -945,10 +1255,15 @@ def save_graph(
     ax_bar.set_xticklabels([label for label, _ in metric_keys], rotation=20, ha="right")
     ax_bar.grid(axis="y", linestyle="--", alpha=0.25)
     ax_bar.legend()
+    fig_bar.savefig(aggregate_path, dpi=160)
+    plt.close(fig_bar)
 
+    fig_line, ax_line = plt.subplots(figsize=(12, 4.8), constrained_layout=True)
     plotted = False
     for label, metrics, color in groups:
-        records = metrics.get("all_records", [])[:max_line_cases]
+        records = metrics.get("all_records", [])
+        if max_line_cases:
+            records = records[:max_line_cases]
         if not records:
             continue
         plotted = True
@@ -959,7 +1274,8 @@ def save_graph(
         ax_line.plot(xs, top1, label=f"{label} BLEU top-1", color=color, linewidth=1.1, linestyle="--", alpha=0.75)
 
     if plotted:
-        ax_line.set_title(f"Per-Case BLEU Line (first {max_line_cases} cases per language)")
+        case_label = "all test cases" if not max_line_cases else f"first {max_line_cases} cases per language"
+        ax_line.set_title(f"Per-Case BLEU Line ({case_label})")
         ax_line.set_xlabel("Test case")
         ax_line.set_ylabel("BLEU")
         ax_line.set_ylim(0, 105)
@@ -974,10 +1290,11 @@ def save_graph(
         )
         ax_line.set_axis_off()
 
-    fig.savefig(output_path, dpi=160)
-    plt.close(fig)
+    fig_line.savefig(per_case_path, dpi=160)
+    plt.close(fig_line)
 
-    print(f"\n  Graph saved -> {output_path}")
+    print(f"\n  Aggregate graph saved -> {aggregate_path}")
+    print(f"  Per-case graph saved -> {per_case_path}")
 
 
 # =============================================================================
@@ -994,6 +1311,17 @@ def parse_args():
         choices=["english", "tagalog", "both"],
         default="both",
         help="Which language(s) to evaluate (default: both)",
+    )
+    p.add_argument(
+        "--prediction-language",
+        choices=["config", "both", "english", "tagalog", "filipino"],
+        default="config",
+        help="Language filter used by the model while predicting (default: config.py)",
+    )
+    p.add_argument(
+        "--compare-prediction-modes",
+        action="store_true",
+        help="Compare tagalog, english, and both prediction modes in one table",
     )
     p.add_argument(
         "--top-k",
@@ -1051,12 +1379,20 @@ def parse_args():
     return p.parse_args()
 
 
+def resolve_prediction_language(value: str) -> str:
+    """Resolve CLI/config language names to model.py's language filter values."""
+    if value == "config":
+        return CONFIG_PREDICTION_LANGUAGE
+    return _LANG_MAP.get(value, "both")
+
+
 def run_evaluation(
     model:      NgramModel,
     lang:       str,
     top_k:      int,
     min_len:    int,
     max_cases:  int | None,
+    prediction_language: str,
     verbose:    bool,
 ) -> dict:
     display = "English" if lang == "english" else "Tagalog (Filipino)"
@@ -1074,14 +1410,25 @@ def run_evaluation(
         cases = random.sample(cases, max_cases)
         print(f"  ⚡ Capped to {max_cases:,} cases")
 
-    print(f"\n  Running predictions (top-k={top_k})…")
-    metrics = evaluate(model, cases, top_k=top_k, verbose=verbose)
+    print(f"\n  Running predictions (top-k={top_k}, prediction_language={prediction_language})…")
+    metrics = evaluate(
+        model,
+        cases,
+        top_k=top_k,
+        language=prediction_language,
+        verbose=verbose,
+    )
     print(f"  ✓ Done")
 
     print_metrics(f"Results — {display}", metrics, top_k)
 
     print(f"\n  Computing context-length breakdown…")
-    breakdown = evaluate_by_context_len(model, cases, top_k=top_k)
+    breakdown = evaluate_by_context_len(
+        model,
+        cases,
+        top_k=top_k,
+        language=prediction_language,
+    )
     print_context_breakdown(breakdown)
     metrics["breakdown"] = breakdown
 
@@ -1093,8 +1440,11 @@ def run_evaluation(
 
 def main():
     args = parse_args()
+    prediction_language = resolve_prediction_language(args.prediction_language)
 
-    if args.output is None:
+    if args.output is None and args.compare_prediction_modes:
+        args.output = f"bleu_mode_comparison_{args.lang}.json"
+    elif args.output is None:
         args.output = f"bleu_test_results_{args.lang}.json"
     if args.graph_output is None:
         args.graph_output = f"bleu_graph_{args.lang}.png"
@@ -1104,8 +1454,15 @@ def main():
     print(BOLD(CYAN("║   Languages: English & Tagalog (Filipino)                        ║")))
     print(BOLD(CYAN("╚══════════════════════════════════════════════════════════════════╝")))
 
+    print(f"\n  {BOLD('Prediction language')}: {CYAN(prediction_language)}")
+
     print_header("LOADING MODEL")
     model = load_model()
+
+    if args.compare_prediction_modes:
+        run_prediction_mode_comparison(model, args)
+        print(GREEN(BOLD("\n✓ BLEU prediction-mode comparison complete.\n")))
+        return
 
     en_metrics  = None
     fil_metrics = None
@@ -1117,6 +1474,7 @@ def main():
             top_k=args.top_k,
             min_len=args.min_seq_len,
             max_cases=args.max_cases,
+            prediction_language=prediction_language,
             verbose=args.verbose,
         )
 
@@ -1127,6 +1485,7 @@ def main():
             top_k=args.top_k,
             min_len=args.min_seq_len,
             max_cases=args.max_cases,
+            prediction_language=prediction_language,
             verbose=args.verbose,
         )
 
