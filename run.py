@@ -74,7 +74,7 @@ class WelcomeUI(tk.Tk):
 
     BG = "#1b1b1b"
     STAGE_BG = "#0B0D0F"
-    GRADIENT = "#565C63"
+    GRADIENT = "#7A8490"
     PANEL = "#242728"
     TEXT = "#f3f3f3"
     SUBTEXT = "#b9bcbc"
@@ -102,6 +102,7 @@ class WelcomeUI(tk.Tk):
         self._subtitle_text = "A Gaze-based Digital Keyboard Interface"
         self._subtitle_index = 0
         self._caret_visible = True
+        self._start_bounds = None
 
         W, H = 900, 560
         sw = self.winfo_screenwidth()
@@ -141,6 +142,7 @@ class WelcomeUI(tk.Tk):
 
         self._build_window_controls(width)
         self.canvas.bind("<ButtonPress-1>", self._start_window_drag)
+        self.canvas.bind("<Button-1>", self._on_canvas_click)
         self.canvas.bind("<B1-Motion>", self._drag_window)
         self.canvas.bind("<ButtonRelease-1>", self._stop_window_drag)
 
@@ -164,6 +166,7 @@ class WelcomeUI(tk.Tk):
         y1 = content_y + 74
         x2 = x1 + btn_w
         y2 = y1 + btn_h
+        self._start_bounds = (x1, y1, x2, y2)
         if Image is not None:
             self._button_photo = self._render_pill_button(btn_w, btn_h, self.BUTTON, opacity=0.0)
             self._button_hover_photo = self._render_pill_button(btn_w, btn_h, self.BUTTON_HOVER)
@@ -272,6 +275,9 @@ class WelcomeUI(tk.Tk):
         c.tag_bind("titlebar", "<B1-Motion>", self._drag_window)
 
     def _start_window_drag(self, event):
+        if self._is_over_start(event):
+            self._dragging_window = False
+            return
         self._dragging_window = event.y < 105 and event.x < self.winfo_width() - 85
         if not self._dragging_window:
             return
@@ -287,6 +293,17 @@ class WelcomeUI(tk.Tk):
 
     def _stop_window_drag(self, _event=None):
         self._dragging_window = False
+
+    def _is_over_start(self, event):
+        if self._start_bounds is None:
+            return False
+        x1, y1, x2, y2 = self._start_bounds
+        return x1 <= event.x <= x2 and y1 <= event.y <= y2
+
+    def _on_canvas_click(self, event):
+        if self._is_over_start(event):
+            self._on_start(event)
+            return "break"
 
     def _on_minimize(self, _event=None):
         self.overrideredirect(False)
@@ -392,14 +409,16 @@ class WelcomeUI(tk.Tk):
                 self.canvas.itemconfigure(item, fill=self.BUTTON)
 
     def _on_cancel(self, _event=None):
-        self._cancel_welcome_jobs()
-        self.result = None
-        self.destroy()
+        self._finish(None)
 
     def _on_start(self, _event=None):
+        self._finish("start")
+
+    def _finish(self, result):
         self._cancel_welcome_jobs()
-        self.result = "start"
-        self.destroy()
+        self.result = result
+        self.withdraw()
+        self.quit()
 
     def _cancel_welcome_jobs(self):
         for job in (self._animate_job, self._fade_job, self._typewriter_job):
@@ -980,8 +999,13 @@ class LauncherUI(tk.Tk):
 def main():
     welcome = WelcomeUI()
     welcome.mainloop()
+    welcome_result = welcome.result
+    try:
+        welcome.destroy()
+    except Exception:
+        pass
 
-    if welcome.result != "start":
+    if welcome_result != "start":
         print("[Info] Welcome cancelled.")
         sys.exit(0)
 
