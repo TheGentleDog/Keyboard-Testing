@@ -13,8 +13,15 @@
 import sys
 import os
 import threading
+import math
+import ctypes
 import tkinter as tk
 from tkinter import ttk
+
+try:
+    from PIL import Image, ImageDraw, ImageFilter, ImageTk
+except ImportError:
+    Image = ImageDraw = ImageFilter = ImageTk = None
 
 # ── Make keyboard modules importable ─────────────────────────────────────────
 KEYBOARD_DIR = os.path.join(os.path.dirname(__file__), "Bench", "Cutted_File", "files")
@@ -24,6 +31,387 @@ sys.path.insert(0, KEYBOARD_DIR)
 # =============================================================================
 #  Launcher UI
 # =============================================================================
+
+def _colorref(hex_color):
+    """Convert #RRGGBB to Windows COLORREF 0x00BBGGRR."""
+    value = hex_color.lstrip("#")
+    r = int(value[0:2], 16)
+    g = int(value[2:4], 16)
+    b = int(value[4:6], 16)
+    return b << 16 | g << 8 | r
+
+
+def _set_dark_title_bar(window, bg="#252628", fg="#ffffff"):
+    """Ask Windows 10/11 to draw a dark native title bar."""
+    if sys.platform != "win32":
+        return
+    try:
+        window.update_idletasks()
+        hwnd = ctypes.windll.user32.GetParent(window.winfo_id()) or window.winfo_id()
+        value = ctypes.c_int(1)
+        # 20 is supported by recent Windows 10/11; 19 is the older fallback.
+        for attribute in (20, 19):
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd,
+                attribute,
+                ctypes.byref(value),
+                ctypes.sizeof(value),
+            )
+
+        caption = ctypes.c_int(_colorref(bg))
+        text = ctypes.c_int(_colorref(fg))
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 35, ctypes.byref(caption), ctypes.sizeof(caption))
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 36, ctypes.byref(text), ctypes.sizeof(text))
+    except Exception:
+        pass
+
+
+class WelcomeUI(tk.Tk):
+    """
+    First screen shown to the user.
+    Clicking Start continues to the existing setup launcher.
+    """
+
+    BG = "#1b1b1b"
+    STAGE_BG = "#0B0D0F"
+    GRADIENT = "#565C63"
+    PANEL = "#242728"
+    TEXT = "#f3f3f3"
+    SUBTEXT = "#b9bcbc"
+    BUTTON = "#111416"
+    BUTTON_HOVER = "#1B2020"
+    BUTTON_BORDER = "#E8ECEC"
+
+    def __init__(self):
+        super().__init__()
+        self.result = None
+
+        self.title("Gaze Keyboard")
+        self.overrideredirect(True)
+        self.resizable(False, False)
+        self.configure(bg=self.BG)
+        self._gradient_phase = 0
+        self._gradient_bounds = None
+        self._gradient_image_id = None
+        self._gradient_photo = None
+        self._button_photo = None
+        self._button_hover_photo = None
+        self._animate_job = None
+        self._fade_job = None
+        self._typewriter_job = None
+        self._subtitle_text = "A Gaze-based Digital Keyboard Interface"
+        self._subtitle_index = 0
+        self._caret_visible = True
+
+        W, H = 900, 560
+        sw = self.winfo_screenwidth()
+        sh = self.winfo_screenheight()
+        self.geometry(f"{W}x{H}+{(sw-W)//2}+{(sh-H)//2}")
+        self.after(0, lambda: _set_dark_title_bar(self, self.STAGE_BG, "#ffffff"))
+
+        self.canvas = tk.Canvas(self, width=W, height=H, bg=self.BG, highlightthickness=0, bd=0)
+        self.canvas.pack(fill="both", expand=True)
+        self._build(W, H)
+
+        self.protocol("WM_DELETE_WINDOW", self._on_cancel)
+        self.bind("<Return>", self._on_start)
+        self.bind("<Escape>", self._on_cancel)
+        self.lift()
+        self.focus_force()
+        self.attributes("-topmost", True)
+        self.after(200, lambda: self.attributes("-topmost", False))
+
+    def _build(self, width, height):
+        c = self.canvas
+
+        # Fill the whole client area so there are no edge gaps.
+        c.create_rectangle(0, 0, width, height, fill=self.STAGE_BG, outline="")
+
+        margin = 0
+        stage_left = margin
+        stage_top = margin
+        stage_right = width
+        stage_bottom = height
+        c.create_rectangle(stage_left, stage_top, stage_right, stage_bottom,
+                           fill=self.STAGE_BG, outline="", width=0)
+        self._gradient_bounds = (stage_left, stage_top, stage_right, stage_bottom)
+        if Image is not None:
+            self._gradient_photo = self._render_angular_gradient(width, height, 0)
+            self._gradient_image_id = c.create_image(0, 0, anchor="nw", image=self._gradient_photo)
+
+        self._build_window_controls(width)
+        self.canvas.bind("<ButtonPress-1>", self._start_window_drag)
+        self.canvas.bind("<B1-Motion>", self._drag_window)
+        self.canvas.bind("<ButtonRelease-1>", self._stop_window_drag)
+
+        nav_y = 68
+        c.create_text(32, nav_y, text="SeenbyEveryone", fill="#d6d7d8",
+                      font=("Krona One", 10), anchor="w")
+        c.create_text(width // 2, nav_y, text="About us", fill="#d6d7d8",
+                      font=("Krona One", 10))
+        c.create_text(width - 112, nav_y, text="Help", fill="#d6d7d8",
+                      font=("Krona One", 10), anchor="e")
+
+        center_x = width // 2
+        content_y = int(height * 0.43)
+        self.welcome_item = c.create_text(center_x, content_y, text="",
+                                          fill=self.TEXT, font=("Krona One", 27))
+        self.subtitle_item = c.create_text(center_x, content_y + 34, text="",
+                                           fill="#c2c4c5", font=("Actor", 16))
+
+        btn_w, btn_h = 122, 34
+        x1 = center_x - btn_w // 2
+        y1 = content_y + 74
+        x2 = x1 + btn_w
+        y2 = y1 + btn_h
+        if Image is not None:
+            self._button_photo = self._render_pill_button(btn_w, btn_h, self.BUTTON, opacity=0.0)
+            self._button_hover_photo = self._render_pill_button(btn_w, btn_h, self.BUTTON_HOVER)
+            self.start_btn_image = c.create_image(x1, y1, anchor="nw", image=self._button_photo)
+            self.start_btn_parts = [self.start_btn_image]
+        else:
+            self.start_btn_parts = [
+                c.create_rectangle(x1, y1, x2, y2, fill=self.BUTTON,
+                                   outline=self.BUTTON_BORDER, width=1),
+            ]
+        self.start_btn_text = c.create_text(center_x, y1 + btn_h / 2, text="START",
+                                            fill="", font=("Segoe UI", 10, "bold"))
+        for item in [*self.start_btn_parts, self.start_btn_text]:
+            c.tag_bind(item, "<Button-1>", self._on_start)
+            c.tag_bind(item, "<Enter>", self._on_button_enter)
+            c.tag_bind(item, "<Leave>", self._on_button_leave)
+        if Image is not None:
+            self._animate_gradient()
+        self._fade_job = self.after(1000, lambda: self._fade_intro(0))
+        self._typewriter_job = self.after(2000, self._type_subtitle)
+
+    def _render_pill_button(self, width, height, fill, opacity=1.0):
+        scale = 4
+        img = Image.new("RGBA", (width * scale, height * scale), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img, "RGBA")
+        border = self._hex_to_rgb(self.BUTTON_BORDER)
+        fill_rgb = self._hex_to_rgb(fill)
+        alpha = max(0, min(255, round(255 * opacity)))
+        rect = (2 * scale, 2 * scale, (width - 2) * scale, (height - 2) * scale)
+        draw.rounded_rectangle(
+            rect,
+            radius=(height // 2 - 1) * scale,
+            fill=(*fill_rgb, alpha),
+            outline=(*border, alpha),
+            width=scale,
+        )
+        img = img.resize((width, height), Image.Resampling.LANCZOS)
+        return ImageTk.PhotoImage(img)
+
+    def _fade_intro(self, step):
+        steps = 18
+        amount = min(1.0, step / steps)
+        eased = 1.0 - ((1.0 - amount) ** 3)
+        if step == 0:
+            self.canvas.itemconfigure(self.welcome_item, text="Welcome to TANAW")
+            self.canvas.itemconfigure(self.start_btn_text, fill="#ffffff")
+        self.canvas.itemconfigure(
+            self.welcome_item,
+            fill=self._blend(self._hex_to_rgb(self.STAGE_BG), self._hex_to_rgb(self.TEXT), eased),
+        )
+        self.canvas.itemconfigure(
+            self.start_btn_text,
+            fill=self._blend(self._hex_to_rgb(self.STAGE_BG), (255, 255, 255), eased),
+        )
+        if Image is not None and hasattr(self, "start_btn_image"):
+            self._button_photo = self._render_pill_button(122, 34, self.BUTTON, opacity=eased)
+            self.canvas.itemconfigure(self.start_btn_image, image=self._button_photo)
+
+        if step < steps:
+            self._fade_job = self.after(28, lambda: self._fade_intro(step + 1))
+        else:
+            self._fade_job = None
+
+    def _build_window_controls(self, width):
+        c = self.canvas
+        min_x = width - 46
+        close_x = width - 24
+        y = 28
+        self.minimize_btn = c.create_text(min_x, y - 1, text="-",
+                                          fill="#d7d9db", font=("Segoe UI", 15, "bold"))
+        self.close_btn = c.create_text(close_x, y, text="x",
+                                       fill="#d7d9db", font=("Segoe UI", 13, "bold"))
+
+        c.tag_bind(self.minimize_btn, "<Button-1>", self._on_minimize)
+        c.tag_bind(self.close_btn, "<Button-1>", self._on_cancel)
+        c.tag_bind(self.minimize_btn, "<Enter>", lambda _e: c.itemconfigure(self.minimize_btn, fill="#ffffff"))
+        c.tag_bind(self.minimize_btn, "<Leave>", lambda _e: c.itemconfigure(self.minimize_btn, fill="#d7d9db"))
+        c.tag_bind(self.close_btn, "<Enter>", lambda _e: c.itemconfigure(self.close_btn, fill="#ff6b6b"))
+        c.tag_bind(self.close_btn, "<Leave>", lambda _e: c.itemconfigure(self.close_btn, fill="#d7d9db"))
+
+    def _build_title_bar(self, width):
+        c = self.canvas
+        bar_h = 42
+        title_hitbox = c.create_rectangle(0, 0, width - 120, bar_h, fill=self.STAGE_BG, outline="")
+        c.addtag_withtag("titlebar", title_hitbox)
+        c.create_rectangle(width - 120, 0, width, bar_h, fill=self.STAGE_BG, outline="")
+        c.create_line(0, bar_h, width, bar_h, fill="#171B1F")
+        c.create_text(22, bar_h // 2, text="Gaze Keyboard", fill="#d7d9db",
+                      font=("Segoe UI", 10, "bold"), anchor="w")
+
+        min_x = width - 92
+        close_x = width - 46
+        self.minimize_btn = c.create_text(min_x, bar_h // 2 - 1, text="—",
+                                          fill="#d7d9db", font=("Segoe UI", 16))
+        self.close_btn = c.create_text(close_x, bar_h // 2, text="×",
+                                       fill="#d7d9db", font=("Segoe UI", 15))
+
+        c.tag_bind(self.minimize_btn, "<Button-1>", self._on_minimize)
+        c.tag_bind(self.close_btn, "<Button-1>", self._on_cancel)
+        c.tag_bind(self.minimize_btn, "<Enter>", lambda _e: c.itemconfigure(self.minimize_btn, fill="#ffffff"))
+        c.tag_bind(self.minimize_btn, "<Leave>", lambda _e: c.itemconfigure(self.minimize_btn, fill="#d7d9db"))
+        c.tag_bind(self.close_btn, "<Enter>", lambda _e: c.itemconfigure(self.close_btn, fill="#ff6b6b"))
+        c.tag_bind(self.close_btn, "<Leave>", lambda _e: c.itemconfigure(self.close_btn, fill="#d7d9db"))
+
+        c.tag_bind("titlebar", "<ButtonPress-1>", self._start_window_drag)
+        c.tag_bind("titlebar", "<B1-Motion>", self._drag_window)
+
+    def _start_window_drag(self, event):
+        self._dragging_window = event.y < 105 and event.x < self.winfo_width() - 85
+        if not self._dragging_window:
+            return
+        self._drag_offset_x = event.x
+        self._drag_offset_y = event.y
+
+    def _drag_window(self, event):
+        if not getattr(self, "_dragging_window", False):
+            return
+        x = self.winfo_pointerx() - self._drag_offset_x
+        y = self.winfo_pointery() - self._drag_offset_y
+        self.geometry(f"+{x}+{y}")
+
+    def _stop_window_drag(self, _event=None):
+        self._dragging_window = False
+
+    def _on_minimize(self, _event=None):
+        self.overrideredirect(False)
+        self.iconify()
+        self.after(50, lambda: self.overrideredirect(True))
+
+    def _type_subtitle(self):
+        if self._subtitle_index <= len(self._subtitle_text):
+            text = self._subtitle_text[:self._subtitle_index]
+            caret = "|" if self._caret_visible else ""
+            self.canvas.itemconfigure(self.subtitle_item, text=f"{text}{caret}")
+            self._subtitle_index += 1
+            delay = 95 if self._subtitle_index in (2, 9, 21, 30) else 42
+            self._typewriter_job = self.after(delay, self._type_subtitle)
+        else:
+            self._blink_subtitle_caret()
+
+    def _blink_subtitle_caret(self):
+        self._caret_visible = not self._caret_visible
+        caret = "|" if self._caret_visible else ""
+        self.canvas.itemconfigure(self.subtitle_item, text=f"{self._subtitle_text}{caret}")
+        self._typewriter_job = self.after(480, self._blink_subtitle_caret)
+
+    def _render_angular_gradient(self, width, height, phase):
+        small_w = 260
+        small_h = max(1, round(height * (small_w / width)))
+        base = self._hex_to_rgb(self.STAGE_BG)
+        accent = self._hex_to_rgb(self.GRADIENT)
+        img = Image.new("RGB", (small_w, small_h), self.STAGE_BG)
+        overlay = Image.new("RGBA", (small_w, small_h), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay, "RGBA")
+
+        cx = small_w / 2
+        cy = small_h / 2
+        radius = math.hypot(small_w, small_h)
+        rotation = phase * 0.016
+        bands = [
+            (0.0, 92, 0.20),
+            (math.pi * 0.72, 68, 0.13),
+            (math.pi * 1.34, 82, 0.10),
+        ]
+
+        for offset, width_deg, opacity in bands:
+            center = rotation + offset
+            half = math.radians(width_deg) / 2
+            points = [
+                (cx, cy),
+                (cx + math.cos(center - half) * radius, cy + math.sin(center - half) * radius),
+                (cx + math.cos(center + half) * radius, cy + math.sin(center + half) * radius),
+            ]
+            alpha = round(255 * opacity)
+            draw.polygon(points, fill=(*accent, alpha))
+
+        overlay = overlay.filter(ImageFilter.GaussianBlur(radius=28))
+        img = Image.alpha_composite(img.convert("RGBA"), overlay)
+
+        shade = Image.new("RGBA", (small_w, small_h), (0, 0, 0, 0))
+        shade_draw = ImageDraw.Draw(shade, "RGBA")
+        for y in range(small_h):
+            distance = abs((y / small_h) - 0.52)
+            alpha = round(70 * max(0.0, 1.0 - distance * 2.2))
+            shade_draw.line((0, y, small_w, y), fill=(*base, alpha))
+        img = Image.alpha_composite(img, shade)
+
+        img = img.resize((width, height), Image.Resampling.BICUBIC)
+        return ImageTk.PhotoImage(img)
+
+    def _animate_gradient(self):
+        if not self._gradient_bounds or self._gradient_image_id is None:
+            return
+
+        self._gradient_phase += 1
+        width = self.canvas.winfo_width()
+        height = self.canvas.winfo_height()
+        self._gradient_photo = self._render_angular_gradient(width, height, self._gradient_phase)
+        self.canvas.itemconfigure(self._gradient_image_id, image=self._gradient_photo)
+        self._animate_job = self.after(85, self._animate_gradient)
+
+    @staticmethod
+    def _hex_to_rgb(color):
+        color = color.lstrip("#")
+        return tuple(int(color[i:i + 2], 16) for i in (0, 2, 4))
+
+    @staticmethod
+    def _blend(start, end, amount):
+        rgb = tuple(round(start[i] + (end[i] - start[i]) * amount) for i in range(3))
+        return "#{:02x}{:02x}{:02x}".format(*rgb)
+
+    def _on_button_enter(self, _event=None):
+        self.canvas.configure(cursor="hand2")
+        if Image is not None and hasattr(self, "start_btn_image"):
+            self.canvas.itemconfigure(self.start_btn_image, image=self._button_hover_photo)
+        else:
+            for item in self.start_btn_parts:
+                self.canvas.itemconfigure(item, fill=self.BUTTON_HOVER)
+
+    def _on_button_leave(self, _event=None):
+        self.canvas.configure(cursor="")
+        if Image is not None and hasattr(self, "start_btn_image"):
+            self.canvas.itemconfigure(self.start_btn_image, image=self._button_photo)
+        else:
+            for item in self.start_btn_parts:
+                self.canvas.itemconfigure(item, fill=self.BUTTON)
+
+    def _on_cancel(self, _event=None):
+        self._cancel_welcome_jobs()
+        self.result = None
+        self.destroy()
+
+    def _on_start(self, _event=None):
+        self._cancel_welcome_jobs()
+        self.result = "start"
+        self.destroy()
+
+    def _cancel_welcome_jobs(self):
+        for job in (self._animate_job, self._fade_job, self._typewriter_job):
+            if job is not None:
+                try:
+                    self.after_cancel(job)
+                except Exception:
+                    pass
+        self._animate_job = None
+        self._fade_job = None
+        self._typewriter_job = None
+
 
 class LauncherUI(tk.Tk):
     """
@@ -590,6 +978,13 @@ class LauncherUI(tk.Tk):
 # =============================================================================
 
 def main():
+    welcome = WelcomeUI()
+    welcome.mainloop()
+
+    if welcome.result != "start":
+        print("[Info] Welcome cancelled.")
+        sys.exit(0)
+
     # ── Show launcher UI ──────────────────────────────────────────────────────
     launcher = LauncherUI()
     launcher.mainloop()
