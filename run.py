@@ -453,20 +453,33 @@ class LauncherUI(tk.Tk):
         "danger":     "#ed4245",
         "border":     "#3f4147",
     }
+    STAGE_BG = WelcomeUI.STAGE_BG
+    GRADIENT = WelcomeUI.GRADIENT
 
     def __init__(self):
         super().__init__()
         self.result = None
         self._preview_stop = None
         self._preview_thread = None
+        self._gradient_phase = 0
+        self._gradient_photo = None
+        self._gradient_image_id = None
+        self._content_gradient_photo = None
+        self._content_gradient_id = None
+        self._content_canvas = None
+        self._settings_scroll_y = 0
+        self._settings_content_height = 1
+        self._animate_job = None
+        self._dragging_window = False
         d = self.DARK
 
         self.title("Gaze Keyboard — Launcher")
+        self.overrideredirect(True)
         self.resizable(False, False)
-        self.configure(bg=d["bg"])
+        self.configure(bg=self.STAGE_BG)
 
         # ── Center window ─────────────────────────────────────────
-        W, H = 560, 770
+        W, H = 843, 555
         sw = self.winfo_screenwidth()
         sh = self.winfo_screenheight()
         self.geometry(f"{W}x{H}+{(sw-W)//2}+{(sh-H)//2}")
@@ -504,7 +517,7 @@ class LauncherUI(tk.Tk):
         w.pack(side="left", fill="x", expand=True)
         return w
 
-    def _build(self, d):
+    def _build_legacy(self, d):
         # ── Header ───────────────────────────────────────────────
         hdr = tk.Frame(self, bg=d["panel"])
         hdr.pack(fill="x")
@@ -792,7 +805,601 @@ class LauncherUI(tk.Tk):
         skip_btn.bind("<Enter>", lambda _: skip_btn.config(bg=d["border"]))
         skip_btn.bind("<Leave>", lambda _: skip_btn.config(bg=d["card_alt"]))
 
+    def _build(self, d):
+        self._camera_var = tk.IntVar(value=0)
+        self._camera_window_var = tk.BooleanVar(value=True)
+        self._camera_debug_var = tk.BooleanVar(value=True)
+        self._distance_var = tk.BooleanVar(value=True)
+        self._ui_layout_var = tk.StringVar(value="qwerty")
+        self._language_english_var = tk.BooleanVar(value=True)
+        self._language_tagalog_var = tk.BooleanVar(value=True)
+        self._dwell_mode_var = tk.StringVar(value="sync")
+        self._points_var = tk.IntVar(value=9)
+        self._samples_var = tk.IntVar(value=90)
+        self._pnoise_var = tk.DoubleVar(value=0.0100)
+        self._mnoise_var = tk.DoubleVar(value=5.5)
+        self._ema_on = tk.BooleanVar(value=True)
+        self._ema_var = tk.DoubleVar(value=0.30)
+
+        self._launcher_canvas = tk.Canvas(self, bg=self.STAGE_BG, highlightthickness=0, bd=0)
+        self._launcher_canvas.pack(fill="both", expand=True)
+        if Image is not None:
+            self._gradient_photo = self._render_launcher_gradient(843, 555, 0)
+            self._gradient_image_id = self._launcher_canvas.create_image(
+                0, 0, anchor="nw", image=self._gradient_photo
+            )
+            self._animate_launcher_gradient()
+        self._build_launcher_controls()
+        self._launcher_canvas.bind("<ButtonPress-1>", self._start_window_drag)
+        self._launcher_canvas.bind("<B1-Motion>", self._drag_window)
+        self._launcher_canvas.bind("<ButtonRelease-1>", self._stop_window_drag)
+
+        nav_bg = "#050607"
+        content_wrap = tk.Frame(self._launcher_canvas, bg="#070809", width=576, height=501)
+        self._launcher_canvas.create_window(253, 40, anchor="nw", width=576, height=501, window=content_wrap)
+        content_wrap.pack_propagate(False)
+
+        nav = tk.Frame(self._launcher_canvas, bg=nav_bg, width=225, height=501)
+        self._launcher_canvas.create_window(14, 40, anchor="nw", width=225, height=501, window=nav)
+        nav.pack_propagate(False)
+
+        style = ttk.Style(self)
+        try:
+            style.theme_use("clam")
+        except Exception:
+            pass
+        style.configure(
+            "Launcher.Vertical.TScrollbar",
+            troughcolor="#070809",
+            background="#050607",
+            bordercolor="#070809",
+            arrowcolor="#050607",
+            darkcolor="#050607",
+            lightcolor="#050607",
+            relief="flat",
+            width=6,
+        )
+        style.map(
+            "Launcher.Vertical.TScrollbar",
+            background=[("active", "#111315"), ("pressed", "#1c1f22")],
+        )
+        canvas = tk.Canvas(content_wrap, bg="#070809", highlightthickness=0, bd=0)
+        self._content_canvas = canvas
+        if Image is not None:
+            self._content_gradient_photo = self._render_launcher_gradient(576, 501, self._gradient_phase)
+            self._content_gradient_id = canvas.create_image(
+                0, 0, anchor="nw", image=self._content_gradient_photo
+            )
+        canvas.pack(fill="both", expand=True)
+
+        sections = {}
+        section_windows = {}
+        section_order = []
+        nav_items = {}
+        nav_images = {}
+        self._settings_canvas = canvas
+        self._settings_sections = sections
+        panel_bg = "#070809"
+        panel_text = "#f3f3f3"
+        panel_muted = "#c6c9cc"
+
+        def sync_scrollregion(_event=None):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        def resize_body(event):
+            if self._content_gradient_id is not None:
+                canvas.tag_lower(self._content_gradient_id)
+            self._layout_canvas_sections(canvas, sections, section_windows, section_order)
+
+        def mousewheel(event):
+            self._scroll_canvas_settings(canvas, sections, int(-1 * (event.delta / 120)) * 42)
+
+        def set_active(key):
+            self._active_setup_section = key
+            for item_key, item in nav_items.items():
+                if Image is not None:
+                    image = nav_images[item_key]["active" if item_key == key else "idle"]
+                    item.config(image=image, fg="#ffffff" if item_key == key else d["text"])
+                else:
+                    item.config(
+                        bg="#15181c" if item_key == key else nav_bg,
+                        fg="#ffffff" if item_key == key else d["text"],
+                    )
+
+        def jump_to(key):
+            self.update_idletasks()
+            section = sections.get(key)
+            if isinstance(section, (int, float)):
+                self._settings_scroll_y = max(0, section - 12)
+                self._draw_canvas_settings(canvas, sections, keep_scroll=True)
+                set_active(key)
+                return
+            section_window = section_windows.get(key)
+            bbox = canvas.bbox("all")
+            if section is None or section_window is None or not bbox:
+                return
+            scroll_height = max(1, bbox[3] - bbox[1])
+            visible = max(1, canvas.winfo_height())
+            max_fraction = max(0.0, (scroll_height - visible) / scroll_height)
+            target_y = max(0, canvas.coords(section_window)[1] - 12)
+            canvas.yview_moveto(min(max_fraction, target_y / scroll_height))
+            set_active(key)
+
+        def make_nav(key, text):
+            if Image is not None:
+                nav_images[key] = {
+                    "idle": self._render_nav_pill(206, 42, nav_bg, 0),
+                    "hover": self._render_nav_pill(206, 42, "#111315", 12),
+                    "active": self._render_nav_pill(206, 42, "#15181c", 12),
+                }
+                item = tk.Label(nav, text=text, image=nav_images[key]["idle"],
+                                compound="center", bg=nav_bg, fg=d["text"],
+                                font=("Segoe UI", 12), anchor="w",
+                                padx=0, pady=0, cursor="hand2")
+            else:
+                item = tk.Label(nav, text=text, bg=nav_bg, fg=d["text"],
+                                font=("Segoe UI", 12), anchor="w",
+                                padx=16, pady=8, cursor="hand2")
+            item.pack(fill="x", padx=10, pady=2)
+            item.bind("<Button-1>", lambda _e, k=key: jump_to(k))
+            if Image is not None:
+                item.bind("<Enter>", lambda _e, i=item, k=key: i.config(image=nav_images[k]["hover"]))
+            else:
+                item.bind("<Enter>", lambda _e, i=item: i.config(bg="#111315"))
+            item.bind("<Leave>", lambda _e: set_active(self._active_setup_section))
+            nav_items[key] = item
+
+        def section(key, title):
+            frame = tk.Frame(canvas, bg=panel_bg, bd=0)
+            sections[key] = frame
+            section_order.append(key)
+            section_windows[key] = canvas.create_window(
+                270, 0, anchor="nw", width=480, window=frame
+            )
+            tk.Label(frame, text=title, bg=panel_bg, fg=panel_text,
+                     font=("Segoe UI", 10, "bold")).pack(anchor="center", pady=(13, 10))
+            inner = tk.Frame(frame, bg=panel_bg)
+            inner.pack(fill="x", padx=30, pady=(0, 24))
+            return inner
+
+        def choice(parent, text, variable, value):
+            rb = tk.Radiobutton(parent, text=text, variable=variable, value=value,
+                                bg=panel_bg, fg=panel_text, selectcolor="#25ba4a",
+                                activebackground=panel_bg, activeforeground=panel_text,
+                                font=("Segoe UI", 12))
+            rb.pack(anchor="w", pady=5)
+            return rb
+
+        def check(parent, text, variable, command=None):
+            cb = tk.Checkbutton(parent, text=text, variable=variable, command=command,
+                                bg=panel_bg, fg=panel_text, selectcolor="#25ba4a",
+                                activebackground=panel_bg, activeforeground=panel_text,
+                                font=("Segoe UI", 12))
+            cb.pack(anchor="w", pady=5)
+            return cb
+
+        def slider(parent, label, variable, from_, to, resolution, fmt):
+            row = tk.Frame(parent, bg=panel_bg)
+            row.pack(fill="x", pady=(18, 4))
+            tk.Label(row, text=label, bg=panel_bg, fg=panel_text,
+                     font=("Segoe UI", 10, "bold")).pack(anchor="w")
+            control = tk.Frame(row, bg=panel_bg)
+            control.pack(fill="x", pady=(7, 0))
+            value_lbl = tk.Label(control, text=fmt(variable.get()), bg=panel_bg,
+                                 fg=panel_text, font=("Segoe UI", 10, "bold"), width=7)
+            value_lbl.pack(side="right", padx=(8, 0))
+            tk.Scale(control, from_=from_, to=to, resolution=resolution,
+                     orient="horizontal", variable=variable, showvalue=False,
+                     bg=panel_bg, fg=panel_text, troughcolor="#4f5052",
+                     activebackground="#25ba4a", highlightthickness=0,
+                     command=lambda v: value_lbl.config(text=fmt(float(v)))
+                     ).pack(side="left", fill="x", expand=True)
+            return row
+
+        tk.Frame(nav, bg=nav_bg, height=38).pack(fill="x")
+        for key, title in [
+            ("camera", "Camera Window"),
+            ("layout", "Keyboard layout"),
+            ("language", "Language"),
+            ("dwell", "Dwell Mode"),
+            ("calibration", "Calibration"),
+            ("kalman", "Kalman Filter"),
+            ("smoother", "Smoother"),
+        ]:
+            make_nav(key, title)
+
+        nav_footer = tk.Frame(nav, bg=nav_bg)
+        nav_footer.pack(fill="x", padx=18, pady=(16, 0))
+
+        default_btn = tk.Label(nav_footer, text="Set default", bg="#3a3b3f", fg="#ffffff",
+                               font=("Segoe UI", 9, "bold"), padx=12, pady=8,
+                               cursor="hand2")
+        default_btn.pack(fill="x", pady=(0, 7))
+        default_btn.bind("<Button-1>", self._set_launcher_defaults)
+        default_btn.bind("<Enter>", lambda _e: default_btn.config(bg="#484a4f"))
+        default_btn.bind("<Leave>", lambda _e: default_btn.config(bg="#3a3b3f"))
+
+        tutorial_btn = tk.Label(nav_footer, text="Start with tutorial",
+                                bg=d["accent"], fg="#ffffff",
+                                font=("Segoe UI", 9, "bold"), padx=12, pady=8,
+                                cursor="hand2")
+        tutorial_btn.pack(fill="x", pady=(0, 7))
+        tutorial_btn.bind("<Button-1>", lambda e: self._on_start(e, tutorial=True))
+        tutorial_btn.bind("<Enter>", lambda _e: tutorial_btn.config(bg=d["accent_hov"]))
+        tutorial_btn.bind("<Leave>", lambda _e: tutorial_btn.config(bg=d["accent"]))
+
+        skip_btn = tk.Label(nav_footer, text="Start without tutorial",
+                            bg="#3a3b3f", fg="#ffffff",
+                            font=("Segoe UI", 9, "bold"), padx=12, pady=8,
+                            cursor="hand2")
+        skip_btn.pack(fill="x")
+        skip_btn.bind("<Button-1>", lambda e: self._on_start(e, tutorial=False))
+        skip_btn.bind("<Enter>", lambda _e: skip_btn.config(bg="#484a4f"))
+        skip_btn.bind("<Leave>", lambda _e: skip_btn.config(bg="#3a3b3f"))
+
+        self._draw_canvas_settings(canvas, sections)
+        canvas.bind("<Configure>", lambda _e: self._draw_canvas_settings(canvas, sections, keep_scroll=True))
+        canvas.bind("<Enter>", lambda _e: canvas.bind_all("<MouseWheel>", mousewheel))
+        canvas.bind("<Leave>", lambda _e: canvas.unbind_all("<MouseWheel>"))
+        self._active_setup_section = "camera"
+        self.after(50, lambda: jump_to("camera"))
+        return
+
+        camera = section("camera", "Camera Window")
+        check(camera, "Show camera preview during tracking", self._camera_window_var)
+        check(camera, "Show debug eye landmarks", self._camera_debug_var)
+        check(camera, "Show distance panel", self._distance_var)
+        preview_row = tk.Frame(camera, bg=panel_bg)
+        preview_row.pack(fill="x", pady=(12, 0))
+        self._preview_btn = tk.Label(preview_row, text="Open Preview", bg=d["accent"],
+                                     fg="#ffffff", font=("Segoe UI", 10, "bold"),
+                                     padx=14, pady=7, cursor="hand2")
+        self._preview_btn.pack(side="left")
+        self._preview_btn.bind("<Button-1>", self._toggle_setup_preview)
+        self._preview_btn.bind("<Enter>", lambda _e: self._preview_btn.config(bg=d["accent_hov"]))
+        self._preview_btn.bind("<Leave>", lambda _e: self._sync_preview_button())
+        self._preview_status = tk.Label(preview_row, text="Closed", bg=panel_bg,
+                                        fg=panel_muted, font=("Segoe UI", 9))
+        self._preview_status.pack(side="left", padx=10)
+
+        layout = section("layout", "Keyboard Layout")
+        choice(layout, "QWERTY", self._ui_layout_var, "qwerty")
+        choice(layout, "UI2", self._ui_layout_var, "ui2")
+
+        language = section("language", "Language")
+        check(language, "English", self._language_english_var)
+        check(language, "Tagalog", self._language_tagalog_var)
+
+        dwell = section("dwell", "Dwell Mode")
+        choice(dwell, "Synchronous", self._dwell_mode_var, "sync")
+        choice(dwell, "Asynchronous", self._dwell_mode_var, "async")
+
+        calibration = section("calibration", "Calibration")
+        tk.Label(calibration, text="Grid Points", bg=panel_bg, fg=panel_text,
+                 font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 4))
+        for pts, label in [(5, "5 (Fast)"), (9, "9 (Default)"),
+                           (16, "16 (Precise)"), (25, "25 (Deadeye)")]:
+            choice(calibration, label, self._points_var, pts)
+        slider(calibration, "Samples/Points", self._samples_var, 20, 120, 1,
+               lambda v: f"{int(float(v))}")
+
+        kalman = section("kalman", "Kalman Filter")
+        slider(kalman, "Process noise", self._pnoise_var, 1e-4, 0.1, 1e-4,
+               lambda v: f"{float(v):.4f}")
+        slider(kalman, "Measurement noise", self._mnoise_var, 1.0, 50.0, 0.5,
+               lambda v: f"{float(v):.1f}")
+
+        smoother = section("smoother", "Smoother")
+        check(smoother, "Enable EMA smoother", self._ema_on, self._toggle_ema)
+        self._ema_frame = tk.Frame(smoother, bg=panel_bg)
+        self._ema_frame.pack(fill="x")
+        slider(self._ema_frame, "EMA alpha", self._ema_var, 0.01, 1.0, 0.01,
+               lambda v: f"{float(v):.2f}")
+
+        canvas.bind("<Configure>", resize_body)
+        canvas.bind("<Enter>", lambda _e: canvas.bind_all("<MouseWheel>", mousewheel))
+        canvas.bind("<Leave>", lambda _e: canvas.unbind_all("<MouseWheel>"))
+        self._active_setup_section = "camera"
+        self.after(50, lambda: (self._layout_canvas_sections(canvas, sections, section_windows, section_order), jump_to("camera")))
+
+    def _set_launcher_defaults(self, _event=None):
+        self._camera_var.set(0)
+        self._camera_window_var.set(True)
+        self._camera_debug_var.set(True)
+        self._distance_var.set(True)
+        self._ui_layout_var.set("qwerty")
+        self._language_english_var.set(True)
+        self._language_tagalog_var.set(True)
+        self._dwell_mode_var.set("sync")
+        self._points_var.set(9)
+        self._samples_var.set(90)
+        self._pnoise_var.set(0.0100)
+        self._mnoise_var.set(5.5)
+        self._ema_on.set(True)
+        self._ema_var.set(0.30)
+        self._toggle_ema()
+        if hasattr(self, "_settings_canvas") and hasattr(self, "_settings_sections"):
+            self._draw_canvas_settings(self._settings_canvas, self._settings_sections, keep_scroll=True)
+        return "break"
+
+    def _draw_canvas_settings(self, canvas, sections, keep_scroll=False):
+        canvas.delete("settings_ui")
+        sections.clear()
+        if self._content_gradient_id is not None:
+            canvas.tag_lower(self._content_gradient_id)
+        if not keep_scroll:
+            self._settings_scroll_y = 0
+        max_scroll = max(0, self._settings_content_height - max(1, canvas.winfo_height()))
+        self._settings_scroll_y = max(0, min(self._settings_scroll_y, max_scroll))
+
+        x = 46
+        width = max(360, canvas.winfo_width() - x - 70)
+        y = 36 - self._settings_scroll_y
+        text = "#f3f3f3"
+        muted = "#c6c9cc"
+        accent = self.DARK["accent"]
+        green = "#25ba4a"
+
+        def bind_click(tag, callback):
+            canvas.tag_bind(tag, "<Button-1>", callback)
+            canvas.tag_bind(tag, "<Enter>", lambda _e: canvas.configure(cursor="hand2"))
+            canvas.tag_bind(tag, "<Leave>", lambda _e: canvas.configure(cursor=""))
+
+        def title(label):
+            canvas.create_text(
+                x + width / 2, y_positions[0],
+                text=label,
+                fill=text,
+                font=("Segoe UI", 10, "bold"),
+                tags=("settings_ui",),
+            )
+            y_positions[0] += 38
+
+        def checkbox(label, var, key):
+            tag = f"settings_{key}"
+            cy = y_positions[0]
+            box = (x + 6, cy - 7, x + 18, cy + 5)
+            canvas.create_rectangle(*box, outline=muted, fill=self.STAGE_BG, tags=("settings_ui", tag))
+            if var.get():
+                canvas.create_rectangle(x + 8, cy - 5, x + 16, cy + 3, outline="", fill=green,
+                                        tags=("settings_ui", tag))
+                canvas.create_line(x + 9, cy - 1, x + 12, cy + 3, x + 17, cy - 6,
+                                   fill="#ffffff", width=2, tags=("settings_ui", tag))
+            canvas.create_text(x + 28, cy, text=label, fill=text, anchor="w",
+                               font=("Segoe UI", 12), tags=("settings_ui", tag))
+            bind_click(tag, lambda _e, v=var: (v.set(not v.get()), self._draw_canvas_settings(canvas, sections, True)))
+            y_positions[0] += 42
+
+        def radio(label, var, value, key):
+            tag = f"settings_{key}_{value}"
+            cy = y_positions[0]
+            canvas.create_oval(x + 6, cy - 6, x + 18, cy + 6, outline=muted, fill=self.STAGE_BG,
+                               tags=("settings_ui", tag))
+            if var.get() == value:
+                canvas.create_oval(x + 9, cy - 3, x + 15, cy + 3, outline="", fill=green,
+                                   tags=("settings_ui", tag))
+            canvas.create_text(x + 28, cy, text=label, fill=text, anchor="w",
+                               font=("Segoe UI", 12), tags=("settings_ui", tag))
+            bind_click(tag, lambda _e, v=var, val=value: (v.set(val), self._draw_canvas_settings(canvas, sections, True)))
+            y_positions[0] += 42
+
+        def slider(label, var, min_value, max_value, fmt, key):
+            y_positions[0] += 10
+            canvas.create_text(x + 6, y_positions[0], text=label, fill=text, anchor="w",
+                               font=("Segoe UI", 10, "bold"), tags=("settings_ui",))
+            y_positions[0] += 30
+            sx1 = x + 6
+            sx2 = x + width - 90
+            sy = y_positions[0]
+            value = float(var.get())
+            pct = (value - min_value) / (max_value - min_value)
+            pct = max(0.0, min(1.0, pct))
+            thumb_x = sx1 + (sx2 - sx1) * pct
+            tag = f"settings_slider_{key}"
+            canvas.create_line(sx1, sy, sx2, sy, fill="#6b7075", width=4, tags=("settings_ui", tag))
+            canvas.create_line(sx1, sy, thumb_x, sy, fill=green, width=4, tags=("settings_ui", tag))
+            canvas.create_oval(thumb_x - 8, sy - 8, thumb_x + 8, sy + 8, outline="", fill="#ffffff",
+                               tags=("settings_ui", tag))
+            canvas.create_text(sx2 + 36, sy, text=fmt(value), fill=text, anchor="w",
+                               font=("Segoe UI", 10, "bold"), tags=("settings_ui", tag))
+
+            def set_from_event(event):
+                pct_inner = max(0.0, min(1.0, (event.x - sx1) / (sx2 - sx1)))
+                var.set(min_value + (max_value - min_value) * pct_inner)
+                self._draw_canvas_settings(canvas, sections, True)
+
+            canvas.tag_bind(tag, "<Button-1>", set_from_event)
+            canvas.tag_bind(tag, "<B1-Motion>", set_from_event)
+            canvas.tag_bind(tag, "<Enter>", lambda _e: canvas.configure(cursor="hand2"))
+            canvas.tag_bind(tag, "<Leave>", lambda _e: canvas.configure(cursor=""))
+            y_positions[0] += 52
+
+        def preview_button():
+            tag = "settings_preview"
+            bx, by = x + 6, y_positions[0]
+            running = self._preview_thread is not None and self._preview_thread.is_alive()
+            label = "Close Preview" if running else "Open Preview"
+            fill = self.DARK["danger"] if running else accent
+            canvas.create_rectangle(bx, by, bx + 120, by + 36, outline="", fill=fill,
+                                    tags=("settings_ui", tag))
+            canvas.create_text(bx + 60, by + 18, text=label, fill="#ffffff",
+                               font=("Segoe UI", 10, "bold"), tags=("settings_ui", tag))
+            self._preview_status_canvas = canvas.create_text(
+                bx + 138, by + 18,
+                text=getattr(self, "_preview_status_text", "Closed"),
+                fill=muted,
+                anchor="w",
+                font=("Segoe UI", 9),
+                tags=("settings_ui",),
+            )
+            bind_click(tag, self._toggle_setup_preview)
+            y_positions[0] += 66
+
+        def section(key, label, draw_fn):
+            sections[key] = y_positions[0] + self._settings_scroll_y
+            title(label)
+            draw_fn()
+            y_positions[0] += 44
+
+        y_positions = [y]
+        section("camera", "Camera Window", lambda: (
+            checkbox("Show camera preview during tracking", self._camera_window_var, "camera_window"),
+            checkbox("Show debug eye landmarks", self._camera_debug_var, "camera_debug"),
+            checkbox("Show distance panel", self._distance_var, "distance"),
+            preview_button(),
+        ))
+        section("layout", "Keyboard Layout", lambda: (
+            radio("QWERTY", self._ui_layout_var, "qwerty", "layout"),
+            radio("UI2", self._ui_layout_var, "ui2", "layout"),
+        ))
+        section("language", "Language", lambda: (
+            checkbox("English", self._language_english_var, "english"),
+            checkbox("Tagalog", self._language_tagalog_var, "tagalog"),
+        ))
+        section("dwell", "Dwell Mode", lambda: (
+            radio("Synchronous", self._dwell_mode_var, "sync", "dwell"),
+            radio("Asynchronous", self._dwell_mode_var, "async", "dwell"),
+        ))
+        section("calibration", "Calibration", lambda: (
+            canvas.create_text(x + 6, y_positions[0], text="Grid Points", fill=text, anchor="w",
+                               font=("Segoe UI", 10, "bold"), tags=("settings_ui",)),
+            y_positions.__setitem__(0, y_positions[0] + 34),
+            radio("5 (Fast)", self._points_var, 5, "points"),
+            radio("9 (Default)", self._points_var, 9, "points"),
+            radio("16 (Precise)", self._points_var, 16, "points"),
+            radio("25 (Deadeye)", self._points_var, 25, "points"),
+            slider("Samples/Points", self._samples_var, 20, 120, lambda v: f"{int(round(v))}", "samples"),
+        ))
+        section("kalman", "Kalman Filter", lambda: (
+            slider("Process noise", self._pnoise_var, 0.0001, 0.1, lambda v: f"{v:.4f}", "pnoise"),
+            slider("Measurement noise", self._mnoise_var, 1.0, 50.0, lambda v: f"{v:.1f}", "mnoise"),
+        ))
+        section("smoother", "Smoother", lambda: (
+            checkbox("Enable EMA smoother", self._ema_on, "ema_on"),
+            slider("EMA alpha", self._ema_var, 0.01, 1.0, lambda v: f"{v:.2f}", "ema"),
+        ))
+
+        self._settings_content_height = max(1, y_positions[0] + self._settings_scroll_y)
+        self._draw_settings_scrollbar(canvas)
+
+    def _scroll_canvas_settings(self, canvas, sections, delta):
+        max_scroll = max(0, self._settings_content_height - max(1, canvas.winfo_height()))
+        self._settings_scroll_y = max(0, min(max_scroll, self._settings_scroll_y + delta))
+        self._draw_canvas_settings(canvas, sections, keep_scroll=True)
+
+    def _draw_settings_scrollbar(self, canvas):
+        canvas.delete("settings_scrollbar")
+        view_h = max(1, canvas.winfo_height())
+        content_h = max(1, self._settings_content_height)
+        if content_h <= view_h:
+            return
+        x = canvas.winfo_width() - 16
+        top = 18
+        bottom = view_h - 18
+        track_h = max(1, bottom - top)
+        thumb_h = max(42, track_h * (view_h / content_h))
+        max_scroll = max(1, content_h - view_h)
+        thumb_y = top + (track_h - thumb_h) * (self._settings_scroll_y / max_scroll)
+        canvas.create_line(x, top, x, bottom, fill="#050607", width=4,
+                           capstyle="round", tags=("settings_scrollbar",))
+        canvas.create_line(x, thumb_y, x, thumb_y + thumb_h, fill="#2c3034", width=4,
+                           capstyle="round", tags=("settings_scrollbar",))
+
+    def _layout_canvas_sections(self, canvas, sections, section_windows, section_order):
+        canvas.update_idletasks()
+        x = 270
+        width = max(320, canvas.winfo_width() - x - 70)
+        y = 38
+        for key in section_order:
+            frame = sections[key]
+            frame.configure(width=width)
+            frame.update_idletasks()
+            canvas.itemconfigure(section_windows[key], width=width)
+            canvas.coords(section_windows[key], x, y)
+            y += frame.winfo_reqheight() + 30
+        canvas.configure(scrollregion=(0, 0, max(1, canvas.winfo_width()), y))
+
+    def _render_nav_pill(self, width, height, fill, radius):
+        scale = 3
+        img = Image.new("RGBA", (width * scale, height * scale), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img, "RGBA")
+        fill_rgb = self._hex_to_rgb(fill)
+        rect = (0, 0, width * scale - 1, height * scale - 1)
+        if radius:
+            draw.rounded_rectangle(rect, radius=radius * scale, fill=(*fill_rgb, 255))
+        else:
+            draw.rectangle(rect, fill=(*fill_rgb, 255))
+        img = img.resize((width, height), Image.Resampling.LANCZOS)
+        return ImageTk.PhotoImage(img)
+
+    def _build_launcher_controls(self):
+        c = self._launcher_canvas
+        self.minimize_btn = c.create_text(780, 23, text="-",
+                                          fill="#d7d9db", font=("Segoe UI", 15, "bold"))
+        self.close_btn = c.create_text(812, 23, text="x",
+                                       fill="#d7d9db", font=("Segoe UI", 13, "bold"))
+        c.tag_bind(self.minimize_btn, "<Button-1>", self._on_minimize)
+        c.tag_bind(self.close_btn, "<Button-1>", self._on_cancel)
+        c.tag_bind(self.minimize_btn, "<Enter>", lambda _e: c.itemconfigure(self.minimize_btn, fill="#ffffff"))
+        c.tag_bind(self.minimize_btn, "<Leave>", lambda _e: c.itemconfigure(self.minimize_btn, fill="#d7d9db"))
+        c.tag_bind(self.close_btn, "<Enter>", lambda _e: c.itemconfigure(self.close_btn, fill="#ff6b6b"))
+        c.tag_bind(self.close_btn, "<Leave>", lambda _e: c.itemconfigure(self.close_btn, fill="#d7d9db"))
+
+    def _start_window_drag(self, event):
+        self._dragging_window = event.y < 44 and event.x < self.winfo_width() - 92
+        if not self._dragging_window:
+            return
+        self._drag_offset_x = event.x
+        self._drag_offset_y = event.y
+
+    def _drag_window(self, _event):
+        if not self._dragging_window:
+            return
+        x = self.winfo_pointerx() - self._drag_offset_x
+        y = self.winfo_pointery() - self._drag_offset_y
+        self.geometry(f"+{x}+{y}")
+
+    def _stop_window_drag(self, _event=None):
+        self._dragging_window = False
+
+    def _on_minimize(self, _event=None):
+        self.overrideredirect(False)
+        self.iconify()
+        self.after(50, lambda: self.overrideredirect(True))
+
+    def _render_launcher_gradient(self, width, height, phase):
+        return WelcomeUI._render_angular_gradient(self, width, height, phase)
+
+    def _animate_launcher_gradient(self):
+        if self._gradient_image_id is None:
+            return
+        self._gradient_phase += 1
+        width = self.winfo_width() if self.winfo_width() > 1 else 843
+        height = self.winfo_height() if self.winfo_height() > 1 else 555
+        self._gradient_photo = self._render_launcher_gradient(width, height, self._gradient_phase)
+        self._launcher_canvas.itemconfigure(self._gradient_image_id, image=self._gradient_photo)
+        if self._content_canvas is not None and self._content_gradient_id is not None:
+            content_width = self._content_canvas.winfo_width()
+            content_height = self._content_canvas.winfo_height()
+            if content_width > 1 and content_height > 1:
+                self._content_gradient_photo = self._render_launcher_gradient(
+                    content_width,
+                    content_height,
+                    self._gradient_phase,
+                )
+                self._content_canvas.itemconfigure(
+                    self._content_gradient_id,
+                    image=self._content_gradient_photo,
+                )
+        self._animate_job = self.after(85, self._animate_launcher_gradient)
+
+    @staticmethod
+    def _hex_to_rgb(color):
+        return WelcomeUI._hex_to_rgb(color)
+
     def _toggle_ema(self):
+        if not hasattr(self, "_ema_frame"):
+            return
         state = "normal" if self._ema_on.get() else "disabled"
         for child in self._ema_frame.winfo_children():
             try:
@@ -808,9 +1415,15 @@ class LauncherUI(tk.Tk):
                 text="Close Preview" if running else "Open Preview",
                 bg=d["danger"] if running else d["accent"],
             )
+        elif hasattr(self, "_settings_canvas") and hasattr(self, "_settings_sections"):
+            self._draw_canvas_settings(self._settings_canvas, self._settings_sections, keep_scroll=True)
 
     def _set_preview_status(self, text, color=None):
+        self._preview_status_text = text
         if not hasattr(self, "_preview_status"):
+            if hasattr(self, "_settings_canvas") and hasattr(self, "_settings_sections"):
+                self._draw_canvas_settings(self._settings_canvas, self._settings_sections, keep_scroll=True)
+                self._sync_preview_button()
             return
         self._preview_status.config(text=text, fg=color or self.DARK["muted"])
         self._sync_preview_button()
@@ -964,13 +1577,30 @@ class LauncherUI(tk.Tk):
 
     def _on_cancel(self, _event=None):
         self._stop_setup_preview()
+        if self._animate_job is not None:
+            try:
+                self.after_cancel(self._animate_job)
+            except Exception:
+                pass
+            self._animate_job = None
         self.destroy()
 
     def _on_start(self, _event=None, tutorial=True):
         self._stop_setup_preview()
+        if self._animate_job is not None:
+            try:
+                self.after_cancel(self._animate_job)
+            except Exception:
+                pass
+            self._animate_job = None
         ui_layout = self._ui_layout_var.get()
-        if tutorial:
-            ui_layout = "ui2"
+        language_preset = []
+        if self._language_english_var.get():
+            language_preset.append("english")
+        if self._language_tagalog_var.get():
+            language_preset.append("tagalog")
+        if not language_preset:
+            language_preset = ["english", "tagalog"]
         self.result = {
             "camera":  self._camera_var.get(),
             "points":  self._points_var.get(),
@@ -980,6 +1610,7 @@ class LauncherUI(tk.Tk):
             "mnoise":  self._mnoise_var.get(),
             "dwell_mode": self._dwell_mode_var.get(),
             "ui_layout": ui_layout,
+            "language_preset": language_preset,
             "camera_window": self._camera_window_var.get(),
             "camera_debug": self._camera_debug_var.get(),
             "distance_panel": self._distance_var.get(),
@@ -1022,7 +1653,8 @@ def main():
     print("  GAZE-BASED DIGITAL KEYBOARD")
     print(f"  Points: {cfg['points']}  |  Samples: {cfg['samples']}  |  "
           f"EMA: {cfg['ema']:.2f}  |  Camera: {cfg['camera']}  |  "
-          f"Dwell: {cfg['dwell_mode']}  |  UI: {cfg['ui_layout']}")
+          f"Dwell: {cfg['dwell_mode']}  |  UI: {cfg['ui_layout']}  |  "
+          f"Language: {', '.join(cfg['language_preset'])}")
     print("=" * 60)
 
     # ── Deferred imports (avoid slowing down launcher) ────────────────────────
@@ -1033,6 +1665,12 @@ def main():
     from config import FILIPINO_DATASET_FILE, ENGLISH_DATASET_FILE, NGRAM_CACHE_FILE
 
     config.DWELL_MODE = cfg["dwell_mode"]
+    if cfg["language_preset"] == ["english"]:
+        config.PREDICTION_LANGUAGE = "english"
+    elif cfg["language_preset"] == ["tagalog"]:
+        config.PREDICTION_LANGUAGE = "filipino"
+    else:
+        config.PREDICTION_LANGUAGE = "both"
 
     def _ensure_datasets():
         missing = []
