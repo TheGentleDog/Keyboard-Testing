@@ -523,6 +523,18 @@ def is_valid_token(token: str) -> bool:
     return True
 
 
+def clean_token(token: str) -> str:
+    return re.sub(r'^[^a-zA-ZÑñ]+|[^a-zA-ZÑñ]+$', '', token.lower())
+
+
+def phrase_tokens(phrase: str) -> list:
+    return [cleaned for token in phrase.split() if (cleaned := clean_token(token))]
+
+
+def contains_blocked_token(tokens) -> bool:
+    return any(token in FILIPINO_BLOCKLIST for token in tokens)
+
+
 def expand_affixes(word: str) -> list:
     variants = [word]
     variants += [f"mag{word}", f"nag{word}", f"magka{word}", f"nagka{word}"]
@@ -572,12 +584,14 @@ def generate(output_file: str = OUTPUT_FILE):
                 results = fill(tmpl)
                 for r in results:
                     token = r["token_str"].strip().lower()
+                    token_key = clean_token(token)
                     score = r["score"]
-                    if score < MIN_SCORE or not is_valid_token(token):
+                    if score < MIN_SCORE or not is_valid_token(token) or token_key in FILIPINO_BLOCKLIST:
                         continue
                     category_words[category][token] += score
                     phrase = re.sub(r'\s+', ' ', tmpl.replace("<mask>", token)).strip().rstrip('.')
-                    all_corpus_seeds.append(phrase.lower())
+                    if not contains_blocked_token(phrase_tokens(phrase)):
+                        all_corpus_seeds.append(phrase.lower())
             except Exception:
                 pass
 
@@ -615,7 +629,8 @@ def generate(output_file: str = OUTPUT_FILE):
     corpus = []
     for phrase in all_corpus_seeds:
         clean = phrase.strip()
-        if clean not in seen_phrases and len(clean.split()) >= 2:
+        tokens = phrase_tokens(clean)
+        if clean not in seen_phrases and len(tokens) >= 2 and not contains_blocked_token(tokens):
             corpus.append(clean)
             seen_phrases.add(clean)
         if len(corpus) >= 800:
@@ -627,8 +642,8 @@ def generate(output_file: str = OUTPUT_FILE):
     corpus_sequences = []
     seen_seq = set()
     for phrase in all_corpus_seeds:
-        tokens = phrase.strip().lower().split()
-        if len(tokens) >= 2:
+        tokens = phrase_tokens(phrase)
+        if len(tokens) >= 2 and not contains_blocked_token(tokens):
             key = " ".join(tokens)
             if key not in seen_seq:
                 corpus_sequences.append(tokens)

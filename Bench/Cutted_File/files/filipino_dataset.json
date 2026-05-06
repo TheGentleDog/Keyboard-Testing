@@ -4,10 +4,11 @@
     "language": "Filipino-Tagalog (RoBERTa-generated)",
     "description": "Auto-generated Dataset via jcblaise/roberta-tagalog-base — For Gaze Based Digital Keyboard",
     "total_words": 997,
-    "total_phrases": 800,
+    "total_phrases": 690,
     "total_shortcuts": 104,
     "last_updated": "2026-05-04",
-    "model_used": "jcblaise/roberta-tagalog-base"
+    "model_used": "jcblaise/roberta-tagalog-base",
+    "cleaned_blocked_corpus": true
   },
   "vocabulary": {
     "pronouns": [
@@ -1172,24 +1173,9 @@
     "kumain na ba kami?",
     "kumain na ba ito?",
     "kumain na ba sya?",
-    "nasaan si tom?",
-    "nasaan si jesus?",
     "nasaan si wood?",
-    "nasaan si tomas?",
-    "nasaan si nelson?",
-    "nasaan si julius?",
-    "nasaan si sheryl?",
-    "nasaan si duterte?",
-    "nasaan si maria?",
-    "nasaan si papa?",
-    "nasaan si satanas?",
-    "nasaan si hesus?",
-    "nasaan si juan?",
-    "nasaan si sara?",
-    "nasaan si elias?",
     "nasaan si cristo?",
     "nasaan si richard?",
-    "nasaan si david?",
     "kami ay masaya ngayon",
     "ikaw ay masaya ngayon",
     "ako ay masaya ngayon",
@@ -1210,118 +1196,26 @@
     "punta na ka sa bahay",
     "punta na kita sa bahay",
     "punta na dito sa bahay",
-    "kasama ko si tom",
-    "kasama ko si nelson",
-    "kasama ko si papa",
     "kasama ko si mama",
-    "kasama ko si tomas",
-    "kasama ko si maria",
-    "kasama ko si julius",
     "kasama ko si wood",
     "kasama ko si tatay",
-    "kasama ko si sheryl",
-    "para kay tom ito",
-    "para kay duterte ito",
-    "para kay manny ito",
-    "para kay pacquiao ito",
-    "para kay leni ito",
-    "para kay jesus ito",
-    "para kay kris ito",
-    "para kay robin ito",
-    "para kay trillanes ito",
-    "para kay noynoy ito",
-    "para kay trump ito",
-    "para kay digong ito",
-    "para kay lord ito",
-    "para kay gordon ito",
-    "para kay marcos ito",
-    "para kay jose ito",
-    "para kay marian ito",
-    "para kay binay ito",
-    "para kay erap ito",
-    "para kay poe ito",
-    "para kay tomas ito",
-    "para kay gloria ito",
-    "para kay cory ito",
-    "para kay robredo ito",
-    "para kay juan ito",
-    "para kay miriam ito",
-    "para kay aquino ito",
-    "para kay hesus ito",
-    "para kay cesar ito",
-    "para kay sara ito",
-    "para kay imee ito",
-    "para kay bongbong ito",
-    "para kay francis ito",
-    "para kay pacman ito",
-    "para kay kim ito",
-    "para kay roxas ito",
-    "para kay obama ito",
-    "para kay cayetano ito",
-    "para kay pnoy ito",
     "para kay wood ito",
-    "para kay sotto ito",
     "para kay vice ito",
-    "para kay maria ito",
     "para kay sharon ito",
-    "para kay david ito",
     "para kay mayor ito",
     "para kay imelda ito",
     "para kay mariel ito",
     "para kay pia ito",
     "para kay mar ito",
-    "sinabi ni tom na pumunta na",
-    "sinabi ni duterte na pumunta na",
-    "sinabi ni trump na pumunta na",
-    "sinabi ni gordon na pumunta na",
-    "sinabi ni jesus na pumunta na",
-    "sinabi ni trillanes na pumunta na",
-    "sinabi ni faeldon na pumunta na",
-    "sinabi ni tomas na pumunta na",
-    "sinabi ni tulfo na pumunta na",
-    "sinabi ni robredo na pumunta na",
-    "sinabi ni pablo na pumunta na",
-    "sinabi ni marcos na pumunta na",
-    "sinabi ni obama na pumunta na",
-    "sinabi ni aquino na pumunta na",
-    "sinabi ni pacquiao na pumunta na",
-    "sinabi ni jose na pumunta na",
-    "sinabi ni enrile na pumunta na",
-    "sinabi ni pedro na pumunta na",
-    "sinabi ni sara na pumunta na",
-    "sinabi ni maria na pumunta na",
-    "sinabi ni santiago na pumunta na",
-    "sinabi ni panelo na pumunta na",
-    "sinabi ni pimentel na pumunta na",
-    "sinabi ni david na pumunta na",
-    "sinabi ni binay na pumunta na",
-    "sinabi ni sotto na pumunta na",
-    "sinabi ni lozada na pumunta na",
-    "sinabi ni lacson na pumunta na",
-    "sinabi ni putin na pumunta na",
     "sinabi ni pilato na pumunta na",
-    "sinabi ni cayetano na pumunta na",
-    "sinabi ni elias na pumunta na",
-    "sinabi ni digong na pumunta na",
-    "sinabi ni nelson na pumunta na",
-    "hinahanap ko si tom",
-    "hinahanap ko si tomas",
-    "hinahanap ko si nelson",
     "hinahanap ko si wood",
-    "hinahanap ko si maria",
-    "hinahanap ko si jesus",
-    "hinahanap ko si satanas",
     "ang lahat ay magaling",
-    "ang diyos ay magaling",
     "ang tao ay magaling",
-    "ang dios ay magaling",
     "ang resulta ay magaling",
     "ang makina ay magaling",
-    "ang biblia ay magaling",
     "ang bata ay magaling",
     "ang doktor ay magaling",
     "ang tubig ay magaling",
-    "ang panginoon ay magaling",
     "ang mundo ay magaling",
     "ang babae ay magaling",
     "ang iba ay magaling",
@@ -1352,9 +1246,6 @@
     "ang alak ay magaling",
     "ang bahay ay magaling",
     "ang matematika ay magaling",
-    "nandito na si tom",
-    "nandito na si tomas",
-    "nandito na si nelson",
     "nandito na si wood",
     "gusto kong kumain ng pagkain",
     "gusto kong magluto ng pagkain",
@@ -2066,139 +1957,64 @@
       "kumain",
       "na",
       "ba",
-      "kayo?"
+      "kayo"
     ],
     [
       "kumain",
       "na",
       "ba",
-      "siya?"
+      "siya"
     ],
     [
       "kumain",
       "na",
       "ba",
-      "ako?"
+      "ako"
     ],
     [
       "kumain",
       "na",
       "ba",
-      "tayo?"
+      "tayo"
     ],
     [
       "kumain",
       "na",
       "ba",
-      "sila?"
+      "sila"
     ],
     [
       "kumain",
       "na",
       "ba",
-      "kami?"
+      "kami"
     ],
     [
       "kumain",
       "na",
       "ba",
-      "ito?"
+      "ito"
     ],
     [
       "kumain",
       "na",
       "ba",
-      "sya?"
+      "sya"
     ],
     [
       "nasaan",
       "si",
-      "tom?"
+      "wood"
     ],
     [
       "nasaan",
       "si",
-      "jesus?"
+      "cristo"
     ],
     [
       "nasaan",
       "si",
-      "wood?"
-    ],
-    [
-      "nasaan",
-      "si",
-      "tomas?"
-    ],
-    [
-      "nasaan",
-      "si",
-      "nelson?"
-    ],
-    [
-      "nasaan",
-      "si",
-      "julius?"
-    ],
-    [
-      "nasaan",
-      "si",
-      "sheryl?"
-    ],
-    [
-      "nasaan",
-      "si",
-      "duterte?"
-    ],
-    [
-      "nasaan",
-      "si",
-      "maria?"
-    ],
-    [
-      "nasaan",
-      "si",
-      "papa?"
-    ],
-    [
-      "nasaan",
-      "si",
-      "satanas?"
-    ],
-    [
-      "nasaan",
-      "si",
-      "hesus?"
-    ],
-    [
-      "nasaan",
-      "si",
-      "juan?"
-    ],
-    [
-      "nasaan",
-      "si",
-      "sara?"
-    ],
-    [
-      "nasaan",
-      "si",
-      "elias?"
-    ],
-    [
-      "nasaan",
-      "si",
-      "cristo?"
-    ],
-    [
-      "nasaan",
-      "si",
-      "richard?"
-    ],
-    [
-      "nasaan",
-      "si",
-      "david?"
+      "richard"
     ],
     [
       "kami",
@@ -2334,43 +2150,7 @@
       "kasama",
       "ko",
       "si",
-      "tom"
-    ],
-    [
-      "kasama",
-      "ko",
-      "si",
-      "nelson"
-    ],
-    [
-      "kasama",
-      "ko",
-      "si",
-      "papa"
-    ],
-    [
-      "kasama",
-      "ko",
-      "si",
       "mama"
-    ],
-    [
-      "kasama",
-      "ko",
-      "si",
-      "tomas"
-    ],
-    [
-      "kasama",
-      "ko",
-      "si",
-      "maria"
-    ],
-    [
-      "kasama",
-      "ko",
-      "si",
-      "julius"
     ],
     [
       "kasama",
@@ -2385,255 +2165,9 @@
       "tatay"
     ],
     [
-      "kasama",
-      "ko",
-      "si",
-      "sheryl"
-    ],
-    [
-      "para",
-      "kay",
-      "tom",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "duterte",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "manny",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "pacquiao",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "leni",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "jesus",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "kris",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "robin",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "trillanes",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "noynoy",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "trump",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "digong",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "lord",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "gordon",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "marcos",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "jose",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "marian",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "binay",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "erap",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "poe",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "tomas",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "gloria",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "cory",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "robredo",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "juan",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "miriam",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "aquino",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "hesus",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "cesar",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "sara",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "imee",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "bongbong",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "francis",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "pacman",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "kim",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "roxas",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "obama",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "cayetano",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "pnoy",
-      "ito"
-    ],
-    [
       "para",
       "kay",
       "wood",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "sotto",
       "ito"
     ],
     [
@@ -2645,19 +2179,7 @@
     [
       "para",
       "kay",
-      "maria",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
       "sharon",
-      "ito"
-    ],
-    [
-      "para",
-      "kay",
-      "david",
       "ito"
     ],
     [
@@ -2693,316 +2215,16 @@
     [
       "sinabi",
       "ni",
-      "tom",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "duterte",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "trump",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "gordon",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "jesus",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "trillanes",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "faeldon",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "tomas",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "tulfo",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "robredo",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "pablo",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "marcos",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "obama",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "aquino",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "pacquiao",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "jose",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "enrile",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "pedro",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "sara",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "maria",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "santiago",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "panelo",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "pimentel",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "david",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "binay",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "sotto",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "lozada",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "lacson",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "putin",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
       "pilato",
       "na",
       "pumunta",
       "na"
     ],
     [
-      "sinabi",
-      "ni",
-      "cayetano",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "elias",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "digong",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "sinabi",
-      "ni",
-      "nelson",
-      "na",
-      "pumunta",
-      "na"
-    ],
-    [
-      "hinahanap",
-      "ko",
-      "si",
-      "tom"
-    ],
-    [
-      "hinahanap",
-      "ko",
-      "si",
-      "tomas"
-    ],
-    [
-      "hinahanap",
-      "ko",
-      "si",
-      "nelson"
-    ],
-    [
       "hinahanap",
       "ko",
       "si",
       "wood"
-    ],
-    [
-      "hinahanap",
-      "ko",
-      "si",
-      "maria"
-    ],
-    [
-      "hinahanap",
-      "ko",
-      "si",
-      "jesus"
-    ],
-    [
-      "hinahanap",
-      "ko",
-      "si",
-      "satanas"
     ],
     [
       "ang",
@@ -3012,19 +2234,7 @@
     ],
     [
       "ang",
-      "diyos",
-      "ay",
-      "magaling"
-    ],
-    [
-      "ang",
       "tao",
-      "ay",
-      "magaling"
-    ],
-    [
-      "ang",
-      "dios",
       "ay",
       "magaling"
     ],
@@ -3037,12 +2247,6 @@
     [
       "ang",
       "makina",
-      "ay",
-      "magaling"
-    ],
-    [
-      "ang",
-      "biblia",
       "ay",
       "magaling"
     ],
@@ -3061,12 +2265,6 @@
     [
       "ang",
       "tubig",
-      "ay",
-      "magaling"
-    ],
-    [
-      "ang",
-      "panginoon",
       "ay",
       "magaling"
     ],
@@ -3249,24 +2447,6 @@
       "matematika",
       "ay",
       "magaling"
-    ],
-    [
-      "nandito",
-      "na",
-      "si",
-      "tom"
-    ],
-    [
-      "nandito",
-      "na",
-      "si",
-      "tomas"
-    ],
-    [
-      "nandito",
-      "na",
-      "si",
-      "nelson"
     ],
     [
       "nandito",
@@ -4098,700 +3278,700 @@
       "ba",
       "akong",
       "pumunta",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "umalis",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "magtrabaho",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "bumalik",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "tumawag",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "makatulong",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "sumakay",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "makarating",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "dumating",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "makapunta",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "lumipat",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "tumayo",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "manatili",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "tumulong",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "sumali",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "manirahan",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "pumasok",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "tumakbo",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "maging",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "tumugon",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "magtanong",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "dumalo",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "lumipad",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "magsinungaling",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "lumabas",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "tumingin",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "maglaro",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "sabihin",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "magpatuloy",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "magtapos",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "makulong",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "magsimula",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "bumisita",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "magkomento",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "sumulat",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "tumalon",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "sumagot",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "makabalik",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "magpakasal",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "makita",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "manalo",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "sumangguni",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "magkamali",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "tumira",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "mabuhay",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "magsalita",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "makipagkita",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "mamatay",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "umupo",
-      "dito?"
+      "dito"
     ],
     [
       "maaari",
       "ba",
       "akong",
       "sumama",
-      "dito?"
+      "dito"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "umuwi",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "pumunta",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "umalis",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "lumabas",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "bumalik",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "magsalita",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "tumawag",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "maglaro",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "tumakbo",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "pumasok",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "magtrabaho",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "kumain",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "sumagot",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "sumakay",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "sumama",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "magpakasal",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "mamatay",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "kumanta",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "dumalaw",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "lumipad",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "sumali",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "magtanong",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "matulog",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "maligo",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "dumating",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "manood",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "magbakasyon",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "uminom",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "tumakas",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "bumisita",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "bumiyahe",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "sumigaw",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "lumangoy",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "tumayo",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "maupo",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "bumoto",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "lumipat",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "makipagkita",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "sumuko",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "tumulong",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "bumili",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "umupo",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "tumira",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "magpahinga",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "humarap",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "mamili",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "dumalo",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "bumaba",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "umiyak",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "pwede",
       "ka",
       "bang",
       "magkita",
-      "mamaya?"
+      "mamaya"
     ],
     [
       "ayoko",
@@ -8603,1058 +7783,1058 @@
       "mo",
       "bang",
       "magtrabaho",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "pumunta",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "mabuhay",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "tumayo",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "kumain",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "umalis",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "lumangoy",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "umuwi",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "maglaro",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "maglakad",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "magpahinga",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "tumakbo",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "matulog",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "magsalita",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "lumipad",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "umupo",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "uminom",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "mamili",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "bumalik",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "maglakbay",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "tumulong",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "lumabas",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "gawin",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "magdasal",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "sumuko",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "magpakasal",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "mamatay",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "magluto",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "magsulat",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "mamuhay",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "maligo",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "bumangon",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "magbakasyon",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "lumaban",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "tumawa",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "lumakad",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "kumanta",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "tumakas",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "lumipat",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "kumilos",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "manood",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "magpunta",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "gumawa",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "sumikat",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "bumili",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "yumaman",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "manalo",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "sumayaw",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "sumali",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "kaya",
       "mo",
       "bang",
       "magretiro",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "sino",
       "ang",
       "pupunta",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "magbabayad",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "nakatira",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "nakaupo",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "mananalo",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "nakakaalam",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "naglagay",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "nagdala",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "nanalo",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "makikinabang",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "papunta",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "hari",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "susi",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "pumatay",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "papasok",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "darating",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "susunod",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "nakatayo",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "nakikinabang",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "lalabas",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "lumabag",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "pumasok",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "wala",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "lalabag",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "tao",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "nagtatago",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "pumunta",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "magsasabi",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "makakapasok",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "naiwan",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "bahala",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "sasagot",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "nagsabi",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "namamahala",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "namatay",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "tawag",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "namumuno",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "sangkot",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "bantay",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "makakakita",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "naninirahan",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "babae",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "nagbayad",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "mananagot",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "uupo",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "tumawag",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "nagpunta",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "matutuwa",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "nagbabayad",
-      "doon?"
+      "doon"
     ],
     [
       "sino",
       "ang",
       "nakakita",
-      "doon?"
+      "doon"
     ],
     [
       "bakit",
       "ka",
       "pumunta",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "pupunta",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "umalis",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "nagpunta",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "wala",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "nandito",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "pumasok",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "nakatira",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "papunta",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "natatakot",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "sumali",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "dumating",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "bumalik",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "nagmamadali",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "napunta",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "sumama",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "nakapasok",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "nakakulong",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "tumakas",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "lumabas",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "hindi",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "natutulog",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "naniniwala",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "tumanggi",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "pumupunta",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "narito",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "naririto",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "nakaupo",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "tutol",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "nakarating",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "tumigil",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "pumayag",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "naninirahan",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "nagtataka",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "galit",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "sumasagot",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "nagsasalita",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "nagtatanong",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "nagtanong",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "tumingin",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "nanatili",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "nagtungo",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "sumakay",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "nagagalit",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "nagtatrabaho",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "lumapit",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "tumawag",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "nagpupunta",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "lumipat",
-      "dito?"
+      "dito"
     ],
     [
       "bakit",
       "ka",
       "sumulat",
-      "dito?"
+      "dito"
     ],
     [
       "anong",
       "oras",
       "ka",
-      "na?"
+      "na"
     ],
     [
       "anong",
       "oras",
       "ka",
-      "pupunta?"
+      "pupunta"
     ],
     [
       "anong",
       "oras",
       "ka",
-      "ba?"
+      "ba"
     ],
     [
       "anong",
       "oras",
       "ka",
-      "pa?"
+      "pa"
     ],
     [
       "anong",
       "oras",
       "ka",
-      "maghihintay?"
+      "maghihintay"
     ],
     [
       "anong",
       "oras",
       "ka",
-      "ngayon?"
+      "ngayon"
     ],
     [
       "anong",
       "oras",
       "ka",
-      "pumunta?"
+      "pumunta"
     ],
     [
       "anong",
       "oras",
       "ka",
-      "makakarating?"
+      "makakarating"
     ],
     [
       "anong",
       "oras",
       "ka",
-      "darating?"
+      "darating"
     ],
     [
       "anong",
       "oras",
       "ka",
-      "natutulog?"
+      "natutulog"
     ],
     [
       "anong",
       "oras",
       "ka",
-      "dumating?"
+      "dumating"
     ],
     [
       "anong",
       "oras",
       "ka",
-      "tatakbo?"
+      "tatakbo"
     ],
     [
       "anong",
       "oras",
       "ka",
-      "papunta?"
+      "papunta"
     ],
     [
       "anong",
       "oras",
       "ka",
-      "nagpunta?"
+      "nagpunta"
     ],
     [
       "anong",
       "oras",
       "ka",
-      "nandito?"
+      "nandito"
     ],
     [
       "anong",
       "oras",
       "ka",
-      "dito?"
+      "dito"
     ],
     [
       "anong",
       "oras",
       "ka",
-      "naghintay?"
+      "naghintay"
     ],
     [
       "anong",
       "oras",
       "ka",
-      "lang?"
+      "lang"
     ]
   ]
 }

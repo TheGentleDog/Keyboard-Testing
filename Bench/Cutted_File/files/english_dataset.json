@@ -3,11 +3,12 @@
     "version": "1.0-roberta",
     "language": "English (RoBERTa-generated)",
     "description": "Auto-generated Dataset via roberta-base — For Gaze Based Digital Keyboard",
-    "total_words": 1200,
-    "total_phrases": 800,
+    "total_words": 1191,
+    "total_phrases": 692,
     "total_shortcuts": 82,
     "last_updated": "2026-05-04",
-    "model_used": "roberta-base"
+    "model_used": "roberta-base",
+    "cleaned_blocked_corpus": true
   },
   "vocabulary": {
     "pronouns": [
@@ -40,7 +41,6 @@
       "now",
       "fun",
       "we",
-      "alex",
       "thee",
       "me",
       "be",
@@ -64,29 +64,21 @@
       "happiness",
       "more",
       "charity",
-      "mac",
-      "chris",
       "advice",
       "war",
       "anybody",
       "solutions",
       "myself",
-      "steve",
       "stability",
       "publication",
       "justice",
       "december",
-      "isis",
       "that",
-      "hillary",
       "last",
       "all",
       "death",
       "have",
-      "charlie",
-      "mike",
-      "inspiration",
-      "josh"
+      "inspiration"
     ],
     "verbs": [
       "cry",
@@ -1332,159 +1324,71 @@
     "nobody is hungry now",
     "it is hungry now",
     "one is hungry now",
-    "peter is hungry now",
-    "alex is hungry now",
-    "jesus is hungry now",
-    "sarah is hungry now",
     "everyone is sleeping",
     "she is sleeping",
     "he is sleeping",
     "everybody is sleeping",
     "nobody is sleeping",
     "someone is sleeping",
-    "god is sleeping",
     "everything is sleeping",
     "it is sleeping",
-    "alex is sleeping",
-    "jack is sleeping",
     "who is sleeping",
-    "jesus is sleeping",
-    "john is sleeping",
     "mom is sleeping",
     "dad is sleeping",
-    "trump is sleeping",
     "this is sleeping",
-    "david is sleeping",
-    "sarah is sleeping",
-    "adam is sleeping",
     "one is sleeping",
-    "rachel is sleeping",
     "sam is sleeping",
-    "ryan is sleeping",
-    "jason is sleeping",
-    "alice is sleeping",
-    "chris is sleeping",
-    "tom is sleeping",
-    "ben is sleeping",
-    "mary is sleeping",
-    "charlie is sleeping",
-    "kevin is sleeping",
     "nothing is sleeping",
-    "jake is sleeping",
     "has he eaten yet?",
     "has she eaten yet?",
     "has anyone eaten yet?",
     "has everyone eaten yet?",
     "has anybody eaten yet?",
     "has someone eaten yet?",
-    "has lily eaten yet?",
-    "has josh eaten yet?",
     "where is he?",
-    "where is trump?",
     "where is she?",
-    "where is america?",
-    "where is god?",
-    "where is israel?",
-    "where is russia?",
-    "where is isis?",
-    "where is china?",
-    "where is obama?",
     "where is it?",
-    "where is clinton?",
     "where is aleppo?",
-    "where is canada?",
-    "where is putin?",
-    "where is jesus?",
     "where is superman?",
     "where is syria?",
-    "where is london?",
     "where is everyone?",
-    "where is paul?",
-    "where is iran?",
     "where is justice?",
-    "where is jordan?",
-    "where is hillary?",
-    "where is iraq?",
-    "where is japan?",
     "where is democracy?",
-    "where is europe?",
-    "where is paris?",
     "he is happy today",
     "everyone is happy today",
     "she is happy today",
     "everybody is happy today",
-    "god is happy today",
     "nobody is happy today",
-    "jesus is happy today",
     "nature is happy today",
-    "america is happy today",
-    "mary is happy today",
-    "david is happy today",
-    "john is happy today",
     "life is happy today",
     "mom is happy today",
     "it is happy today",
     "all is happy today",
-    "peter is happy today",
-    "bob is happy today",
-    "israel is happy today",
     "who is happy today",
     "someone is happy today",
-    "hope is happy today",
     "he is going home",
     "she is going home",
     "everyone is going home",
     "everybody is going home",
     "nobody is going home",
-    "trump is going home",
     "someone is going home",
-    "obama is going home",
-    "kevin is going home",
-    "jesus is going home",
-    "alex is going home",
-    "chris is going home",
     "dad is going home",
     "mom is going home",
-    "jack is going home",
-    "ryan is going home",
-    "jordan is going home",
-    "john is going home",
-    "paul is going home",
-    "steve is going home",
     "george is going home",
-    "hillary is going home",
     "this is going home",
-    "charlie is going home",
-    "sarah is going home",
-    "peter is going home",
-    "josh is going home",
     "joe is going home",
-    "david is going home",
-    "michael is going home",
-    "mike is going home",
-    "james is going home",
-    "tom is going home",
-    "america is going home",
     "chuck is going home",
-    "jason is going home",
-    "alice is going home",
     "jim is going home",
-    "bob is going home",
     "bruce is going home",
-    "charles is going home",
-    "rachel is going home",
     "i am with you",
     "i am with him",
     "i am with her",
     "i am with them",
-    "i am with god",
     "i am with thee",
-    "i am with jesus",
     "i am with me",
     "i am with myself",
     "i am with love",
     "i am with it",
-    "i am with christ",
     "this is for you",
     "this is for show",
     "this is for now",
@@ -1494,7 +1398,6 @@
     "this is for testing",
     "this is for me",
     "this is for charity",
-    "this is for mac",
     "this is for christmas",
     "this is for today",
     "this is for publication",
@@ -1554,7 +1457,6 @@
     "others said to come already",
     "enough said to come already",
     "or said to come already",
-    "trump said to come already",
     "all said to come already",
     "best said to come already",
     "well said to come already",
@@ -1564,7 +1466,6 @@
     "i am looking for answers",
     "i am looking for help",
     "i am looking for you",
-    "i am looking for jobs",
     "i am looking for opportunities",
     "i am looking for employment",
     "i am looking for friends",
@@ -1602,27 +1503,19 @@
     "i am looking for this",
     "i am looking for freedom",
     "i am looking for security",
-    "i am looking for hope",
     "i am looking for clarity",
     "i am looking for trouble",
     "he is very talented",
     "she is very talented",
     "everyone is very talented",
-    "steve is very talented",
     "everybody is very talented",
-    "david is very talented",
-    "michael is very talented",
-    "mike is very talented",
-    "alex is very talented",
     "winter is already here",
     "it is already here",
     "summer is already here",
     "tomorrow is already here",
     "christmas is already here",
     "spring is already here",
-    "china is already here",
     "september is already here",
-    "trump is already here",
     "he is already here",
     "this is already here",
     "november is already here",
@@ -1631,17 +1524,13 @@
     "war is already here",
     "everything is already here",
     "december is already here",
-    "america is already here",
     "death is already here",
     "august is already here",
     "today is already here",
-    "europe is already here",
     "change is already here",
     "brexit is already here",
     "march is already here",
-    "god is already here",
     "history is already here",
-    "paris is already here",
     "january is already here",
     "friday is already here",
     "justice is already here",
@@ -1651,10 +1540,8 @@
     "future is already here",
     "february is already here",
     "june is already here",
-    "canada is already here",
     "sunday is already here",
     "hell is already here",
-    "london is already here",
     "i want to eat some food",
     "i want to get some food",
     "i want to cook some food",
@@ -1921,7 +1808,6 @@
     "go ahead and celebrate",
     "go ahead and eat",
     "go ahead and guess",
-    "go ahead and hope",
     "go ahead and wait",
     "go ahead and experiment",
     "go ahead and proceed",
@@ -1980,7 +1866,6 @@
     "help me read",
     "help me escape",
     "help me too",
-    "help me hope",
     "help me find",
     "help me relax",
     "i don't feel like writing today",
@@ -2026,7 +1911,6 @@
     "let's just celebrate already",
     "let's just breathe already",
     "let's just finish already",
-    "let's just hope already",
     "let's just pretend already",
     "let's just wait already",
     "let's just move already",
@@ -2175,30 +2059,6 @@
       "now"
     ],
     [
-      "peter",
-      "is",
-      "hungry",
-      "now"
-    ],
-    [
-      "alex",
-      "is",
-      "hungry",
-      "now"
-    ],
-    [
-      "jesus",
-      "is",
-      "hungry",
-      "now"
-    ],
-    [
-      "sarah",
-      "is",
-      "hungry",
-      "now"
-    ],
-    [
       "everyone",
       "is",
       "sleeping"
@@ -2225,11 +2085,6 @@
     ],
     [
       "someone",
-      "is",
-      "sleeping"
-    ],
-    [
-      "god",
       "is",
       "sleeping"
     ],
@@ -2244,27 +2099,7 @@
       "sleeping"
     ],
     [
-      "alex",
-      "is",
-      "sleeping"
-    ],
-    [
-      "jack",
-      "is",
-      "sleeping"
-    ],
-    [
       "who",
-      "is",
-      "sleeping"
-    ],
-    [
-      "jesus",
-      "is",
-      "sleeping"
-    ],
-    [
-      "john",
       "is",
       "sleeping"
     ],
@@ -2279,27 +2114,7 @@
       "sleeping"
     ],
     [
-      "trump",
-      "is",
-      "sleeping"
-    ],
-    [
       "this",
-      "is",
-      "sleeping"
-    ],
-    [
-      "david",
-      "is",
-      "sleeping"
-    ],
-    [
-      "sarah",
-      "is",
-      "sleeping"
-    ],
-    [
-      "adam",
       "is",
       "sleeping"
     ],
@@ -2309,57 +2124,7 @@
       "sleeping"
     ],
     [
-      "rachel",
-      "is",
-      "sleeping"
-    ],
-    [
       "sam",
-      "is",
-      "sleeping"
-    ],
-    [
-      "ryan",
-      "is",
-      "sleeping"
-    ],
-    [
-      "jason",
-      "is",
-      "sleeping"
-    ],
-    [
-      "alice",
-      "is",
-      "sleeping"
-    ],
-    [
-      "chris",
-      "is",
-      "sleeping"
-    ],
-    [
-      "tom",
-      "is",
-      "sleeping"
-    ],
-    [
-      "ben",
-      "is",
-      "sleeping"
-    ],
-    [
-      "mary",
-      "is",
-      "sleeping"
-    ],
-    [
-      "charlie",
-      "is",
-      "sleeping"
-    ],
-    [
-      "kevin",
       "is",
       "sleeping"
     ],
@@ -2369,207 +2134,85 @@
       "sleeping"
     ],
     [
-      "jake",
-      "is",
-      "sleeping"
-    ],
-    [
       "has",
       "he",
       "eaten",
-      "yet?"
+      "yet"
     ],
     [
       "has",
       "she",
       "eaten",
-      "yet?"
+      "yet"
     ],
     [
       "has",
       "anyone",
       "eaten",
-      "yet?"
+      "yet"
     ],
     [
       "has",
       "everyone",
       "eaten",
-      "yet?"
+      "yet"
     ],
     [
       "has",
       "anybody",
       "eaten",
-      "yet?"
+      "yet"
     ],
     [
       "has",
       "someone",
       "eaten",
-      "yet?"
-    ],
-    [
-      "has",
-      "lily",
-      "eaten",
-      "yet?"
-    ],
-    [
-      "has",
-      "josh",
-      "eaten",
-      "yet?"
+      "yet"
     ],
     [
       "where",
       "is",
-      "he?"
+      "he"
     ],
     [
       "where",
       "is",
-      "trump?"
+      "she"
     ],
     [
       "where",
       "is",
-      "she?"
+      "it"
     ],
     [
       "where",
       "is",
-      "america?"
+      "aleppo"
     ],
     [
       "where",
       "is",
-      "god?"
+      "superman"
     ],
     [
       "where",
       "is",
-      "israel?"
+      "syria"
     ],
     [
       "where",
       "is",
-      "russia?"
+      "everyone"
     ],
     [
       "where",
       "is",
-      "isis?"
+      "justice"
     ],
     [
       "where",
       "is",
-      "china?"
-    ],
-    [
-      "where",
-      "is",
-      "obama?"
-    ],
-    [
-      "where",
-      "is",
-      "it?"
-    ],
-    [
-      "where",
-      "is",
-      "clinton?"
-    ],
-    [
-      "where",
-      "is",
-      "aleppo?"
-    ],
-    [
-      "where",
-      "is",
-      "canada?"
-    ],
-    [
-      "where",
-      "is",
-      "putin?"
-    ],
-    [
-      "where",
-      "is",
-      "jesus?"
-    ],
-    [
-      "where",
-      "is",
-      "superman?"
-    ],
-    [
-      "where",
-      "is",
-      "syria?"
-    ],
-    [
-      "where",
-      "is",
-      "london?"
-    ],
-    [
-      "where",
-      "is",
-      "everyone?"
-    ],
-    [
-      "where",
-      "is",
-      "paul?"
-    ],
-    [
-      "where",
-      "is",
-      "iran?"
-    ],
-    [
-      "where",
-      "is",
-      "justice?"
-    ],
-    [
-      "where",
-      "is",
-      "jordan?"
-    ],
-    [
-      "where",
-      "is",
-      "hillary?"
-    ],
-    [
-      "where",
-      "is",
-      "iraq?"
-    ],
-    [
-      "where",
-      "is",
-      "japan?"
-    ],
-    [
-      "where",
-      "is",
-      "democracy?"
-    ],
-    [
-      "where",
-      "is",
-      "europe?"
-    ],
-    [
-      "where",
-      "is",
-      "paris?"
+      "democracy"
     ],
     [
       "he",
@@ -2596,49 +2239,13 @@
       "today"
     ],
     [
-      "god",
-      "is",
-      "happy",
-      "today"
-    ],
-    [
       "nobody",
       "is",
       "happy",
       "today"
     ],
     [
-      "jesus",
-      "is",
-      "happy",
-      "today"
-    ],
-    [
       "nature",
-      "is",
-      "happy",
-      "today"
-    ],
-    [
-      "america",
-      "is",
-      "happy",
-      "today"
-    ],
-    [
-      "mary",
-      "is",
-      "happy",
-      "today"
-    ],
-    [
-      "david",
-      "is",
-      "happy",
-      "today"
-    ],
-    [
-      "john",
       "is",
       "happy",
       "today"
@@ -2668,24 +2275,6 @@
       "today"
     ],
     [
-      "peter",
-      "is",
-      "happy",
-      "today"
-    ],
-    [
-      "bob",
-      "is",
-      "happy",
-      "today"
-    ],
-    [
-      "israel",
-      "is",
-      "happy",
-      "today"
-    ],
-    [
       "who",
       "is",
       "happy",
@@ -2693,12 +2282,6 @@
     ],
     [
       "someone",
-      "is",
-      "happy",
-      "today"
-    ],
-    [
-      "hope",
       "is",
       "happy",
       "today"
@@ -2734,43 +2317,7 @@
       "home"
     ],
     [
-      "trump",
-      "is",
-      "going",
-      "home"
-    ],
-    [
       "someone",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "obama",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "kevin",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "jesus",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "alex",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "chris",
       "is",
       "going",
       "home"
@@ -2788,49 +2335,7 @@
       "home"
     ],
     [
-      "jack",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "ryan",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "jordan",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "john",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "paul",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "steve",
-      "is",
-      "going",
-      "home"
-    ],
-    [
       "george",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "hillary",
       "is",
       "going",
       "home"
@@ -2842,67 +2347,7 @@
       "home"
     ],
     [
-      "charlie",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "sarah",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "peter",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "josh",
-      "is",
-      "going",
-      "home"
-    ],
-    [
       "joe",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "david",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "michael",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "mike",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "james",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "tom",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "america",
       "is",
       "going",
       "home"
@@ -2914,43 +2359,13 @@
       "home"
     ],
     [
-      "jason",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "alice",
-      "is",
-      "going",
-      "home"
-    ],
-    [
       "jim",
       "is",
       "going",
       "home"
     ],
     [
-      "bob",
-      "is",
-      "going",
-      "home"
-    ],
-    [
       "bruce",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "charles",
-      "is",
-      "going",
-      "home"
-    ],
-    [
-      "rachel",
       "is",
       "going",
       "home"
@@ -2983,19 +2398,7 @@
       "i",
       "am",
       "with",
-      "god"
-    ],
-    [
-      "i",
-      "am",
-      "with",
       "thee"
-    ],
-    [
-      "i",
-      "am",
-      "with",
-      "jesus"
     ],
     [
       "i",
@@ -3020,12 +2423,6 @@
       "am",
       "with",
       "it"
-    ],
-    [
-      "i",
-      "am",
-      "with",
-      "christ"
     ],
     [
       "this",
@@ -3080,12 +2477,6 @@
       "is",
       "for",
       "charity"
-    ],
-    [
-      "this",
-      "is",
-      "for",
-      "mac"
     ],
     [
       "this",
@@ -3466,13 +2857,6 @@
       "already"
     ],
     [
-      "trump",
-      "said",
-      "to",
-      "come",
-      "already"
-    ],
-    [
       "all",
       "said",
       "to",
@@ -3534,13 +2918,6 @@
       "looking",
       "for",
       "you"
-    ],
-    [
-      "i",
-      "am",
-      "looking",
-      "for",
-      "jobs"
     ],
     [
       "i",
@@ -3806,13 +3183,6 @@
       "am",
       "looking",
       "for",
-      "hope"
-    ],
-    [
-      "i",
-      "am",
-      "looking",
-      "for",
       "clarity"
     ],
     [
@@ -3841,37 +3211,7 @@
       "talented"
     ],
     [
-      "steve",
-      "is",
-      "very",
-      "talented"
-    ],
-    [
       "everybody",
-      "is",
-      "very",
-      "talented"
-    ],
-    [
-      "david",
-      "is",
-      "very",
-      "talented"
-    ],
-    [
-      "michael",
-      "is",
-      "very",
-      "talented"
-    ],
-    [
-      "mike",
-      "is",
-      "very",
-      "talented"
-    ],
-    [
-      "alex",
       "is",
       "very",
       "talented"
@@ -3913,19 +3253,7 @@
       "here"
     ],
     [
-      "china",
-      "is",
-      "already",
-      "here"
-    ],
-    [
       "september",
-      "is",
-      "already",
-      "here"
-    ],
-    [
-      "trump",
       "is",
       "already",
       "here"
@@ -3979,12 +3307,6 @@
       "here"
     ],
     [
-      "america",
-      "is",
-      "already",
-      "here"
-    ],
-    [
       "death",
       "is",
       "already",
@@ -3998,12 +3320,6 @@
     ],
     [
       "today",
-      "is",
-      "already",
-      "here"
-    ],
-    [
-      "europe",
       "is",
       "already",
       "here"
@@ -4027,19 +3343,7 @@
       "here"
     ],
     [
-      "god",
-      "is",
-      "already",
-      "here"
-    ],
-    [
       "history",
-      "is",
-      "already",
-      "here"
-    ],
-    [
-      "paris",
       "is",
       "already",
       "here"
@@ -4099,12 +3403,6 @@
       "here"
     ],
     [
-      "canada",
-      "is",
-      "already",
-      "here"
-    ],
-    [
       "sunday",
       "is",
       "already",
@@ -4112,12 +3410,6 @@
     ],
     [
       "hell",
-      "is",
-      "already",
-      "here"
-    ],
-    [
-      "london",
       "is",
       "already",
       "here"
@@ -4486,343 +3778,343 @@
       "can",
       "i",
       "stay",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "live",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "come",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "sleep",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "sit",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "park",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "go",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "speak",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "work",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "leave",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "talk",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "eat",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "get",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "be",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "wait",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "start",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "stand",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "help",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "change",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "volunteer",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "stop",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "move",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "call",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "finish",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "vote",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "walk",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "sign",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "see",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "pray",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "remain",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "register",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "play",
-      "here?"
+      "here"
     ],
     [
       "can",
       "i",
       "visit",
-      "here?"
+      "here"
     ],
     [
       "can",
       "you",
       "talk",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "chat",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "come",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "call",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "speak",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "return",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "answer",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "skype",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "play",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "meet",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "ask",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "try",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "visit",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "help",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "comment",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "see",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "explain",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "respond",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "check",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "hear",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "remember",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "text",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "join",
-      "later?"
+      "later"
     ],
     [
       "can",
       "you",
       "update",
-      "later?"
+      "later"
     ],
     [
       "i",
@@ -6014,12 +5306,6 @@
       "go",
       "ahead",
       "and",
-      "hope"
-    ],
-    [
-      "go",
-      "ahead",
-      "and",
       "wait"
     ],
     [
@@ -6320,11 +5606,6 @@
       "help",
       "me",
       "too"
-    ],
-    [
-      "help",
-      "me",
-      "hope"
     ],
     [
       "help",
@@ -6644,12 +5925,6 @@
       "let's",
       "just",
       "finish",
-      "already"
-    ],
-    [
-      "let's",
-      "just",
-      "hope",
       "already"
     ],
     [
@@ -7442,13 +6717,6 @@
       "let's",
       "try",
       "to",
-      "hope",
-      "tomorrow"
-    ],
-    [
-      "let's",
-      "try",
-      "to",
       "escape",
       "tomorrow"
     ],
@@ -7820,13 +7088,6 @@
       "no",
       "need",
       "to",
-      "hope",
-      "anymore"
-    ],
-    [
-      "no",
-      "need",
-      "to",
       "watch",
       "anymore"
     ],
@@ -7835,989 +7096,982 @@
       "you",
       "talk",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "answer",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "hear",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "speak",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "respond",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "understand",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "donate",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "help",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "start",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "drive",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "pray",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "see",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "leave",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "breathe",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "remember",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "stop",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "translate",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "explain",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "continue",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "say",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "sing",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "finish",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "communicate",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "die",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "imagine",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "call",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "connect",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "play",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "sleep",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "ask",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "reply",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "cry",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "chat",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "comment",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "confirm",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "vote",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "go",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "eat",
       "right",
-      "now?"
+      "now"
     ],
     [
       "can",
       "you",
       "wait",
       "right",
-      "now?"
+      "now"
     ],
     [
       "who",
       "is",
       "in",
-      "there?"
+      "there"
     ],
     [
       "who",
       "is",
       "out",
-      "there?"
+      "there"
     ],
     [
       "who",
       "is",
       "really",
-      "there?"
+      "there"
     ],
     [
       "who",
       "is",
       "up",
-      "there?"
+      "there"
     ],
     [
       "who",
       "is",
       "over",
-      "there?"
+      "there"
     ],
     [
       "who",
       "is",
       "down",
-      "there?"
+      "there"
     ],
     [
       "who",
       "is",
       "actually",
-      "there?"
+      "there"
     ],
     [
       "who",
       "is",
       "sitting",
-      "there?"
+      "there"
     ],
     [
       "who",
       "is",
       "standing",
-      "there?"
+      "there"
     ],
     [
       "who",
       "is",
       "still",
-      "there?"
+      "there"
     ],
     [
       "who",
       "is",
       "back",
-      "there?"
+      "there"
     ],
     [
       "who",
       "is",
       "living",
-      "there?"
+      "there"
     ],
     [
       "who",
       "is",
       "hiding",
-      "there?"
+      "there"
     ],
     [
       "who",
       "is",
       "right",
-      "there?"
+      "there"
     ],
     [
       "who",
       "is",
       "doing",
-      "there?"
+      "there"
     ],
     [
       "who",
       "is",
       "praying",
-      "there?"
+      "there"
     ],
     [
       "who",
       "is",
       "not",
-      "there?"
+      "there"
     ],
     [
       "who",
       "is",
       "working",
-      "there?"
+      "there"
     ],
     [
       "who",
       "is",
       "even",
-      "there?"
+      "there"
     ],
     [
       "why",
       "are",
       "you",
       "out",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "even",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "still",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "really",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "coming",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "on",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "standing",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "doing",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "all",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "hiding",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "living",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "sitting",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "down",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "over",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "asking",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "in",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "staying",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "back",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "up",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "waiting",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "actually",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "not",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "writing",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "stopping",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "working",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "ever",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "right",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "visiting",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "afraid",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "playing",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "asked",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "being",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "talking",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "speaking",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "stuck",
-      "here?"
+      "here"
     ],
     [
       "why",
       "are",
       "you",
       "already",
-      "here?"
+      "here"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "up?"
+      "up"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "leaving?"
+      "leaving"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "starting?"
+      "starting"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "awake?"
+      "awake"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "playing?"
+      "playing"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "at?"
+      "visiting"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "visiting?"
+      "speaking"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "speaking?"
+      "here"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "here?"
+      "there"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "there?"
+      "eating"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "eating?"
+      "due"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "due?"
+      "off"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "off?"
+      "out"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "out?"
+      "on"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "on?"
+      "running"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "running?"
+      "arriving"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "arriving?"
+      "online"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "online?"
+      "working"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "working?"
+      "outside"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "outside?"
+      "broadcasting"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "broadcasting?"
+      "performing"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "performing?"
+      "travelling"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "travelling?"
+      "home"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "home?"
+      "now"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "now?"
+      "born"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "born?"
+      "flying"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "flying?"
+      "in"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "in?"
+      "going"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "going?"
+      "sleeping"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "sleeping?"
+      "talking"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "talking?"
+      "traveling"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "traveling?"
+      "released"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "released?"
+      "today"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "today?"
+      "open"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "open?"
+      "free"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "free?"
+      "available"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "available?"
+      "meeting"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "meeting?"
+      "tweeting"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "tweeting?"
+      "waiting"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "waiting?"
+      "fasting"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "fasting?"
+      "shooting"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "shooting?"
+      "attending"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "attending?"
+      "practicing"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "practicing?"
+      "retiring"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "retiring?"
+      "voting"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "voting?"
+      "filming"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "filming?"
+      "blogging"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "blogging?"
+      "showing"
     ],
     [
       "what",
       "time",
       "are",
       "you",
-      "showing?"
-    ],
-    [
-      "what",
-      "time",
-      "are",
-      "you",
-      "departing?"
+      "departing"
     ],
     [
       "the",
@@ -10002,14 +9256,6 @@
       "is",
       "so",
       "great",
-      "today"
-    ],
-    [
-      "the",
-      "weather",
-      "is",
-      "so",
-      "crappy",
       "today"
     ],
     [
