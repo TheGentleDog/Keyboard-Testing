@@ -835,13 +835,19 @@ class LauncherUI(tk.Tk):
         self._launcher_canvas.bind("<ButtonRelease-1>", self._stop_window_drag)
 
         nav_bg = "#050607"
+        nav_x, nav_y, nav_w, nav_h = 14, 40, 225, 501
         content_wrap = tk.Frame(self._launcher_canvas, bg="#070809", width=576, height=501)
         self._launcher_canvas.create_window(253, 40, anchor="nw", width=576, height=501, window=content_wrap)
         content_wrap.pack_propagate(False)
 
-        nav = tk.Frame(self._launcher_canvas, bg=nav_bg, width=225, height=501)
-        self._launcher_canvas.create_window(14, 40, anchor="nw", width=225, height=501, window=nav)
-        nav.pack_propagate(False)
+        if Image is not None:
+            self._nav_panel_photo = self._render_alpha_panel(nav_w, nav_h, nav_bg, 0.3)
+            self._launcher_canvas.create_image(nav_x, nav_y, anchor="nw", image=self._nav_panel_photo)
+        else:
+            self._launcher_canvas.create_rectangle(
+                nav_x, nav_y, nav_x + nav_w, nav_y + nav_h,
+                outline="", fill=nav_bg, stipple="gray25",
+            )
 
         style = ttk.Style(self)
         try:
@@ -891,20 +897,40 @@ class LauncherUI(tk.Tk):
                 canvas.tag_lower(self._content_gradient_id)
             self._layout_canvas_sections(canvas, sections, section_windows, section_order)
 
-        def mousewheel(event):
-            self._scroll_canvas_settings(canvas, sections, int(-1 * (event.delta / 120)) * 42)
-
         def set_active(key):
             self._active_setup_section = key
             for item_key, item in nav_items.items():
                 if Image is not None:
                     image = nav_images[item_key]["active" if item_key == key else "idle"]
-                    item.config(image=image, fg="#ffffff" if item_key == key else d["text"])
-                else:
-                    item.config(
-                        bg="#15181c" if item_key == key else nav_bg,
-                        fg="#ffffff" if item_key == key else d["text"],
+                    self._launcher_canvas.itemconfigure(item["bg"], image=image)
+                    self._launcher_canvas.itemconfigure(
+                        item["text"], fill="#ffffff" if item_key == key else d["text"]
                     )
+                else:
+                    self._launcher_canvas.itemconfigure(
+                        item["bg"], fill="#15181c" if item_key == key else nav_bg
+                    )
+                    self._launcher_canvas.itemconfigure(
+                        item["text"], fill="#ffffff" if item_key == key else d["text"]
+                    )
+
+        def sync_active_from_scroll():
+            if not sections:
+                return
+            marker = self._settings_scroll_y + max(56, int(canvas.winfo_height() * 0.18))
+            active_key = self._active_setup_section
+            for item_key, section_top in sorted(sections.items(), key=lambda item: item[1]):
+                if section_top <= marker:
+                    active_key = item_key
+                else:
+                    break
+            if active_key != self._active_setup_section:
+                set_active(active_key)
+
+        def mousewheel(event):
+            self._scroll_canvas_settings(canvas, sections, int(-1 * (event.delta / 120)) * 42)
+            sync_active_from_scroll()
+            return "break"
 
         def jump_to(key):
             self.update_idletasks()
@@ -926,28 +952,50 @@ class LauncherUI(tk.Tk):
             set_active(key)
 
         def make_nav(key, text):
+            index = len(nav_items)
+            item_y = nav_y + 33 + index * 50
+            item_x = nav_x + 10
             if Image is not None:
                 nav_images[key] = {
-                    "idle": self._render_nav_pill(206, 42, nav_bg, 0),
+                    "idle": self._render_nav_pill(206, 42, nav_bg, 12),
                     "hover": self._render_nav_pill(206, 42, "#111315", 12),
                     "active": self._render_nav_pill(206, 42, "#15181c", 12),
                 }
-                item = tk.Label(nav, text=text, image=nav_images[key]["idle"],
-                                compound="center", bg=nav_bg, fg=d["text"],
-                                font=("Segoe UI", 12), anchor="w",
-                                padx=0, pady=0, cursor="hand2")
+                bg_item = self._launcher_canvas.create_image(
+                    item_x, item_y, anchor="nw", image=nav_images[key]["idle"],
+                    tags=(f"nav_{key}", "nav_item"),
+                )
             else:
-                item = tk.Label(nav, text=text, bg=nav_bg, fg=d["text"],
-                                font=("Segoe UI", 12), anchor="w",
-                                padx=16, pady=8, cursor="hand2")
-            item.pack(fill="x", padx=10, pady=2)
-            item.bind("<Button-1>", lambda _e, k=key: jump_to(k))
+                bg_item = self._launcher_canvas.create_rectangle(
+                    item_x, item_y, item_x + 206, item_y + 42,
+                    outline="", fill=nav_bg, tags=(f"nav_{key}", "nav_item"),
+                )
+            text_item = self._launcher_canvas.create_text(
+                item_x + 103, item_y + 21, text=text, fill=d["text"],
+                font=("Segoe UI", 12), anchor="center", tags=(f"nav_{key}", "nav_item"),
+            )
+            self._launcher_canvas.tag_bind(f"nav_{key}", "<Button-1>", lambda _e, k=key: jump_to(k))
             if Image is not None:
-                item.bind("<Enter>", lambda _e, i=item, k=key: i.config(image=nav_images[k]["hover"]))
+                self._launcher_canvas.tag_bind(
+                    f"nav_{key}", "<Enter>",
+                    lambda _e, b=bg_item, k=key: (
+                        self._launcher_canvas.configure(cursor="hand2"),
+                        self._launcher_canvas.itemconfigure(b, image=nav_images[k]["hover"]),
+                    ),
+                )
             else:
-                item.bind("<Enter>", lambda _e, i=item: i.config(bg="#111315"))
-            item.bind("<Leave>", lambda _e: set_active(self._active_setup_section))
-            nav_items[key] = item
+                self._launcher_canvas.tag_bind(
+                    f"nav_{key}", "<Enter>",
+                    lambda _e, b=bg_item: (
+                        self._launcher_canvas.configure(cursor="hand2"),
+                        self._launcher_canvas.itemconfigure(b, fill="#111315"),
+                    ),
+                )
+            self._launcher_canvas.tag_bind(
+                f"nav_{key}", "<Leave>",
+                lambda _e: (self._launcher_canvas.configure(cursor=""), set_active(self._active_setup_section)),
+            )
+            nav_items[key] = {"bg": bg_item, "text": text_item}
 
         def section(key, title):
             frame = tk.Frame(canvas, bg=panel_bg, bd=0)
@@ -996,7 +1044,6 @@ class LauncherUI(tk.Tk):
                      ).pack(side="left", fill="x", expand=True)
             return row
 
-        tk.Frame(nav, bg=nav_bg, height=38).pack(fill="x")
         for key, title in [
             ("camera", "Camera Window"),
             ("layout", "Keyboard layout"),
@@ -1008,34 +1055,64 @@ class LauncherUI(tk.Tk):
         ]:
             make_nav(key, title)
 
-        nav_footer = tk.Frame(nav, bg=nav_bg)
-        nav_footer.pack(fill="x", padx=18, pady=(16, 0))
+        def footer_button(key, label, y, fill, hover, callback):
+            x1 = nav_x + 18
+            w = nav_w - 36
+            h = 34
+            tag = f"footer_{key}"
+            if Image is not None:
+                normal_img = self._render_nav_pill(w, h, fill, 10)
+                hover_img = self._render_nav_pill(w, h, hover, 10)
+                nav_images[tag] = {"idle": normal_img, "hover": hover_img}
+                rect = self._launcher_canvas.create_image(
+                    x1, y, anchor="nw", image=normal_img, tags=(tag, "footer_button"),
+                )
+            else:
+                rect = self._launcher_canvas.create_rectangle(
+                    x1, y, x1 + w, y + h, outline="", fill=fill, tags=(tag, "footer_button"),
+                )
+            self._launcher_canvas.create_text(
+                x1 + w / 2, y + h / 2, text=label, fill="#ffffff",
+                font=("Segoe UI", 8, "bold"), anchor="center", tags=(tag, "footer_button"),
+            )
+            self._launcher_canvas.tag_bind(tag, "<Button-1>", callback)
+            if Image is not None:
+                self._launcher_canvas.tag_bind(
+                    tag, "<Enter>",
+                    lambda _e, r=rect, t=tag: (
+                        self._launcher_canvas.configure(cursor="hand2"),
+                        self._launcher_canvas.itemconfigure(r, image=nav_images[t]["hover"]),
+                    ),
+                )
+                self._launcher_canvas.tag_bind(
+                    tag, "<Leave>",
+                    lambda _e, r=rect, t=tag: (
+                        self._launcher_canvas.configure(cursor=""),
+                        self._launcher_canvas.itemconfigure(r, image=nav_images[t]["idle"]),
+                    ),
+                )
+            else:
+                self._launcher_canvas.tag_bind(
+                    tag, "<Enter>",
+                    lambda _e, r=rect: (
+                        self._launcher_canvas.configure(cursor="hand2"),
+                        self._launcher_canvas.itemconfigure(r, fill=hover),
+                    ),
+                )
+                self._launcher_canvas.tag_bind(
+                    tag, "<Leave>",
+                    lambda _e, r=rect: (
+                        self._launcher_canvas.configure(cursor=""),
+                        self._launcher_canvas.itemconfigure(r, fill=fill),
+                    ),
+                )
 
-        default_btn = tk.Label(nav_footer, text="Set default", bg="#3a3b3f", fg="#ffffff",
-                               font=("Segoe UI", 9, "bold"), padx=12, pady=8,
-                               cursor="hand2")
-        default_btn.pack(fill="x", pady=(0, 7))
-        default_btn.bind("<Button-1>", self._set_launcher_defaults)
-        default_btn.bind("<Enter>", lambda _e: default_btn.config(bg="#484a4f"))
-        default_btn.bind("<Leave>", lambda _e: default_btn.config(bg="#3a3b3f"))
-
-        tutorial_btn = tk.Label(nav_footer, text="Start with tutorial",
-                                bg=d["accent"], fg="#ffffff",
-                                font=("Segoe UI", 9, "bold"), padx=12, pady=8,
-                                cursor="hand2")
-        tutorial_btn.pack(fill="x", pady=(0, 7))
-        tutorial_btn.bind("<Button-1>", lambda e: self._on_start(e, tutorial=True))
-        tutorial_btn.bind("<Enter>", lambda _e: tutorial_btn.config(bg=d["accent_hov"]))
-        tutorial_btn.bind("<Leave>", lambda _e: tutorial_btn.config(bg=d["accent"]))
-
-        skip_btn = tk.Label(nav_footer, text="Start without tutorial",
-                            bg="#3a3b3f", fg="#ffffff",
-                            font=("Segoe UI", 9, "bold"), padx=12, pady=8,
-                            cursor="hand2")
-        skip_btn.pack(fill="x")
-        skip_btn.bind("<Button-1>", lambda e: self._on_start(e, tutorial=False))
-        skip_btn.bind("<Enter>", lambda _e: skip_btn.config(bg="#484a4f"))
-        skip_btn.bind("<Leave>", lambda _e: skip_btn.config(bg="#3a3b3f"))
+        footer_y = nav_y + nav_h - 120
+        footer_button("default", "Set default", footer_y, "#3a3b3f", "#484a4f", self._set_launcher_defaults)
+        footer_button("tutorial", "Start with tutorial", footer_y + 42, "#3a3b3f", "#484a4f",
+                      lambda e: self._on_start(e, tutorial=True))
+        footer_button("skip", "Start without tutorial", footer_y + 84, "#3a3b3f", "#484a4f",
+                      lambda e: self._on_start(e, tutorial=False))
 
         self._draw_canvas_settings(canvas, sections)
         canvas.bind("<Configure>", lambda _e: self._draw_canvas_settings(canvas, sections, keep_scroll=True))
@@ -1125,6 +1202,7 @@ class LauncherUI(tk.Tk):
     def _draw_canvas_settings(self, canvas, sections, keep_scroll=False):
         canvas.delete("settings_ui")
         sections.clear()
+        self._settings_header_panels = []
         if self._content_gradient_id is not None:
             canvas.tag_lower(self._content_gradient_id)
         if not keep_scroll:
@@ -1217,15 +1295,22 @@ class LauncherUI(tk.Tk):
         def preview_button():
             tag = "settings_preview"
             bx, by = x + 6, y_positions[0]
+            bw, bh = 120, 36
             running = self._preview_thread is not None and self._preview_thread.is_alive()
             label = "Close Preview" if running else "Open Preview"
-            fill = self.DARK["danger"] if running else accent
-            canvas.create_rectangle(bx, by, bx + 120, by + 36, outline="", fill=fill,
+            fill = self.DARK["danger"] if running else "#3a3b3f"
+            if Image is not None:
+                preview_photo = self._render_nav_pill(bw, bh, fill, 10)
+                self._settings_header_panels.append(preview_photo)
+                canvas.create_image(bx, by, anchor="nw", image=preview_photo,
                                     tags=("settings_ui", tag))
-            canvas.create_text(bx + 60, by + 18, text=label, fill="#ffffff",
+            else:
+                canvas.create_rectangle(bx, by, bx + bw, by + bh, outline="", fill=fill,
+                                        tags=("settings_ui", tag))
+            canvas.create_text(bx + bw / 2, by + bh / 2, text=label, fill="#ffffff",
                                font=("Segoe UI", 10, "bold"), tags=("settings_ui", tag))
             self._preview_status_canvas = canvas.create_text(
-                bx + 138, by + 18,
+                bx + 138, by + bh / 2,
                 text=getattr(self, "_preview_status_text", "Closed"),
                 fill=muted,
                 anchor="w",
@@ -1237,8 +1322,24 @@ class LauncherUI(tk.Tk):
 
         def section(key, label, draw_fn):
             sections[key] = y_positions[0] + self._settings_scroll_y
+            panel_x = x - 16
+            panel_y = y_positions[0] - 18
+            panel_w = width + 32
             title(label)
             draw_fn()
+            panel_h = y_positions[0] - panel_y + 20
+            if Image is not None:
+                panel_photo = self._render_alpha_panel(panel_w, panel_h, "#000000", 0.3)
+                self._settings_header_panels.append(panel_photo)
+                panel_id = canvas.create_image(
+                    panel_x, panel_y, anchor="nw", image=panel_photo, tags=("settings_ui",)
+                )
+            else:
+                panel_id = canvas.create_rectangle(
+                    panel_x, panel_y, panel_x + panel_w, panel_y + panel_h,
+                    outline="", fill="#000000", stipple="gray25", tags=("settings_ui",)
+                )
+            canvas.tag_lower(panel_id, "settings_ui")
             y_positions[0] += 44
 
         y_positions = [y]
@@ -1330,6 +1431,12 @@ class LauncherUI(tk.Tk):
         else:
             draw.rectangle(rect, fill=(*fill_rgb, 255))
         img = img.resize((width, height), Image.Resampling.LANCZOS)
+        return ImageTk.PhotoImage(img)
+
+    def _render_alpha_panel(self, width, height, fill, opacity):
+        alpha = max(0, min(255, round(255 * opacity)))
+        fill_rgb = self._hex_to_rgb(fill)
+        img = Image.new("RGBA", (width, height), (*fill_rgb, alpha))
         return ImageTk.PhotoImage(img)
 
     def _build_launcher_controls(self):
@@ -1585,6 +1692,32 @@ class LauncherUI(tk.Tk):
             self._animate_job = None
         self.destroy()
 
+    def destroy(self):
+        if getattr(self, "_destroying", False):
+            return
+        self._destroying = True
+        if self._animate_job is not None:
+            try:
+                self.after_cancel(self._animate_job)
+            except Exception:
+                pass
+            self._animate_job = None
+        try:
+            if self._content_canvas is not None:
+                self._content_canvas.unbind_all("<MouseWheel>")
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "_launcher_canvas") and self._launcher_canvas is not None:
+                self._launcher_canvas.delete("all")
+        except Exception:
+            pass
+        self._settings_header_panels = []
+        self._gradient_photo = None
+        self._content_gradient_photo = None
+        self._nav_panel_photo = None
+        super().destroy()
+
     def _on_start(self, _event=None, tutorial=True):
         self._stop_setup_preview()
         if self._animate_job is not None:
@@ -1594,6 +1727,9 @@ class LauncherUI(tk.Tk):
                 pass
             self._animate_job = None
         ui_layout = self._ui_layout_var.get()
+        if tutorial and ui_layout != "ui2":
+            print("[Info] Tutorial uses UI2 layout; switching from QWERTY for this session.")
+            ui_layout = "ui2"
         language_preset = []
         if self._language_english_var.get():
             language_preset.append("english")
@@ -1616,7 +1752,7 @@ class LauncherUI(tk.Tk):
             "distance_panel": self._distance_var.get(),
             "tutorial": tutorial,
         }
-        self.destroy()
+        self.quit()
 
 
 # =============================================================================
@@ -1645,10 +1781,19 @@ def main():
     launcher.mainloop()
 
     if launcher.result is None:
+        try:
+            launcher.destroy()
+        except Exception:
+            pass
         print("[Info] Launcher cancelled.")
         sys.exit(0)
 
     cfg = launcher.result
+    try:
+        launcher.destroy()
+    except Exception:
+        pass
+
     print("=" * 60)
     print("  GAZE-BASED DIGITAL KEYBOARD")
     print(f"  Points: {cfg['points']}  |  Samples: {cfg['samples']}  |  "
