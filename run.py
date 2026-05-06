@@ -601,7 +601,7 @@ class LauncherUI(tk.Tk):
         # ────────────────────────────────────────────────────────
         dwell = self._section(body, "DWELL MODE",
                               "Choose whether selection happens by trial winner or immediate hold.")
-        self._dwell_mode_var = tk.StringVar(value="sync")
+        self._dwell_mode_var = tk.StringVar(value="async")
         dwell_frame = tk.Frame(dwell, bg=d["card"])
         dwell_frame.pack(fill="x", pady=3)
         tk.Label(dwell_frame, text="Selection mode", bg=d["card"], fg=d["text"],
@@ -810,7 +810,7 @@ class LauncherUI(tk.Tk):
         self._camera_window_var = tk.BooleanVar(value=True)
         self._camera_debug_var = tk.BooleanVar(value=True)
         self._distance_var = tk.BooleanVar(value=True)
-        self._ui_layout_var = tk.StringVar(value="qwerty")
+        self._ui_layout_var = tk.StringVar(value="ui2")
         self._language_english_var = tk.BooleanVar(value=True)
         self._language_tagalog_var = tk.BooleanVar(value=True)
         self._dwell_mode_var = tk.StringVar(value="async")
@@ -1107,11 +1107,10 @@ class LauncherUI(tk.Tk):
                     ),
                 )
 
-        footer_y = nav_y + nav_h - 120
-        footer_button("default", "Set default", footer_y, "#3a3b3f", "#484a4f", self._set_launcher_defaults)
-        footer_button("tutorial", "Start with tutorial", footer_y + 42, "#3a3b3f", "#484a4f",
+        footer_y = nav_y + nav_h - 78
+        footer_button("tutorial", "Start with tutorial", footer_y, "#3a3b3f", "#484a4f",
                       lambda e: self._on_start(e, tutorial=True))
-        footer_button("skip", "Start without tutorial", footer_y + 84, "#3a3b3f", "#484a4f",
+        footer_button("skip", "Start without tutorial", footer_y + 42, "#3a3b3f", "#484a4f",
                       lambda e: self._on_start(e, tutorial=False))
 
         self._draw_canvas_settings(canvas, sections)
@@ -1236,14 +1235,22 @@ class LauncherUI(tk.Tk):
         def checkbox(label, var, key):
             tag = f"settings_{key}"
             cy = y_positions[0]
-            box = (x + 6, cy - 7, x + 18, cy + 5)
-            canvas.create_rectangle(*box, outline=muted, fill=self.STAGE_BG, tags=("settings_ui", tag))
+            box = (x + 4, cy - 9, x + 22, cy + 9)
+            outline = "#ffffff" if var.get() else muted
+            canvas.create_rectangle(*box, outline=outline, fill="#101214", width=2,
+                                    tags=("settings_ui", tag))
             if var.get():
-                canvas.create_rectangle(x + 8, cy - 5, x + 16, cy + 3, outline="", fill=green,
-                                        tags=("settings_ui", tag))
-                canvas.create_line(x + 9, cy - 1, x + 12, cy + 3, x + 17, cy - 6,
-                                   fill="#ffffff", width=2, tags=("settings_ui", tag))
-            canvas.create_text(x + 28, cy, text=label, fill=text, anchor="w",
+                canvas.create_line(
+                    x + 8, cy + 1,
+                    x + 12, cy + 5,
+                    x + 19, cy - 6,
+                    fill="#ffffff",
+                    width=2,
+                    capstyle="round",
+                    joinstyle="round",
+                    tags=("settings_ui", tag),
+                )
+            canvas.create_text(x + 34, cy, text=label, fill=text, anchor="w",
                                font=("Segoe UI", 12), tags=("settings_ui", tag))
             bind_click(tag, lambda _e, v=var: (v.set(not v.get()), self._draw_canvas_settings(canvas, sections, True)))
             y_positions[0] += 42
@@ -1251,10 +1258,13 @@ class LauncherUI(tk.Tk):
         def radio(label, var, value, key):
             tag = f"settings_{key}_{value}"
             cy = y_positions[0]
-            canvas.create_oval(x + 6, cy - 6, x + 18, cy + 6, outline=muted, fill=self.STAGE_BG,
+            selected = var.get() == value
+            canvas.create_oval(x + 5, cy - 7, x + 19, cy + 7,
+                               outline="#ffffff" if selected else muted,
+                               fill="#101214", width=2,
                                tags=("settings_ui", tag))
-            if var.get() == value:
-                canvas.create_oval(x + 9, cy - 3, x + 15, cy + 3, outline="", fill=green,
+            if selected:
+                canvas.create_oval(x + 9, cy - 3, x + 15, cy + 3, outline="", fill="#ffffff",
                                    tags=("settings_ui", tag))
             canvas.create_text(x + 28, cy, text=label, fill=text, anchor="w",
                                font=("Segoe UI", 12), tags=("settings_ui", tag))
@@ -1274,9 +1284,12 @@ class LauncherUI(tk.Tk):
             pct = max(0.0, min(1.0, pct))
             thumb_x = sx1 + (sx2 - sx1) * pct
             tag = f"settings_slider_{key}"
-            canvas.create_line(sx1, sy, sx2, sy, fill="#6b7075", width=4, tags=("settings_ui", tag))
-            canvas.create_line(sx1, sy, thumb_x, sy, fill=green, width=4, tags=("settings_ui", tag))
-            canvas.create_oval(thumb_x - 8, sy - 8, thumb_x + 8, sy + 8, outline="", fill="#ffffff",
+            canvas.create_line(sx1, sy, sx2, sy, fill="#6b7075", width=4,
+                               capstyle="round", tags=("settings_ui", tag))
+            canvas.create_line(sx1, sy, thumb_x, sy, fill="#ffffff", width=4,
+                               capstyle="round", tags=("settings_ui", tag))
+            canvas.create_oval(thumb_x - 8, sy - 8, thumb_x + 8, sy + 8,
+                               outline="#ffffff", fill="#ffffff",
                                tags=("settings_ui", tag))
             canvas.create_text(sx2 + 36, sy, text=fmt(value), fill=text, anchor="w",
                                font=("Segoe UI", 10, "bold"), tags=("settings_ui", tag))
@@ -1330,6 +1343,24 @@ class LauncherUI(tk.Tk):
             )
             bind_click(tag, self._toggle_setup_preview)
             y_positions[0] += 66
+
+        def default_button():
+            tag = "settings_default"
+            bw, bh = 170, 36
+            bx = x + width - bw - 6
+            by = y_positions[0]
+            if Image is not None:
+                default_photo = self._render_nav_pill(bw, bh, "#3a3b3f", 10)
+                self._settings_header_panels.append(default_photo)
+                canvas.create_image(bx, by, anchor="nw", image=default_photo,
+                                    tags=("settings_ui", tag))
+            else:
+                canvas.create_rectangle(bx, by, bx + bw, by + bh, outline="", fill="#3a3b3f",
+                                        tags=("settings_ui", tag))
+            canvas.create_text(bx + bw / 2, by + bh / 2, text="Set default", fill="#ffffff",
+                               font=("Segoe UI", 10, "bold"), tags=("settings_ui", tag))
+            bind_click(tag, self._set_launcher_defaults)
+            y_positions[0] += 58
 
         def section(key, label, draw_fn):
             sections[key] = y_positions[0] + self._settings_scroll_y
@@ -1390,6 +1421,8 @@ class LauncherUI(tk.Tk):
             checkbox("Enable EMA smoother", self._ema_on, "ema_on"),
             slider("EMA alpha", self._ema_var, 0.01, 1.0, lambda v: f"{v:.2f}", "ema"),
         ))
+
+        default_button()
 
         self._settings_content_height = max(1, y_positions[0] + self._settings_scroll_y)
         self._draw_settings_scrollbar(canvas)
