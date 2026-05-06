@@ -4,11 +4,12 @@
     "language": "Filipino-Tagalog (RoBERTa-generated)",
     "description": "Auto-generated Dataset via jcblaise/roberta-tagalog-base — For Gaze Based Digital Keyboard",
     "total_words": 997,
-    "total_phrases": 690,
+    "total_phrases": 715,
     "total_shortcuts": 104,
     "last_updated": "2026-05-04",
     "model_used": "jcblaise/roberta-tagalog-base",
-    "cleaned_blocked_corpus": true
+    "cleaned_blocked_corpus": true,
+    "aac_seed_phrases": true
   },
   "vocabulary": {
     "pronouns": [
@@ -1833,7 +1834,32 @@
     "sana ay matapos na tayo",
     "sana ay nandito na tayo",
     "sana ay magbago na tayo",
-    "sana ay dumating na tayo"
+    "sana ay dumating na tayo",
+    "kailangan ko ng tulong",
+    "kailangan ko ng tubig",
+    "kailangan ko ng pagkain",
+    "kailangan ko ng gamot",
+    "gutom na ako",
+    "uhaw na ako",
+    "pagod na ako",
+    "masakit ang katawan ko",
+    "masakit ang ulo ko",
+    "nilalamig ako",
+    "naiinitan ako",
+    "tulungan mo ako",
+    "pakiusap tulungan mo ako",
+    "pakitawagan ang pamilya ko",
+    "pakibigay ang gamot ko",
+    "pwede mo ba akong tulungan",
+    "pwede mo ba akong ilipat",
+    "pakibukas ang ilaw",
+    "pakipatay ang ilaw",
+    "gusto kong magpahinga",
+    "gusto kong matulog",
+    "gusto kong umuwi",
+    "salamat po",
+    "oo po",
+    "hindi po"
   ],
   "corpus_sequences": [
     [
@@ -8835,6 +8861,139 @@
       "oras",
       "ka",
       "lang"
+    ],
+    [
+      "kailangan",
+      "ko",
+      "ng",
+      "tulong"
+    ],
+    [
+      "kailangan",
+      "ko",
+      "ng",
+      "tubig"
+    ],
+    [
+      "kailangan",
+      "ko",
+      "ng",
+      "pagkain"
+    ],
+    [
+      "kailangan",
+      "ko",
+      "ng",
+      "gamot"
+    ],
+    [
+      "gutom",
+      "na",
+      "ako"
+    ],
+    [
+      "uhaw",
+      "na",
+      "ako"
+    ],
+    [
+      "pagod",
+      "na",
+      "ako"
+    ],
+    [
+      "masakit",
+      "ang",
+      "katawan",
+      "ko"
+    ],
+    [
+      "masakit",
+      "ang",
+      "ulo",
+      "ko"
+    ],
+    [
+      "nilalamig",
+      "ako"
+    ],
+    [
+      "naiinitan",
+      "ako"
+    ],
+    [
+      "tulungan",
+      "mo",
+      "ako"
+    ],
+    [
+      "pakiusap",
+      "tulungan",
+      "mo",
+      "ako"
+    ],
+    [
+      "pakitawagan",
+      "ang",
+      "pamilya",
+      "ko"
+    ],
+    [
+      "pakibigay",
+      "ang",
+      "gamot",
+      "ko"
+    ],
+    [
+      "pwede",
+      "mo",
+      "ba",
+      "akong",
+      "tulungan"
+    ],
+    [
+      "pwede",
+      "mo",
+      "ba",
+      "akong",
+      "ilipat"
+    ],
+    [
+      "pakibukas",
+      "ang",
+      "ilaw"
+    ],
+    [
+      "pakipatay",
+      "ang",
+      "ilaw"
+    ],
+    [
+      "gusto",
+      "kong",
+      "magpahinga"
+    ],
+    [
+      "gusto",
+      "kong",
+      "matulog"
+    ],
+    [
+      "gusto",
+      "kong",
+      "umuwi"
+    ],
+    [
+      "salamat",
+      "po"
+    ],
+    [
+      "oo",
+      "po"
+    ],
+    [
+      "hindi",
+      "po"
     ]
   ]
 }

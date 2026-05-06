@@ -637,9 +637,9 @@ def save_graph(
 
 
 PREDICTION_MODE_COLUMNS = [
-    ("tagalog mode", "filipino"),
-    ("english mode", "english"),
-    ("both mode", "both"),
+    ("Tagalog mode", "filipino"),
+    ("English mode", "english"),
+    ("Bilingual mode", "both"),
 ]
 
 
@@ -657,34 +657,33 @@ def _fmt_mode_value(stats: dict | None, key: str, is_pct: bool, lower_is_better:
 
 
 def print_prediction_mode_table(matrix: dict, top_k: int):
-    """Print one table comparing each corpus language across prediction modes."""
+    """Print separate MSP tables for Tagalog and English test cases."""
     print_header("MSP PREDICTION-MODE COMPARISON")
 
-    col_labels = []
-    for lang_label, lang_key in (("Filipino/Tagalog", "tagalog"), ("English", "english")):
-        if lang_key in matrix:
-            for mode_label, mode_key in PREDICTION_MODE_COLUMNS:
-                col_labels.append((lang_label, mode_label, lang_key, mode_key))
-
     metric_rows = [
-        ("Appearance Rate", "appearance_rate", True, False),
-        ("Hit@1 Rate", "hit_at_1_rate", True, False),
-        ("Avg MSP", "avg_msp", False, True),
-        ("Words", "n_words", False, False),
+        ("Evaluated Words", "n_words", False, False),
+        ("Top-K Appearance", "n_appeared", False, False),
+        ("Rate of Appearance in Suggestions", "appearance_rate", True, False),
+        ("Avg MSP (Mean Selection Points)", "avg_msp", False, True),
     ]
 
-    cell_w = 21
-    print(f"\n  {'':<18}" + "".join(f"{lang:<{cell_w}}" for lang, _, _, _ in col_labels))
-    print(f"  {'Metric':<18}" + "".join(f"{mode:<{cell_w}}" for _, mode, _, _ in col_labels))
-    print("  " + "-" * (18 + cell_w * len(col_labels)))
+    cell_w = 17
+    for test_lang, title in (("tagalog", "Tagalog words"), ("english", "English words")):
+        if test_lang not in matrix:
+            continue
 
-    for label, key, is_pct, lower_is_better in metric_rows:
-        row = f"  {label:<18}"
-        for _, _, lang_key, mode_key in col_labels:
-            row += f"{_fmt_mode_value(matrix[lang_key].get(mode_key), key, is_pct, lower_is_better):>{cell_w}}"
-        print(row)
+        print(f"\n  {title}")
+        header = f"  {'Metric':<18}" + ''.join(f"{mode_label:>{cell_w}}" for mode_label, _ in PREDICTION_MODE_COLUMNS)
+        print(header)
+        print("  " + "-" * (18 + cell_w * len(PREDICTION_MODE_COLUMNS)))
 
-    print(f"\n  Lower Avg MSP is better. Other rates are higher-is-better. Top-{top_k} suggestions.")
+        for label, key, is_pct, lower_is_better in metric_rows:
+            row = f"  {label:<18}"
+            for _, mode_key in PREDICTION_MODE_COLUMNS:
+                row += f"{_fmt_mode_value(matrix[test_lang].get(mode_key), key, is_pct, lower_is_better):>{cell_w}}"
+            print(row)
+
+    print(f"\n  Lower Avg MSP is better. Rates and appearance counts are higher-is-better. Top-{top_k} suggestions.")
 
 
 def show_prediction_mode_table(matrix: dict, top_k: int):
@@ -706,10 +705,10 @@ def show_prediction_mode_table(matrix: dict, top_k: int):
                 columns.append((lang_label, mode_label, lang_key, mode_key))
 
     rows = [
-        ("Appearance Rate", "appearance_rate", True),
-        ("Hit@1 Rate", "hit_at_1_rate", True),
-        ("Avg MSP", "avg_msp", False),
-        ("Words", "n_words", False),
+        ("Evaluated Words", "n_words", False),
+        ("Top-K Appearance", "n_appeared", False),
+        ("Rate of Appearance in Suggestions", "appearance_rate", True),
+        ("Avg MSP (Mean Selection Points)", "avg_msp", False),
     ]
 
     try:

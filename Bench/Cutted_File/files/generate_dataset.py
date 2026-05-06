@@ -336,6 +336,34 @@ CATEGORY_MAP = {
     "daily_life":    "verbs",
 }
 
+AAC_SEED_PHRASES = [
+    "kailangan ko ng tulong",
+    "kailangan ko ng tubig",
+    "kailangan ko ng pagkain",
+    "kailangan ko ng gamot",
+    "gutom na ako",
+    "uhaw na ako",
+    "pagod na ako",
+    "masakit ang katawan ko",
+    "masakit ang ulo ko",
+    "nilalamig ako",
+    "naiinitan ako",
+    "tulungan mo ako",
+    "pakiusap tulungan mo ako",
+    "pakitawagan ang pamilya ko",
+    "pakibigay ang gamot ko",
+    "pwede mo ba akong tulungan",
+    "pwede mo ba akong ilipat",
+    "pakibukas ang ilaw",
+    "pakipatay ang ilaw",
+    "gusto kong magpahinga",
+    "gusto kong matulog",
+    "gusto kong umuwi",
+    "salamat po",
+    "oo po",
+    "hindi po",
+]
+
 # ─────────────────────────────────────────────
 # FILTER SETS — applied after vocabulary generation
 # ─────────────────────────────────────────────
@@ -597,6 +625,8 @@ def generate(output_file: str = OUTPUT_FILE):
 
     print(f"\r    [{'█'*40}] {total_templates}/{total_templates} ✓\n")
 
+    all_corpus_seeds.extend(AAC_SEED_PHRASES)
+
     print("🔧 Expanding verb affixes...")
     for base in list(category_words.get("verbs", Counter()).keys())[:40]:
         for variant in expand_affixes(base):
@@ -633,7 +663,7 @@ def generate(output_file: str = OUTPUT_FILE):
         if clean not in seen_phrases and len(tokens) >= 2 and not contains_blocked_token(tokens):
             corpus.append(clean)
             seen_phrases.add(clean)
-        if len(corpus) >= 800:
+        if len(corpus) >= 1600:
             break
 
     # ── corpus_sequences: tokenised lists — used by model.py for n-gram training
@@ -648,7 +678,7 @@ def generate(output_file: str = OUTPUT_FILE):
             if key not in seen_seq:
                 corpus_sequences.append(tokens)
                 seen_seq.add(key)
-        if len(corpus_sequences) >= 1200:
+        if len(corpus_sequences) >= 2000:
             break
 
     total_words     = sum(len(v) for v in vocabulary.values())

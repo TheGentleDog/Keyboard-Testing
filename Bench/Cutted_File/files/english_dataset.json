@@ -4,11 +4,12 @@
     "language": "English (RoBERTa-generated)",
     "description": "Auto-generated Dataset via roberta-base — For Gaze Based Digital Keyboard",
     "total_words": 1191,
-    "total_phrases": 692,
+    "total_phrases": 715,
     "total_shortcuts": 82,
     "last_updated": "2026-05-04",
     "model_used": "roberta-base",
-    "cleaned_blocked_corpus": true
+    "cleaned_blocked_corpus": true,
+    "aac_seed_phrases": true
   },
   "vocabulary": {
     "pronouns": [
@@ -2007,7 +2008,30 @@
     "let's try to stop tomorrow",
     "let's try to talk tomorrow",
     "let's try to do tomorrow",
-    "let's try to reconnect tomorrow"
+    "let's try to reconnect tomorrow",
+    "i need help",
+    "i need water",
+    "i need food",
+    "i need medicine",
+    "i am hungry",
+    "i am thirsty",
+    "i am tired",
+    "i feel pain",
+    "i feel cold",
+    "i feel hot",
+    "please help me",
+    "please call my family",
+    "please give me medicine",
+    "can you help me",
+    "can you move me",
+    "can you turn on the light",
+    "can you turn off the light",
+    "i want to rest",
+    "i want to sleep",
+    "i want to go home",
+    "thank you",
+    "yes please",
+    "no thank you"
   ],
   "corpus_sequences": [
     [
@@ -9297,6 +9321,133 @@
       "so",
       "poor",
       "today"
+    ],
+    [
+      "i",
+      "need",
+      "help"
+    ],
+    [
+      "i",
+      "need",
+      "water"
+    ],
+    [
+      "i",
+      "need",
+      "food"
+    ],
+    [
+      "i",
+      "need",
+      "medicine"
+    ],
+    [
+      "i",
+      "am",
+      "hungry"
+    ],
+    [
+      "i",
+      "am",
+      "thirsty"
+    ],
+    [
+      "i",
+      "am",
+      "tired"
+    ],
+    [
+      "i",
+      "feel",
+      "pain"
+    ],
+    [
+      "i",
+      "feel",
+      "cold"
+    ],
+    [
+      "i",
+      "feel",
+      "hot"
+    ],
+    [
+      "please",
+      "help",
+      "me"
+    ],
+    [
+      "please",
+      "call",
+      "my",
+      "family"
+    ],
+    [
+      "please",
+      "give",
+      "me",
+      "medicine"
+    ],
+    [
+      "can",
+      "you",
+      "help",
+      "me"
+    ],
+    [
+      "can",
+      "you",
+      "move",
+      "me"
+    ],
+    [
+      "can",
+      "you",
+      "turn",
+      "on",
+      "the",
+      "light"
+    ],
+    [
+      "can",
+      "you",
+      "turn",
+      "off",
+      "the",
+      "light"
+    ],
+    [
+      "i",
+      "want",
+      "to",
+      "rest"
+    ],
+    [
+      "i",
+      "want",
+      "to",
+      "sleep"
+    ],
+    [
+      "i",
+      "want",
+      "to",
+      "go",
+      "home"
+    ],
+    [
+      "thank",
+      "you"
+    ],
+    [
+      "yes",
+      "please"
+    ],
+    [
+      "no",
+      "thank",
+      "you"
     ]
   ]
 }

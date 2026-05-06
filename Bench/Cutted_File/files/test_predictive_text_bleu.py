@@ -451,9 +451,9 @@ def print_comparison(en_metrics: dict, fil_metrics: dict, top_k: int):
 
 
 PREDICTION_MODE_COLUMNS = [
-    ("tagalog mode", "filipino"),
-    ("english mode", "english"),
-    ("both mode", "both"),
+    ("Tagalog mode", "filipino"),
+    ("English mode", "english"),
+    ("Bilingual mode", "both"),
 ]
 
 
@@ -471,34 +471,33 @@ def _fmt_mode_metric(metrics: dict | None, key: str, is_pct: bool = True) -> str
 
 
 def print_prediction_mode_table(matrix: dict, top_k: int):
-    """Print one table comparing each test language across prediction modes."""
+    """Print separate BLEU tables for Tagalog and English test cases."""
     print_header("BLEU PREDICTION-MODE COMPARISON")
-
-    col_labels = []
-    for lang_label, lang_key in (("Filipino/Tagalog", "tagalog"), ("English", "english")):
-        if lang_key in matrix:
-            for mode_label, mode_key in PREDICTION_MODE_COLUMNS:
-                col_labels.append((lang_label, mode_label, lang_key, mode_key))
 
     metric_rows = [
         ("Hit@1", "hit@1", True),
         (f"Hit@{top_k}", f"hit@{top_k}", True),
         ("MRR", "MRR", True),
-        ("Avg BLEU oracle", "avg_bleu_oracle", True),
+        ("Avg BLEU Oracle", "avg_bleu_oracle", True),
         ("Corpus BLEU", "corpus_bleu", True),
         ("Cases", "n_cases", False),
     ]
 
-    cell_w = 21
-    print(f"\n  {'':<18}" + "".join(f"{lang:<{cell_w}}" for lang, _, _, _ in col_labels))
-    print(f"  {'Metric':<18}" + "".join(f"{mode:<{cell_w}}" for _, mode, _, _ in col_labels))
-    print("  " + "-" * (18 + cell_w * len(col_labels)))
+    cell_w = 17
+    for test_lang, title in (("tagalog", "Tagalog test cases"), ("english", "English test cases")):
+        if test_lang not in matrix:
+            continue
 
-    for label, key, is_pct in metric_rows:
-        row = f"  {label:<18}"
-        for _, _, lang_key, mode_key in col_labels:
-            row += f"{_fmt_mode_metric(matrix[lang_key].get(mode_key), key, is_pct):>{cell_w}}"
-        print(row)
+        print(f"\n  {title}")
+        header = f"  {'Metric':<18}" + ''.join(f"{mode_label:>{cell_w}}" for mode_label, _ in PREDICTION_MODE_COLUMNS)
+        print(header)
+        print("  " + "-" * (18 + cell_w * len(PREDICTION_MODE_COLUMNS)))
+
+        for label, key, is_pct in metric_rows:
+            row = f"  {label:<18}"
+            for _, mode_key in PREDICTION_MODE_COLUMNS:
+                row += f"{_fmt_mode_metric(matrix[test_lang].get(mode_key), key, is_pct):>{cell_w}}"
+            print(row)
 
     print(f"\n  Higher is better for BLEU, Hit@K, and MRR. Top-{top_k} predictions.")
 
@@ -538,6 +537,13 @@ def show_prediction_mode_table(matrix: dict, top_k: int):
     root.title("BLEU Prediction-Mode Comparison")
     root.configure(bg="#1e1e2e")
     root.resizable(False, False)
+
+    root.update_idletasks()
+    width = max(930, 200 + len(columns) * 130)
+    height = 420
+    x = (root.winfo_screenwidth() - width) // 2
+    y = (root.winfo_screenheight() - height) // 2
+    root.geometry(f"{width}x{height}+{x}+{y}")
 
     title_font = tkfont.Font(family="Segoe UI", size=13, weight="bold")
     header_font = tkfont.Font(family="Segoe UI", size=9, weight="bold")
@@ -579,6 +585,9 @@ def show_prediction_mode_table(matrix: dict, top_k: int):
 
     for idx, (_, mode_label, _, _) in enumerate(columns, start=1):
         tk.Label(frame, text=mode_label, width=17, bg=HEADER_BG, fg=DIM_FG, font=header_font, padx=8, pady=7).grid(row=1, column=idx, sticky="nsew", padx=1, pady=1)
+
+    for c in range(len(columns) + 1):
+        frame.columnconfigure(c, weight=1)
 
     for row_idx, (label, key, is_pct) in enumerate(rows, start=2):
         bg = ROW_A if row_idx % 2 == 0 else ROW_B

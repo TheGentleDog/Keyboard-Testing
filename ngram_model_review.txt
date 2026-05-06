@@ -1,0 +1,100 @@
+N-gram Model Review
+===================
+
+Current assessment
+------------------
+The current n-gram model is enough for a working prototype and demo. Common AAC
+contexts now produce practical suggestions:
+
+- "i need" -> help, water, food, medicine
+- "please" -> help, call, give
+- "kailangan ko" -> ng
+- "gusto kong" -> magpahinga, matulog, kumain, magluto, bumili
+- "masakit ang" -> katawan, ulo
+
+It is not yet enough to treat as a final optimized prediction model without
+rerunning BLEU/MSP and doing task-based testing. The generated datasets are much
+cleaner now, but they are still partly RoBERTa-generated and still contain some
+category noise, such as non-pronoun words inside the pronouns category.
+
+Implemented algorithm/data changes
+----------------------------------
+1. Generator token cleaning
+   Both dataset generators now clean phrase tokens before exporting
+   communication_corpus and corpus_sequences. This prevents punctuation forms
+   such as "trump?" or "jesus?" from bypassing the blocklist.
+
+2. Corpus filtering
+   Blocked names, public figures, vulgar words, and language-mismatched words
+   are filtered not only from vocabulary, but also from generated corpus phrases
+   and sequence training data.
+
+3. Defensive model ingestion cleaning
+   model.py now cleans tokens again when loading datasets. This protects the
+   model even if a future dataset contains punctuation or messy tokens.
+
+4. Lower phrase weighting
+   PHRASE_REPEATS was reduced from 50 to 20 so generated RoBERTa phrases do not
+   dominate the model as strongly.
+
+5. AAC seed phrases
+   English and Filipino AAC-style seed phrases were added to the generators and
+   to model training. These improve practical caregiver/user phrases such as
+   requests for help, water, food, medicine, rest, and family contact.
+
+6. Minimum n-gram count threshold
+   Next-word suggestions now ignore very low-count bigram/trigram candidates
+   before falling back to broader contexts. This reduces weird one-off
+   predictions.
+
+7. Cache rebuild
+   ngram_model_standalone.json was rebuilt after cleaning the datasets and
+   changing model training behavior.
+
+Remaining limitations
+---------------------
+1. Dataset category noise
+   Some vocabulary categories still contain words that do not belong there. This
+   matters less for next-word prediction than corpus_sequences, but it can still
+   affect completion suggestions.
+
+2. Generated corpus bias
+   RoBERTa-generated masked sentences are plausible language, but not always
+   AAC-specific. Real AAC phrases should eventually dominate the corpus.
+
+3. Mixed-language ranking
+   English and Filipino are trained together. This is useful for bilingual mode,
+   but Filipino-only and English-only modes may need stronger language gating.
+
+4. Evaluation changed
+   BLEU/MSP results should be rerun. The cache, corpus, vocabulary, n-gram
+   weights, and suggestion ranking behavior changed.
+
+Recommended next improvements
+-----------------------------
+1. Build a curated AAC test set
+   Create a fixed list of target phrases for needs, pain, comfort, family,
+   greetings, yes/no, emergency, and daily actions. Use this for BLEU/MSP and
+   manual suggestion-rank checks.
+
+2. Add more real AAC phrase seeds
+   Add 200-500 hand-written English and Filipino phrases. This will likely help
+   more than adding more masked-language-model output.
+
+3. Clean category-specific vocabulary
+   Add allowlists for categories like pronouns, time, body, food, and questions.
+   This can remove category pollution without deleting useful words globally.
+
+4. Tune ranking weights after evaluation
+   PHRASE_REPEATS, WORD_REPEATS, shortcut multipliers, and n-gram thresholds
+   should be tuned against BLEU/MSP results rather than guessed.
+
+5. Consider separate caches per language mode
+   A dedicated Filipino cache, English cache, and bilingual cache may produce
+   cleaner suggestions than one mixed cache with filters.
+
+Bottom line
+-----------
+The current state is good enough to continue UI and interaction testing. For
+final quantitative reporting, rerun BLEU/MSP and keep this model version as a
+new cleaned/trained baseline.

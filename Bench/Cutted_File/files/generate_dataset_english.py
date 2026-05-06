@@ -435,6 +435,32 @@ ENGLISH_PROPER_NAMES = {
     "isis",
 }
 
+AAC_SEED_PHRASES = [
+    "i need help",
+    "i need water",
+    "i need food",
+    "i need medicine",
+    "i am hungry",
+    "i am thirsty",
+    "i am tired",
+    "i feel pain",
+    "i feel cold",
+    "i feel hot",
+    "please help me",
+    "please call my family",
+    "please give me medicine",
+    "can you help me",
+    "can you move me",
+    "can you turn on the light",
+    "can you turn off the light",
+    "i want to rest",
+    "i want to sleep",
+    "i want to go home",
+    "thank you",
+    "yes please",
+    "no thank you",
+]
+
 # Vulgar / sexually explicit / crude English words
 ENGLISH_VULGAR = {
     # Strong profanity
@@ -608,6 +634,8 @@ def generate(output_file: str = OUTPUT_FILE):
 
     print(f"\r    [{'█'*40}] {total_templates}/{total_templates} ✓\n")
 
+    all_corpus_seeds.extend(AAC_SEED_PHRASES)
+
     print("🔧 Expanding verb forms...")
     for base in list(category_words.get("verbs", Counter()).keys())[:40]:
         for variant in expand_verb_forms(base):
@@ -644,7 +672,7 @@ def generate(output_file: str = OUTPUT_FILE):
         if clean not in seen_phrases and len(tokens) >= 2 and not contains_blocked_token(tokens):
             corpus.append(clean)
             seen_phrases.add(clean)
-        if len(corpus) >= 800:
+        if len(corpus) >= 1600:
             break
 
     # ── corpus_sequences: tokenised lists — used by model.py for n-gram training
@@ -659,7 +687,7 @@ def generate(output_file: str = OUTPUT_FILE):
             if key not in seen_seq:
                 corpus_sequences.append(tokens)
                 seen_seq.add(key)
-        if len(corpus_sequences) >= 1200:
+        if len(corpus_sequences) >= 2000:
             break
 
     total_words     = sum(len(v) for v in vocabulary.values())

@@ -74,7 +74,7 @@ class WelcomeUI(tk.Tk):
 
     BG = "#1b1b1b"
     STAGE_BG = "#0B0D0F"
-    GRADIENT = "#7A8490"
+    GRADIENT = "#98A5B3"
     PANEL = "#242728"
     TEXT = "#f3f3f3"
     SUBTEXT = "#b9bcbc"
@@ -327,9 +327,12 @@ class WelcomeUI(tk.Tk):
         self.canvas.itemconfigure(self.subtitle_item, text=f"{self._subtitle_text}{caret}")
         self._typewriter_job = self.after(480, self._blink_subtitle_caret)
 
-    def _render_angular_gradient(self, width, height, phase):
+    def _render_angular_gradient(self, width, height, phase, offset_x=0, offset_y=0,
+                                 full_width=None, full_height=None):
+        full_width = full_width or width
+        full_height = full_height or height
         small_w = 260
-        small_h = max(1, round(height * (small_w / width)))
+        small_h = max(1, round(full_height * (small_w / full_width)))
         base = self._hex_to_rgb(self.STAGE_BG)
         accent = self._hex_to_rgb(self.GRADIENT)
         img = Image.new("RGB", (small_w, small_h), self.STAGE_BG)
@@ -341,9 +344,9 @@ class WelcomeUI(tk.Tk):
         radius = math.hypot(small_w, small_h)
         rotation = phase * 0.016
         bands = [
-            (0.0, 92, 0.20),
-            (math.pi * 0.72, 68, 0.13),
-            (math.pi * 1.34, 82, 0.10),
+            (0.0, 96, 0.27),
+            (math.pi * 0.72, 72, 0.17),
+            (math.pi * 1.34, 86, 0.14),
         ]
 
         for offset, width_deg, opacity in bands:
@@ -364,9 +367,18 @@ class WelcomeUI(tk.Tk):
         shade_draw = ImageDraw.Draw(shade, "RGBA")
         for y in range(small_h):
             distance = abs((y / small_h) - 0.52)
-            alpha = round(70 * max(0.0, 1.0 - distance * 2.2))
+            alpha = round(52 * max(0.0, 1.0 - distance * 2.2))
             shade_draw.line((0, y, small_w, y), fill=(*base, alpha))
         img = Image.alpha_composite(img, shade)
+
+        if offset_x or offset_y or full_width != width or full_height != height:
+            sx = small_w / full_width
+            sy = small_h / full_height
+            left = int(round(offset_x * sx))
+            top = int(round(offset_y * sy))
+            right = int(round((offset_x + width) * sx))
+            bottom = int(round((offset_y + height) * sy))
+            img = img.crop((left, top, max(left + 1, right), max(top + 1, bottom)))
 
         img = img.resize((width, height), Image.Resampling.BICUBIC)
         return ImageTk.PhotoImage(img)
@@ -835,10 +847,15 @@ class LauncherUI(tk.Tk):
         self._launcher_canvas.bind("<ButtonRelease-1>", self._stop_window_drag)
 
         nav_bg = "#050607"
+        launcher_w, launcher_h = 843, 555
         nav_x, nav_y, nav_w, nav_h = 14, 40, 225, 501
+        content_x, content_y, content_w, content_h = 253, 40, 576, 501
         content_wrap = tk.Frame(self._launcher_canvas, bg="#070809", width=576, height=501)
-        self._launcher_canvas.create_window(253, 40, anchor="nw", width=576, height=501, window=content_wrap)
+        self._launcher_canvas.create_window(
+            content_x, content_y, anchor="nw", width=content_w, height=content_h, window=content_wrap
+        )
         content_wrap.pack_propagate(False)
+        self._content_gradient_view = (content_x, content_y, launcher_w, launcher_h)
 
         if Image is not None:
             self._nav_panel_photo = self._render_alpha_panel(nav_w, nav_h, nav_bg, 0.3)
@@ -872,7 +889,11 @@ class LauncherUI(tk.Tk):
         canvas = tk.Canvas(content_wrap, bg="#070809", highlightthickness=0, bd=0)
         self._content_canvas = canvas
         if Image is not None:
-            self._content_gradient_photo = self._render_launcher_gradient(576, 501, self._gradient_phase)
+            self._content_gradient_photo = self._render_launcher_gradient(
+                content_w, content_h, self._gradient_phase,
+                offset_x=content_x, offset_y=content_y,
+                full_width=launcher_w, full_height=launcher_h,
+            )
             self._content_gradient_id = canvas.create_image(
                 0, 0, anchor="nw", image=self._content_gradient_photo
             )
@@ -1061,8 +1082,8 @@ class LauncherUI(tk.Tk):
             h = 34
             tag = f"footer_{key}"
             if Image is not None:
-                normal_img = self._render_nav_pill(w, h, fill, 10)
-                hover_img = self._render_nav_pill(w, h, hover, 10)
+                normal_img = self._render_setup_action_button(w, h, fill)
+                hover_img = self._render_setup_action_button(w, h, hover)
                 nav_images[tag] = {"idle": normal_img, "hover": hover_img}
                 rect = self._launcher_canvas.create_image(
                     x1, y, anchor="nw", image=normal_img, tags=(tag, "footer_button"),
@@ -1108,9 +1129,9 @@ class LauncherUI(tk.Tk):
                 )
 
         footer_y = nav_y + nav_h - 78
-        footer_button("tutorial", "Start with tutorial", footer_y, "#3a3b3f", "#484a4f",
+        footer_button("tutorial", "Start with tutorial", footer_y, WelcomeUI.BUTTON, WelcomeUI.BUTTON_HOVER,
                       lambda e: self._on_start(e, tutorial=True))
-        footer_button("skip", "Start without tutorial", footer_y + 42, "#3a3b3f", "#484a4f",
+        footer_button("skip", "Start without tutorial", footer_y + 42, WelcomeUI.BUTTON, WelcomeUI.BUTTON_HOVER,
                       lambda e: self._on_start(e, tutorial=False))
 
         self._draw_canvas_settings(canvas, sections)
@@ -1322,14 +1343,18 @@ class LauncherUI(tk.Tk):
             bw, bh = 120, 36
             running = self._preview_thread is not None and self._preview_thread.is_alive()
             label = "Close Preview" if running else "Open Preview"
-            fill = self.DARK["danger"] if running else "#3a3b3f"
+            fill = self.DARK["danger"] if running else WelcomeUI.BUTTON
             if Image is not None:
-                preview_photo = self._render_nav_pill(bw, bh, fill, 10)
+                preview_photo = (
+                    self._render_nav_pill(bw, bh, fill, 10)
+                    if running else self._render_setup_action_button(bw, bh, fill)
+                )
                 self._settings_header_panels.append(preview_photo)
                 canvas.create_image(bx, by, anchor="nw", image=preview_photo,
                                     tags=("settings_ui", tag))
             else:
-                canvas.create_rectangle(bx, by, bx + bw, by + bh, outline="", fill=fill,
+                outline = "" if running else WelcomeUI.BUTTON_BORDER
+                canvas.create_rectangle(bx, by, bx + bw, by + bh, outline=outline, fill=fill,
                                         tags=("settings_ui", tag))
             canvas.create_text(bx + bw / 2, by + bh / 2, text=label, fill="#ffffff",
                                font=("Segoe UI", 10, "bold"), tags=("settings_ui", tag))
@@ -1350,12 +1375,13 @@ class LauncherUI(tk.Tk):
             bx = x + width - bw - 6
             by = y_positions[0]
             if Image is not None:
-                default_photo = self._render_nav_pill(bw, bh, "#3a3b3f", 10)
+                default_photo = self._render_setup_action_button(bw, bh, WelcomeUI.BUTTON)
                 self._settings_header_panels.append(default_photo)
                 canvas.create_image(bx, by, anchor="nw", image=default_photo,
                                     tags=("settings_ui", tag))
             else:
-                canvas.create_rectangle(bx, by, bx + bw, by + bh, outline="", fill="#3a3b3f",
+                canvas.create_rectangle(bx, by, bx + bw, by + bh, outline=WelcomeUI.BUTTON_BORDER,
+                                        fill=WelcomeUI.BUTTON,
                                         tags=("settings_ui", tag))
             canvas.create_text(bx + bw / 2, by + bh / 2, text="Set default", fill="#ffffff",
                                font=("Segoe UI", 10, "bold"), tags=("settings_ui", tag))
@@ -1477,6 +1503,23 @@ class LauncherUI(tk.Tk):
         img = img.resize((width, height), Image.Resampling.LANCZOS)
         return ImageTk.PhotoImage(img)
 
+    def _render_setup_action_button(self, width, height, fill):
+        scale = 4
+        img = Image.new("RGBA", (width * scale, height * scale), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img, "RGBA")
+        border = self._hex_to_rgb(WelcomeUI.BUTTON_BORDER)
+        fill_rgb = self._hex_to_rgb(fill)
+        rect = (2 * scale, 2 * scale, (width - 2) * scale, (height - 2) * scale)
+        draw.rounded_rectangle(
+            rect,
+            radius=(height // 2 - 1) * scale,
+            fill=(*fill_rgb, 255),
+            outline=(*border, 255),
+            width=scale,
+        )
+        img = img.resize((width, height), Image.Resampling.LANCZOS)
+        return ImageTk.PhotoImage(img)
+
     def _render_alpha_panel(self, width, height, fill, opacity):
         alpha = max(0, min(255, round(255 * opacity)))
         fill_rgb = self._hex_to_rgb(fill)
@@ -1518,8 +1561,13 @@ class LauncherUI(tk.Tk):
         self.iconify()
         self.after(50, lambda: self.overrideredirect(True))
 
-    def _render_launcher_gradient(self, width, height, phase):
-        return WelcomeUI._render_angular_gradient(self, width, height, phase)
+    def _render_launcher_gradient(self, width, height, phase, offset_x=0, offset_y=0,
+                                  full_width=None, full_height=None):
+        return WelcomeUI._render_angular_gradient(
+            self, width, height, phase,
+            offset_x=offset_x, offset_y=offset_y,
+            full_width=full_width, full_height=full_height,
+        )
 
     def _animate_launcher_gradient(self):
         if self._gradient_image_id is None:
@@ -1533,10 +1581,18 @@ class LauncherUI(tk.Tk):
             content_width = self._content_canvas.winfo_width()
             content_height = self._content_canvas.winfo_height()
             if content_width > 1 and content_height > 1:
+                offset_x, offset_y, full_width, full_height = getattr(
+                    self, "_content_gradient_view",
+                    (0, 0, width, height),
+                )
                 self._content_gradient_photo = self._render_launcher_gradient(
                     content_width,
                     content_height,
                     self._gradient_phase,
+                    offset_x=offset_x,
+                    offset_y=offset_y,
+                    full_width=full_width,
+                    full_height=full_height,
                 )
                 self._content_canvas.itemconfigure(
                     self._content_gradient_id,

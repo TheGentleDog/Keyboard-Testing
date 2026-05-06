@@ -14,6 +14,7 @@
 
 import os
 import json
+import re
 from collections import defaultdict, Counter
 
 from config import (
@@ -28,6 +29,47 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 
 # Flores et al. (2022) derived substitution rules
 FLORES_RULES_FILE = os.path.join(_HERE, "flores_rules.json")
+
+AAC_SEED_SEQUENCES = [
+    ["i", "need", "help"],
+    ["i", "need", "water"],
+    ["i", "need", "food"],
+    ["i", "am", "hungry"],
+    ["i", "am", "thirsty"],
+    ["i", "am", "tired"],
+    ["i", "feel", "pain"],
+    ["i", "feel", "cold"],
+    ["i", "feel", "hot"],
+    ["please", "help", "me"],
+    ["please", "call", "my", "family"],
+    ["please", "give", "me", "medicine"],
+    ["can", "you", "help", "me"],
+    ["can", "you", "move", "me"],
+    ["can", "you", "turn", "on", "the", "light"],
+    ["can", "you", "turn", "off", "the", "light"],
+    ["i", "want", "to", "rest"],
+    ["i", "want", "to", "sleep"],
+    ["i", "want", "to", "go", "home"],
+    ["thank", "you"],
+    ["yes", "please"],
+    ["no", "thank", "you"],
+    ["kailangan", "ko", "ng", "tulong"],
+    ["kailangan", "ko", "ng", "tubig"],
+    ["kailangan", "ko", "ng", "pagkain"],
+    ["gutom", "na", "ako"],
+    ["uhaw", "na", "ako"],
+    ["pagod", "na", "ako"],
+    ["masakit", "ang", "katawan", "ko"],
+    ["masakit", "ang", "ulo", "ko"],
+    ["tulungan", "mo", "ako"],
+    ["pakiusap", "tulungan", "mo", "ako"],
+    ["pakitawagan", "ang", "pamilya", "ko"],
+    ["gusto", "kong", "magpahinga"],
+    ["gusto", "kong", "matulog"],
+    ["salamat", "po"],
+    ["oo", "po"],
+    ["hindi", "po"],
+]
 
 
 # =============================================================================
@@ -120,6 +162,20 @@ class NgramModel:
         self.english_vocab       = set()  # words that came from English dataset
 
     # ── Training ──────────────────────────────────────────────────────────────
+    @staticmethod
+    def _clean_token(token):
+        token = str(token).lower().strip()
+        token = re.sub(r"^[^\wñ']+|[^\wñ']+$", "", token, flags=re.IGNORECASE)
+        return token
+
+    def _clean_sequence(self, seq):
+        cleaned = []
+        for token in seq:
+            token = self._clean_token(token)
+            if token and (token.isalpha() or token.replace("'", "").isalpha()):
+                cleaned.append(token)
+        return cleaned
+
     def train_from_builtin(self):
         """
         Load both Filipino and English datasets then train the n-gram model.
@@ -138,7 +194,7 @@ class NgramModel:
         3.  Shortcut expansions — added as unigrams so they appear in
             completion candidates.
         """
-        PHRASE_REPEATS = 50   # how many times each corpus phrase is replayed
+        PHRASE_REPEATS = 20   # how many times each corpus phrase is replayed
         WORD_REPEATS   = 5    # unigram boost for plain vocabulary words
 
         all_sequences = []    # list of token-lists for n-gram building
@@ -170,7 +226,7 @@ class NgramModel:
             if sequences:
                 print(f"   ▸ {label}: {len(sequences)} corpus sequences")
                 for seq in sequences:
-                    tokens = [t.lower() for t in seq if isinstance(t, str)]
+                    tokens = self._clean_sequence(seq)
                     if len(tokens) >= 2:
                         lang_vocab_set.update(tokens)
                         for _ in range(PHRASE_REPEATS):
@@ -182,7 +238,7 @@ class NgramModel:
                 print(f"   ▸ {label}: no corpus_sequences — "
                       f"falling back to {len(corpus)} corpus phrases")
                 for phrase in corpus:
-                    tokens = phrase.lower().split()
+                    tokens = self._clean_sequence(str(phrase).split())
                     if len(tokens) >= 2:
                         lang_vocab_set.update(tokens)
                         for _ in range(PHRASE_REPEATS):
@@ -192,15 +248,24 @@ class NgramModel:
             vocab = data.get("vocabulary", {})
             for category, words in vocab.items():
                 for word in words:
-                    w = word.lower()
-                    lang_vocab_set.add(w)
-                    all_unigram_tokens.extend([w] * WORD_REPEATS)
+                    w = self._clean_token(word)
+                    if w:
+                        lang_vocab_set.add(w)
+                        all_unigram_tokens.extend([w] * WORD_REPEATS)
 
             # 3. shortcuts
             shortcuts = data.get("shortcuts", {})
             for abbrev, full_word in shortcuts.items():
                 self.csv_shortcuts[abbrev] = full_word
-                all_unigram_tokens.extend([full_word.lower()] * WORD_REPEATS)
+                shortcut_tokens = self._clean_sequence(str(full_word).split())
+                all_unigram_tokens.extend(shortcut_tokens * WORD_REPEATS)
+
+        print(f"✓ Adding AAC seed phrases: {len(AAC_SEED_SEQUENCES)}")
+        for seq in AAC_SEED_SEQUENCES:
+            tokens = self._clean_sequence(seq)
+            if len(tokens) >= 2:
+                for _ in range(PHRASE_REPEATS * 2):
+                    all_sequences.append(tokens)
 
         print(f"\n✓ Total shortcuts loaded  : {len(self.csv_shortcuts)}")
         print(f"✓ Corpus sequences        : {len(all_sequences)}")
@@ -534,22 +599,24 @@ class NgramModel:
 
     # ── Probability & suggestions ─────────────────────────────────────────────
     def get_word_probability(self, word, context=None):
-        word       = word.lower()
+        word       = self._clean_token(word)
+        if not word:
+            return 0.0
         alpha      = 0.1
         vocab_size = len(self.vocabulary)
         if not context:
             count = self.unigrams.get(word, 0)
             return (count + alpha) / (self.total_words + alpha * vocab_size)
         elif len(context) == 1:
-            prev      = self.resolve_shortcut(context[0].lower())
+            prev      = self.resolve_shortcut(self._clean_token(context[0]))
             count     = self.bigrams[prev].get(word, 0)
             prev_count= self.unigrams.get(prev, 0)
             if prev_count == 0:
                 return self.get_word_probability(word)
             return (count + alpha) / (prev_count + alpha * vocab_size)
         else:
-            prev2     = self.resolve_shortcut(context[-2].lower())
-            prev1     = self.resolve_shortcut(context[-1].lower())
+            prev2     = self.resolve_shortcut(self._clean_token(context[-2]))
+            prev1     = self.resolve_shortcut(self._clean_token(context[-1]))
             ctx       = (prev2, prev1)
             count     = self.trigrams[ctx].get(word, 0)
             ctx_count = sum(self.trigrams[ctx].values())
@@ -578,7 +645,10 @@ class NgramModel:
         return True
 
     def get_completion_suggestions(self, prefix, context=None, max_results=8, language="both"):
-        prefix = prefix.lower()
+        prefix = self._clean_token(prefix)
+        context = self._clean_sequence(context or [])
+        if not prefix:
+            return []
         shortcut_candidates = []
         for full_word, source in self.get_all_shortcut_expansions(prefix):
             if not self._lang_filter(full_word, language):
@@ -657,9 +727,15 @@ class NgramModel:
     }
 
     def get_next_word_suggestions(self, context=None, max_results=6, language="both"):
+        MIN_BIGRAM_COUNT = 3
+        MIN_TRIGRAM_COUNT = 3
+
         def _filter(pairs, no_starters=False):
             result = []
             for w, _ in pairs:
+                w = self._clean_token(w)
+                if not w:
+                    continue
                 if not self._lang_filter(w, language):
                     continue
                 if no_starters and w in self._BAD_STARTERS:
@@ -669,22 +745,28 @@ class NgramModel:
                     break
             return result
 
+        context = self._clean_sequence(context or [])
         if not context:
             return _filter(self.unigrams.most_common(max_results * 5), no_starters=True)
         elif len(context) == 1:
-            prev   = self.resolve_shortcut(context[0].lower())
-            source = self.bigrams[prev] if prev in self.bigrams else self.unigrams
+            prev   = self.resolve_shortcut(context[0])
+            source = (
+                Counter({w: c for w, c in self.bigrams[prev].items() if c >= MIN_BIGRAM_COUNT})
+                if prev in self.bigrams else self.unigrams
+            )
             return _filter(source.most_common(max_results * 3))
         else:
-            prev2 = self.resolve_shortcut(context[-2].lower())
-            prev1 = self.resolve_shortcut(context[-1].lower())
+            prev2 = self.resolve_shortcut(context[-2])
+            prev1 = self.resolve_shortcut(context[-1])
             ctx   = (prev2, prev1)
             if ctx in self.trigrams:
-                result = _filter(self.trigrams[ctx].most_common(max_results * 3))
+                source = Counter({w: c for w, c in self.trigrams[ctx].items() if c >= MIN_TRIGRAM_COUNT})
+                result = _filter(source.most_common(max_results * 3))
                 if result:
                     return result
             if prev1 in self.bigrams:
-                result = _filter(self.bigrams[prev1].most_common(max_results * 3))
+                source = Counter({w: c for w, c in self.bigrams[prev1].items() if c >= MIN_BIGRAM_COUNT})
+                result = _filter(source.most_common(max_results * 3))
                 if result:
                     return result
             return _filter(self.unigrams.most_common(max_results * 5), no_starters=True)
