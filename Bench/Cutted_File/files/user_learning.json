@@ -6,7 +6,8 @@
     "l": "looking",
     "el": "election",
     "n": "nurse",
-    "h": "husband"
+    "h": "husband",
+    "y": "you"
   },
   "user_shortcut_usage": {
     "m": 2,
@@ -15,7 +16,8 @@
     "l": 1,
     "el": 1,
     "n": 1,
-    "h": 1
+    "h": 1,
+    "y": 1
   },
   "new_words": [],
   "word_usage_history": [
@@ -120,6 +122,118 @@
     [
       "hi",
       []
+    ],
+    [
+      "i",
+      [
+        "i",
+        "want",
+        "to",
+        "get",
+        "some",
+        "water"
+      ]
+    ],
+    [
+      "want",
+      [
+        "i",
+        "want",
+        "to",
+        "get",
+        "some",
+        "water"
+      ]
+    ],
+    [
+      "to",
+      [
+        "i",
+        "want"
+      ]
+    ],
+    [
+      "get",
+      [
+        "want",
+        "to"
+      ]
+    ],
+    [
+      "some",
+      [
+        "to",
+        "get"
+      ]
+    ],
+    [
+      "water",
+      [
+        "get",
+        "some"
+      ]
+    ],
+    [
+      "i",
+      [
+        "some",
+        "water"
+      ]
+    ],
+    [
+      "don't",
+      [
+        "water",
+        "i"
+      ]
+    ],
+    [
+      "water",
+      [
+        "get",
+        "some"
+      ]
+    ],
+    [
+      "ngayon",
+      [
+        "ngayon",
+        "ngayon"
+      ]
+    ],
+    [
+      "ngayon",
+      [
+        "ngayon",
+        "ngayon"
+      ]
+    ],
+    [
+      "ngayon",
+      [
+        "ngayon"
+      ]
+    ],
+    [
+      "i",
+      [
+        "i",
+        "love"
+      ]
+    ],
+    [
+      "love",
+      [
+        "i",
+        "love"
+      ]
+    ],
+    [
+      "you",
+      [
+        "i",
+        "love"
+      ]
     ]
   ]
 }

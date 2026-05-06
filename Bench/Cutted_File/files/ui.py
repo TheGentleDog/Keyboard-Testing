@@ -102,9 +102,103 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         kwargs['cursor'] = getattr(self, "pointer_cursor", "arrow")
 
         lbl = tk.Label(parent, relief=relief, bd=bd, **kwargs)
-        lbl.bind('<Button-1>', lambda _e, c=command: c())
-        self._dwell_register(lbl, command)
+
+        def guarded_command():
+            if not self._tutorial_allows_widget(lbl):
+                self._show_tutorial_locked_status()
+                return
+            command()
+
+        lbl.bind('<Button-1>', lambda _e, c=guarded_command: c())
+        self._dwell_register(lbl, guarded_command)
         return lbl
+
+    def _show_tutorial_locked_status(self):
+        if not self._ui_tutorial_enabled or not hasattr(self, "status_bar"):
+            return
+        self.status_bar.config(text="Tutorial: follow the highlighted target")
+
+    def _tutorial_allows_widget(self, widget):
+        if not getattr(self, "_ui_tutorial_enabled", False):
+            return True
+        step = getattr(self, "_tutorial_step", None)
+        if step in (None, "done"):
+            return True
+        if getattr(self, "_tutorial_input_paused", False):
+            return widget is getattr(self, "_finish_tutorial_btn", None)
+        allowed = self._tutorial_allowed_widgets()
+        if allowed is None:
+            return True
+        return any(widget is item for item in allowed if item is not None)
+
+    def _tutorial_allowed_widgets(self):
+        step = getattr(self, "_tutorial_step", None)
+        if step == "welcome":
+            return []
+        if step == "type_hello":
+            return [self._expected_hello_target()[1]]
+        if step == "select_there":
+            return [self._tutorial_select_there_target()]
+        if step in ("tts_hello", "tts_hi"):
+            return [self.keyboard_buttons[4] if len(self.keyboard_buttons) >= 5 else None]
+        if step == "edit_hello":
+            return [self._tutorial_edit_hello_target()]
+        if step == "save_sentence":
+            return [self.keyboard_buttons[4] if len(self.keyboard_buttons) >= 5 else None]
+        if step == "clear_before_predefined":
+            if self._in_predefined_mode:
+                return [self.keyboard_buttons[3] if len(self.keyboard_buttons) >= 4 else None]
+            if self.output_words or self.current_input:
+                return [getattr(self, "_clearall_btn", None)]
+            return []
+        if step == "predefined":
+            if self._tutorial_predefined_selected:
+                return []
+            if self._in_predefined_mode:
+                return [self.predefined_func_buttons[0] if self.predefined_func_buttons else None]
+            return [self.keyboard_buttons[3] if len(self.keyboard_buttons) >= 4 else None]
+        if step == "finish":
+            return [getattr(self, "_finish_tutorial_btn", None)]
+        if step == "familiarize":
+            return []
+        return None
+
+    def _tutorial_select_there_target(self):
+        words = [w.lower() for w in self.output_words]
+        if words == ["hello"]:
+            if self.current_input:
+                return getattr(self, "_backspace_btn", None)
+            return self._prediction_button("there")
+        if words and words[0] != "hello":
+            return getattr(self, "_clearall_btn", None)
+        if len(words) >= 2:
+            bad_index = len(words) - 1
+            if self.output_cursor == -1:
+                return self.keyboard_buttons[0] if len(self.keyboard_buttons) >= 1 else None
+            if self.output_cursor < bad_index:
+                return self.keyboard_buttons[1] if len(self.keyboard_buttons) >= 2 else None
+            if self.output_cursor > bad_index:
+                return self.keyboard_buttons[0] if len(self.keyboard_buttons) >= 1 else None
+            return getattr(self, "_backspace_btn", None)
+        return self._prediction_button("there")
+
+    def _tutorial_edit_hello_target(self):
+        words = [w.lower() for w in self.output_words]
+        if len(words) < 2 or words[1] != "there" or words[0] not in ("hello", "hi"):
+            return getattr(self, "_clearall_btn", None)
+        if words[:2] == ["hi", "there"] and not self.current_input:
+            return None
+        if self.current_input and self.output_cursor != 0:
+            return getattr(self, "_backspace_btn", None)
+        if self.current_input:
+            return self._expected_hi_target()[1]
+        if self.output_cursor == -1:
+            return self.keyboard_buttons[0] if len(self.keyboard_buttons) >= 1 else None
+        if self.output_cursor == 1:
+            return self.keyboard_buttons[0] if len(self.keyboard_buttons) >= 1 else None
+        if self.output_cursor == 0:
+            return self._expected_hi_target()[1]
+        return self.keyboard_buttons[1] if len(self.keyboard_buttons) >= 2 else None
 
     def __init__(self, ui_layout="qwerty", gaze_tracking_active=False, ui_tutorial=False):
         super().__init__()

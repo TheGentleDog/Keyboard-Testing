@@ -619,7 +619,7 @@ class LauncherUI(tk.Tk):
         # ────────────────────────────────────────────────────────
         layout = self._section(body, "UI LAYOUT",
                                "Pick the keyboard layout shown after calibration.")
-        self._ui_layout_var = tk.StringVar(value="qwerty")
+        self._ui_layout_var = tk.StringVar(value="ui2")
         layout_frame = tk.Frame(layout, bg=d["card"])
         layout_frame.pack(fill="x", pady=3)
         tk.Label(layout_frame, text="Keyboard UI", bg=d["card"], fg=d["text"],
@@ -813,7 +813,7 @@ class LauncherUI(tk.Tk):
         self._ui_layout_var = tk.StringVar(value="qwerty")
         self._language_english_var = tk.BooleanVar(value=True)
         self._language_tagalog_var = tk.BooleanVar(value=True)
-        self._dwell_mode_var = tk.StringVar(value="sync")
+        self._dwell_mode_var = tk.StringVar(value="async")
         self._points_var = tk.IntVar(value=9)
         self._samples_var = tk.IntVar(value=90)
         self._pnoise_var = tk.DoubleVar(value=0.0100)
@@ -1184,10 +1184,10 @@ class LauncherUI(tk.Tk):
         self._camera_window_var.set(True)
         self._camera_debug_var.set(True)
         self._distance_var.set(True)
-        self._ui_layout_var.set("qwerty")
+        self._ui_layout_var.set("ui2")
         self._language_english_var.set(True)
         self._language_tagalog_var.set(True)
-        self._dwell_mode_var.set("sync")
+        self._dwell_mode_var.set("async")
         self._points_var.set(9)
         self._samples_var.set(90)
         self._pnoise_var.set(0.0100)
@@ -1286,7 +1286,18 @@ class LauncherUI(tk.Tk):
                 var.set(min_value + (max_value - min_value) * pct_inner)
                 self._draw_canvas_settings(canvas, sections, True)
 
-            canvas.tag_bind(tag, "<Button-1>", set_from_event)
+            def start_drag(event):
+                set_from_event(event)
+                canvas.bind("<B1-Motion>", set_from_event)
+                canvas.bind("<ButtonRelease-1>", stop_drag)
+                return "break"
+
+            def stop_drag(_event=None):
+                canvas.unbind("<B1-Motion>")
+                canvas.unbind("<ButtonRelease-1>")
+                return "break"
+
+            canvas.tag_bind(tag, "<Button-1>", start_drag)
             canvas.tag_bind(tag, "<B1-Motion>", set_from_event)
             canvas.tag_bind(tag, "<Enter>", lambda _e: canvas.configure(cursor="hand2"))
             canvas.tag_bind(tag, "<Leave>", lambda _e: canvas.configure(cursor=""))

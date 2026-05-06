@@ -165,12 +165,24 @@ class DwellMixin:
             return None
 
         if self._point_in_zoom_popup(px, py):
-            return self._zoom_source_btn
+            target = self._zoom_source_btn
+            if target is not None and not self._dwell_button_allowed(target):
+                return None
+            return target
 
         for btn, _command in self.dwell_btn_meta.values():
-            if self._point_in_widget(btn, px, py):
+            if self._point_in_widget(btn, px, py) and self._dwell_button_allowed(btn):
                 return btn
         return None
+
+    def _dwell_button_allowed(self, btn):
+        checker = getattr(self, "_tutorial_allows_widget", None)
+        if checker is None:
+            return True
+        try:
+            return bool(checker(btn))
+        except Exception:
+            return True
 
     def _point_in_zoom_popup(self, px, py):
         if self._zoom_popup is None or self._zoom_source_btn is None:
