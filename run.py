@@ -15,6 +15,7 @@ import os
 import threading
 import math
 import ctypes
+import time
 import tkinter as tk
 from tkinter import ttk
 
@@ -1723,6 +1724,38 @@ class LauncherUI(tk.Tk):
             camera_hfov_deg = 60.0
             real_ipd_cm = 6.3
 
+            def _resolution_label(frame_w, frame_h):
+                short_side = min(frame_w, frame_h)
+                if short_side >= 2160:
+                    return "4K"
+                if short_side >= 1440:
+                    return "1440p"
+                if short_side >= 1080:
+                    return "1080p"
+                if short_side >= 720:
+                    return "720p"
+                if short_side >= 480:
+                    return "480p"
+                return f"{frame_w}x{frame_h}"
+
+            def _screen_size():
+                if sys.platform == "win32":
+                    try:
+                        return (
+                            ctypes.windll.user32.GetSystemMetrics(0),
+                            ctypes.windll.user32.GetSystemMetrics(1),
+                        )
+                    except Exception:
+                        pass
+                return 1280, 720
+
+            def _fit_size(frame_w, frame_h, max_w, max_h):
+                if frame_w <= 0 or frame_h <= 0:
+                    return max_w, max_h
+                scale = min(max_w / frame_w, max_h / frame_h)
+                scale = max(0.1, scale)
+                return max(1, int(frame_w * scale)), max(1, int(frame_h * scale))
+
             cap = cv2.VideoCapture(camera_id)
             cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, camera_w)
@@ -1738,15 +1771,25 @@ class LauncherUI(tk.Tk):
             else:
                 status = f"Preview {actual_w}x{actual_h}"
 
+            screen_w, screen_h = _screen_size()
+            max_preview_w = int(screen_w * 0.92)
+            max_preview_h = int(screen_h * 0.86)
+            display_w, display_h = _fit_size(actual_w, actual_h, max_preview_w, max_preview_h)
+            cv2.namedWindow(win, cv2.WINDOW_NORMAL)
+            cv2.resizeWindow(win, display_w, display_h)
+            last_frame_size = (actual_w, actual_h)
+
             mesh = mp.solutions.face_mesh.FaceMesh(
                 max_num_faces=1,
                 refine_landmarks=True,
                 min_detection_confidence=0.5,
                 min_tracking_confidence=0.5,
             )
+            preview_latency_avg_ms = 0.0
             self.after(0, lambda: self._set_preview_status(status, self.DARK["accent"]))
 
             while self._preview_stop is not None and not self._preview_stop.is_set():
+                frame_start = time.perf_counter()
                 ret, frame = cap.read()
                 if not ret:
                     self.after(0, lambda: self._set_preview_status("Frame read failed", self.DARK["danger"]))
@@ -1754,8 +1797,20 @@ class LauncherUI(tk.Tk):
 
                 frame = cv2.flip(frame, 1)
                 h, w = frame.shape[:2]
+                if (w, h) != last_frame_size:
+                    display_w, display_h = _fit_size(w, h, max_preview_w, max_preview_h)
+                    cv2.resizeWindow(win, display_w, display_h)
+                    last_frame_size = (w, h)
+                    status = f"Preview {w}x{h}"
+                    self.after(0, lambda s=status: self._set_preview_status(s, self.DARK["accent"]))
+
                 result = mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
                 lms = result.multi_face_landmarks[0].landmark if result.multi_face_landmarks else None
+                latency_ms = (time.perf_counter() - frame_start) * 1000.0
+                if preview_latency_avg_ms <= 0:
+                    preview_latency_avg_ms = latency_ms
+                else:
+                    preview_latency_avg_ms = 0.15 * latency_ms + 0.85 * preview_latency_avg_ms
 
                 if lms is not None:
                     left_eye = np.array([lms[468].x * w, lms[468].y * h])
@@ -1786,8 +1841,9 @@ class LauncherUI(tk.Tk):
                         ipd_px = float(np.linalg.norm(left_eye - right_eye))
                         if ipd_px > 1.0:
                             distance_cm = (real_ipd_cm * focal_x_px) / ipd_px
-                            cv2.rectangle(frame, (10, 10), (330, 222), (18, 18, 18), -1)
-                            cv2.putText(frame, f"1080p distance: {distance_cm:.1f} cm", (22, 42),
+                            resolution = _resolution_label(w, h)
+                            cv2.rectangle(frame, (10, 10), (330, 250), (18, 18, 18), -1)
+                            cv2.putText(frame, f"{resolution} distance: {distance_cm:.1f} cm", (22, 42),
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 220, 120), 2, cv2.LINE_AA)
                             cv2.putText(frame, f"IPD px: {ipd_px:.1f}", (22, 72),
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.48, (210, 210, 210), 1, cv2.LINE_AA)
@@ -1801,12 +1857,17 @@ class LauncherUI(tk.Tk):
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.48, (160, 160, 160), 1, cv2.LINE_AA)
                             cv2.putText(frame, f"Camera {camera_id}", (22, 204),
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.48, (160, 160, 160), 1, cv2.LINE_AA)
+                            cv2.putText(frame, f"Latency: {preview_latency_avg_ms:.1f} ms", (22, 230),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.48, (160, 160, 160), 1, cv2.LINE_AA)
                 else:
-                    cv2.rectangle(frame, (10, 10), (275, 58), (18, 18, 18), -1)
+                    cv2.rectangle(frame, (10, 10), (275, 84), (18, 18, 18), -1)
                     cv2.putText(frame, "No face detected", (22, 42),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 100, 255), 2, cv2.LINE_AA)
+                    cv2.putText(frame, f"Latency: {preview_latency_avg_ms:.1f} ms", (22, 70),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.48, (160, 160, 160), 1, cv2.LINE_AA)
 
-                cv2.imshow(win, frame)
+                preview = cv2.resize(frame, (display_w, display_h), interpolation=cv2.INTER_AREA)
+                cv2.imshow(win, preview)
                 key = cv2.waitKey(1) & 0xFF
                 if key in (ord("q"), 27):
                     break
@@ -2125,7 +2186,8 @@ def main():
                     text=(
                         f"Gaze active | mouse {state} | frames {tracker._tracking_frames} | "
                         f"faces {tracker._tracking_faces} | points {tracker._tracking_predictions} | "
-                        f"moves {tracker._mouse_moves} | pyauto {'OK' if tracker.pyautogui_ok else 'NO'}"
+                        f"moves {tracker._mouse_moves} | latency {tracker._pipeline_latency_avg_ms:.1f} ms | "
+                        f"pyauto {'OK' if tracker.pyautogui_ok else 'NO'}"
                     )
                 )
             app.after(3000, monitor_tracking)
