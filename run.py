@@ -636,7 +636,7 @@ class LauncherUI(tk.Tk):
         layout_frame.pack(fill="x", pady=3)
         tk.Label(layout_frame, text="Keyboard UI", bg=d["card"], fg=d["text"],
                  font=("Segoe UI", 11), anchor="w", width=22).pack(side="left")
-        for value, label in [("qwerty", "QWERTY"), ("ui2", "UI2")]:
+        for value, label in [("ui2", "Default"), ("qwerty", "QWERTY")]:
             rb = tk.Radiobutton(layout_frame, text=label, variable=self._ui_layout_var,
                                 value=value, bg=d["card"], fg=d["text"],
                                 selectcolor=d["accent"], activebackground=d["card"],
@@ -953,6 +953,45 @@ class LauncherUI(tk.Tk):
             sync_active_from_scroll()
             return "break"
 
+        scrollbar_drag = {"offset": 0}
+
+        def scrollbar_metrics():
+            view_h = max(1, canvas.winfo_height())
+            content_h = max(1, self._settings_content_height)
+            top = 18
+            bottom = view_h - 18
+            track_h = max(1, bottom - top)
+            thumb_h = max(42, track_h * (view_h / content_h))
+            max_scroll = max(1, content_h - view_h)
+            travel = max(1, track_h - thumb_h)
+            thumb_y = top + travel * (self._settings_scroll_y / max_scroll)
+            return top, thumb_h, max_scroll, travel, thumb_y
+
+        def drag_scrollbar(event):
+            top, thumb_h, max_scroll, travel, _thumb_y = scrollbar_metrics()
+            pct = (event.y - top - scrollbar_drag["offset"]) / travel
+            self._settings_scroll_y = max(0, min(max_scroll, pct * max_scroll))
+            self._draw_canvas_settings(canvas, sections, keep_scroll=True)
+            sync_active_from_scroll()
+            return "break"
+
+        def start_scrollbar_drag(event):
+            _top, thumb_h, _max_scroll, _travel, thumb_y = scrollbar_metrics()
+            if thumb_y <= event.y <= thumb_y + thumb_h:
+                scrollbar_drag["offset"] = event.y - thumb_y
+            else:
+                scrollbar_drag["offset"] = thumb_h / 2
+            canvas.configure(cursor="sb_v_double_arrow")
+            canvas.bind("<B1-Motion>", drag_scrollbar)
+            canvas.bind("<ButtonRelease-1>", stop_scrollbar_drag)
+            return drag_scrollbar(event)
+
+        def stop_scrollbar_drag(_event=None):
+            canvas.configure(cursor="")
+            canvas.unbind("<B1-Motion>")
+            canvas.unbind("<ButtonRelease-1>")
+            return "break"
+
         def jump_to(key):
             self.update_idletasks()
             section = sections.get(key)
@@ -1128,7 +1167,7 @@ class LauncherUI(tk.Tk):
                     ),
                 )
 
-        footer_y = nav_y + nav_h - 78
+        footer_y = nav_y + nav_h - 92
         footer_button("tutorial", "Start with tutorial", footer_y, WelcomeUI.BUTTON, WelcomeUI.BUTTON_HOVER,
                       lambda e: self._on_start(e, tutorial=True))
         footer_button("skip", "Start without tutorial", footer_y + 42, WelcomeUI.BUTTON, WelcomeUI.BUTTON_HOVER,
@@ -1138,6 +1177,9 @@ class LauncherUI(tk.Tk):
         canvas.bind("<Configure>", lambda _e: self._draw_canvas_settings(canvas, sections, keep_scroll=True))
         canvas.bind("<Enter>", lambda _e: canvas.bind_all("<MouseWheel>", mousewheel))
         canvas.bind("<Leave>", lambda _e: canvas.unbind_all("<MouseWheel>"))
+        canvas.tag_bind("settings_scrollbar", "<Button-1>", start_scrollbar_drag)
+        canvas.tag_bind("settings_scrollbar", "<Enter>", lambda _e: canvas.configure(cursor="sb_v_double_arrow"))
+        canvas.tag_bind("settings_scrollbar", "<Leave>", lambda _e: canvas.configure(cursor=""))
         self._active_setup_section = "camera"
         self.after(50, lambda: jump_to("camera"))
         return
@@ -1160,8 +1202,8 @@ class LauncherUI(tk.Tk):
         self._preview_status.pack(side="left", padx=10)
 
         layout = section("layout", "Keyboard Layout")
+        choice(layout, "Default", self._ui_layout_var, "ui2")
         choice(layout, "QWERTY", self._ui_layout_var, "qwerty")
-        choice(layout, "UI2", self._ui_layout_var, "ui2")
 
         language = section("language", "Language")
         check(language, "English", self._language_english_var)
@@ -1418,8 +1460,8 @@ class LauncherUI(tk.Tk):
             preview_button(),
         ))
         section("layout", "Keyboard Layout", lambda: (
+            radio("Default", self._ui_layout_var, "ui2", "layout"),
             radio("QWERTY", self._ui_layout_var, "qwerty", "layout"),
-            radio("UI2", self._ui_layout_var, "ui2", "layout"),
         ))
         section("language", "Language", lambda: (
             checkbox("English", self._language_english_var, "english"),
@@ -1471,6 +1513,8 @@ class LauncherUI(tk.Tk):
         thumb_h = max(42, track_h * (view_h / content_h))
         max_scroll = max(1, content_h - view_h)
         thumb_y = top + (track_h - thumb_h) * (self._settings_scroll_y / max_scroll)
+        canvas.create_line(x, top, x, bottom, fill="#070809", width=18,
+                           capstyle="round", tags=("settings_scrollbar",))
         canvas.create_line(x, top, x, bottom, fill="#050607", width=4,
                            capstyle="round", tags=("settings_scrollbar",))
         canvas.create_line(x, thumb_y, x, thumb_y + thumb_h, fill="#2c3034", width=4,
@@ -1828,7 +1872,7 @@ class LauncherUI(tk.Tk):
             self._animate_job = None
         ui_layout = self._ui_layout_var.get()
         if tutorial and ui_layout != "ui2":
-            print("[Info] Tutorial uses UI2 layout; switching from QWERTY for this session.")
+            print("[Info] Tutorial uses Default layout; switching from QWERTY for this session.")
             ui_layout = "ui2"
         language_preset = []
         if self._language_english_var.get():

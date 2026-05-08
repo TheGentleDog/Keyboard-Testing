@@ -28,9 +28,13 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             "input_bg":         "#f9f9f9",
             "text_fg":          "black",
             "suggestion_fg":    "gray",
-            "button_bg":        "#e0e0e0",
+            "button_bg":        "#e3e3e3",
             "button_fg":        "black",
-            "button_active_bg": "#d0d0d0",
+            "button_active_bg": "#d4d4d4",
+            "funckey_bg":       "#dedede",
+            "funckey_fg":       "black",
+            "funckey_active_bg":"#d2d2d2",
+            "button_border":    "#a8a8a8",
             "dwell_bar":        "#00cc44",
             "dwell_bg":         "#c8f0d8",
         },
@@ -89,6 +93,29 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             pass
 
     # ── macOS-compatible button override ──────────────────────────────────────
+    def _theme_button_chrome(self):
+        theme = self.themes[self.current_theme]
+        border = theme.get("button_border")
+        if border:
+            return {
+                "relief": "flat",
+                "bd": 0,
+                "highlightthickness": 1,
+                "highlightbackground": border,
+                "highlightcolor": border,
+            }
+        return {
+            "relief": "raised",
+            "bd": 1,
+            "highlightthickness": 0,
+        }
+
+    def _apply_button_chrome(self, widget):
+        try:
+            widget.config(**self._theme_button_chrome())
+        except Exception:
+            pass
+
     def _make_dwell_btn(self, parent, command, **kwargs):
         """
         Override DwellMixin._make_dwell_btn to use tk.Label instead of
@@ -100,6 +127,11 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         relief = kwargs.pop('relief', 'flat')
         bd     = kwargs.pop('bd', 1)
         kwargs['cursor'] = getattr(self, "pointer_cursor", "arrow")
+        chrome = self._theme_button_chrome().copy()
+        if self.themes[self.current_theme].get("button_border"):
+            relief = chrome.pop("relief")
+            bd = chrome.pop("bd")
+            kwargs.update(chrome)
 
         lbl = tk.Label(parent, relief=relief, bd=bd, **kwargs)
 
@@ -232,6 +264,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self.predefined_func_buttons = []
         self._panic_active           = False
         self._settings_open          = False
+        self._settings_window        = None
         self._pointer_overlay        = None
         self._pointer_canvas         = None
         self._pointer_job            = None
@@ -285,7 +318,9 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         return "break"
 
     def _open_settings_shortcut(self, _event=None):
-        if not self._settings_open:
+        if self._settings_open:
+            self._close_settings_window()
+        else:
             self.show_settings()
         return "break"
 
@@ -436,6 +471,34 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     def _restore_main_cursor(self):
         self._settings_open = False
         self._show_main_pointer()
+
+    def _pause_gaze_input_for_settings(self):
+        self.dwell_enabled = False
+        self.dwell_hovered = None
+        self._dwell_reset_all()
+        self._zoom_hide()
+
+    def _resume_gaze_input_after_settings(self):
+        self.dwell_enabled = config.DWELL_ENABLED
+        self.dwell_hovered = None
+        self._dwell_reset_all()
+
+    def _close_settings_window(self, _event=None):
+        settings_win = self._settings_window
+        self._settings_window = None
+        if settings_win is not None:
+            try:
+                settings_win.grab_release()
+            except Exception:
+                pass
+            try:
+                settings_win.destroy()
+            except Exception:
+                pass
+        self._resume_gaze_input_after_settings()
+        self._restore_main_cursor()
+        self._take_focus()
+        return "break"
 
     def _take_focus(self):
         try:
@@ -1175,9 +1238,11 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
 
         # ── Top area: text displays + PANIC BUTTON ────────────────────────────
         top_frame = tk.Frame(self, bg=theme["bg"])
+        self.top_frame = top_frame
         top_frame.pack(fill="x", padx=self._frame_gap(), pady=(self._frame_gap(), 3))
 
         displays = tk.Frame(top_frame, bg=theme["bg"])
+        self.displays_frame = displays
         displays.pack(side="left", fill="both", expand=True)
 
         self.input_display = tk.Text(
@@ -1275,6 +1340,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         func_bg  = theme.get("funckey_bg", theme["button_bg"])
         func_fg  = theme.get("funckey_fg", theme["button_fg"])
         func_abg = theme.get("funckey_active_bg", theme["button_active_bg"])
+        parent.configure(bg=theme["bg"])
 
         self.keyboard_buttons = []   # func row occupies indices 0-4
 
@@ -1305,6 +1371,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     def _create_letter_rows(self, parent):
         """Q-P / A-⌫ / Z-Clear all rows."""
         theme = self.themes[self.current_theme]
+        parent.configure(bg=theme["bg"])
         self._unregister_widgets(parent)
 
         def btn_kw(**extra):
@@ -1364,6 +1431,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     def _create_ui2_group_rows(self, parent):
         """UI2 Design 6: grouped letter blocks."""
         theme = self.themes[self.current_theme]
+        parent.configure(bg=theme["bg"])
         self._unregister_widgets(parent)
         self._ui2_group_buttons = {}
         self._ui2_letter_buttons = {}
@@ -1417,6 +1485,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     def _show_ui2_letters(self, letters):
         """UI2 Design 7: large individual letter choices for a selected group."""
         theme = self.themes[self.current_theme]
+        self.letters_frame.configure(bg=theme["bg"])
         self._unregister_widgets(self.letters_frame)
         self._ui2_letter_buttons = {}
 
@@ -1780,12 +1849,14 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             panic_sound.stop()
             self._panic_active = False
             self.panic_btn.config(bg=self.themes[self.current_theme].get("panic_bg", "#660002"))
+            self._apply_button_chrome(self.panic_btn)
             self.status_bar.config(text="Alarm stopped")
         else:
             panic_sound.start()
             self._panic_active = True
             self.panic_btn.config(bg="#ff0000")
-            self.status_bar.config(text="🚨 ALARM ACTIVE — press PANIC again to stop")
+            self._apply_button_chrome(self.panic_btn)
+            self.status_bar.config(text="Alarm active | press PANIC again to stop")
 
     # =========================================================================
     # NAVIGATION
@@ -1832,9 +1903,20 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self.input_display.config(bg=theme["input_bg"], fg=theme["text_fg"],
                                   insertbackground=theme["text_fg"])
         self.predictive_container.config(bg=theme["bg"])
+        for frame_name in (
+            "top_frame", "displays_frame", "content_area", "main_grid",
+            "func_row_frame", "letters_frame", "predefined_frame",
+        ):
+            frame = getattr(self, frame_name, None)
+            if frame is not None:
+                try:
+                    frame.configure(bg=theme["bg"])
+                except Exception:
+                    pass
         panic_bg = theme.get("panic_bg", "#660002")
         if hasattr(self, 'panic_btn'):
-            self.panic_btn.config(bg=panic_bg, fg="white")
+            self.panic_btn.config(bg="#ff0000" if self._panic_active else panic_bg, fg="white")
+            self._apply_button_chrome(self.panic_btn)
         # keyboard_buttons[0..4] are the function row; rest are letter keys
         func_bg    = theme.get("funckey_bg",    theme["button_bg"])
         func_fg    = theme.get("funckey_fg",    theme["button_fg"])
@@ -1851,6 +1933,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                     btn.config(bg=theme["button_bg"], fg=theme["button_fg"],
                                activebackground=theme["button_active_bg"],
                                activeforeground=theme["button_fg"])
+                self._apply_button_chrome(btn)
         for widget in self.predictive_container.winfo_children():
             if isinstance(widget, tk.Button):
                 widget.config(
@@ -1858,6 +1941,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                     activebackground=theme["button_active_bg"],
                     activeforeground=theme["button_fg"],
                 )
+                self._apply_button_chrome(widget)
 
     def _toggle_zoom(self, enabled):
         config.DWELL_ZOOM = enabled
@@ -1871,50 +1955,85 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     def change_theme(self, theme, settings_window=None):
         self.current_theme = theme
         self.apply_theme()
+        if hasattr(self, "func_row_frame"):
+            self._create_func_row(self.func_row_frame)
+        if hasattr(self, "letters_frame"):
+            self._create_keyboard_area(self.letters_frame)
         if settings_window:
-            try:
-                settings_window.grab_release()
-            except Exception:
-                pass
-            settings_window.destroy()
-            self._restore_main_cursor()
-            self._take_focus()
+            self._close_settings_window()
         self.update_display()
         self.status_bar.config(text=f"Theme changed to {theme.capitalize()} Mode")
+
+    def _toggle_settings_dwell(self, enabled):
+        self._toggle_dwell(enabled)
+        if self._settings_open:
+            self.dwell_enabled = False
+            self.dwell_hovered = None
+            self._dwell_reset_all()
 
     # =========================================================================
     # SETTINGS PANEL  (caretaker opens via physical 'S' key)
     # =========================================================================
     def show_settings(self):
+        if self._settings_open:
+            return
         self._show_system_pointer()
+        self._pause_gaze_input_for_settings()
         settings_win = tk.Toplevel(self)
+        self._settings_window = settings_win
         settings_win.title("Settings")
         settings_win.geometry("440x640")
         settings_win.resizable(False, True)
         settings_win.transient(self)
+        settings_win.configure(bg="#1e1f22")
         settings_win.grab_set()
         self._apply_arrow_cursor(settings_win)
+        settings_win.bind("<KeyPress-s>", self._close_settings_window)
+        settings_win.bind("<KeyPress-S>", self._close_settings_window)
 
-        def _close_settings():
-            try:
-                settings_win.grab_release()
-            except Exception:
-                pass
-            settings_win.destroy()
-            self._restore_main_cursor()
-            self._take_focus()
+        settings_win.protocol("WM_DELETE_WINDOW", self._close_settings_window)
 
-        settings_win.protocol("WM_DELETE_WINDOW", _close_settings)
+        settings_bg = "#1e1f22"
+        card_bg = "#2b2d31"
+        text_fg = "#dcddde"
+        muted_fg = "#9da1a6"
+        accent = "#5865f2"
+        button_bg = "#313338"
+        button_hover = "#3a3d43"
+        try:
+            style = ttk.Style(settings_win)
+            style.theme_use("clam")
+        except Exception:
+            style = ttk.Style(settings_win)
+        style.configure("Settings.TFrame", background=settings_bg)
+        style.configure("Settings.TLabel", background=card_bg, foreground=text_fg)
+        style.configure("SettingsMuted.TLabel", background=card_bg, foreground=muted_fg)
+        style.configure("Settings.TLabelframe", background=card_bg, bordercolor="#42454a", relief="solid")
+        style.configure("Settings.TLabelframe.Label", background=card_bg, foreground=text_fg,
+                        font=("Segoe UI", 10, "bold"))
+        style.configure("Settings.TCheckbutton", background=card_bg, foreground=text_fg)
+        style.map("Settings.TCheckbutton", background=[("active", card_bg)], foreground=[("active", "#ffffff")])
+        style.configure("Settings.TRadiobutton", background=card_bg, foreground=text_fg)
+        style.map("Settings.TRadiobutton", background=[("active", card_bg)], foreground=[("active", "#ffffff")])
+        style.configure("Settings.TButton", background=button_bg, foreground=text_fg,
+                        bordercolor="#42454a", focusthickness=0, padding=(12, 7))
+        style.map("Settings.TButton", background=[("active", button_hover), ("pressed", accent)],
+                  foreground=[("active", "#ffffff"), ("pressed", "#ffffff")])
+        style.configure("Settings.Horizontal.TScale", background=card_bg, troughcolor="#171719")
+        style.configure("Settings.Vertical.TScrollbar", background="#313338", troughcolor="#171719",
+                        bordercolor="#171719", arrowcolor=text_fg, darkcolor="#313338",
+                        lightcolor="#313338")
 
         # Scrollable container
-        outer = tk.Frame(settings_win)
+        outer = tk.Frame(settings_win, bg=settings_bg)
         outer.pack(fill="both", expand=True)
-        canvas  = tk.Canvas(outer, borderwidth=0, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+        canvas  = tk.Canvas(outer, borderwidth=0, highlightthickness=0, bg=settings_bg)
+        scrollbar = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview,
+                                  style="Settings.Vertical.TScrollbar")
         canvas.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
-        inner = tk.Frame(canvas)
+        inner = tk.Frame(canvas, bg=settings_bg)
         win_id = canvas.create_window((0, 0), window=inner, anchor="nw")
 
         def _on_resize(e):
@@ -1933,50 +2052,57 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         win = inner  # point all subsequent widgets at the scrollable inner frame
 
         # Theme
-        tf = ttk.LabelFrame(win, text="Theme", padding=12)
+        tf = ttk.LabelFrame(win, text="Theme", padding=12, style="Settings.TLabelframe")
         tf.pack(fill="x", padx=20, pady=(15, 8))
-        ttk.Label(tf, text="Select Theme:", font=("Segoe UI", 11)).pack(anchor="w", pady=(0, 8))
-        btn_row = tk.Frame(tf)
+        ttk.Label(tf, text="Select Theme:", font=("Segoe UI", 11),
+                  style="Settings.TLabel").pack(anchor="w", pady=(0, 8))
+        btn_row = tk.Frame(tf, bg=card_bg)
         btn_row.pack(fill="x")
-        ttk.Button(btn_row, text="☀ Light Mode",
+        ttk.Button(btn_row, text="Light Mode", style="Settings.TButton",
                    command=lambda: self.change_theme("light", settings_win), width=18).pack(side="left", padx=(0, 10), ipady=8)
-        ttk.Button(btn_row, text="🌙 Dark Mode",
+        ttk.Button(btn_row, text="Dark Mode", style="Settings.TButton",
                    command=lambda: self.change_theme("dark",  settings_win), width=18).pack(side="left", ipady=8)
         ttk.Label(tf, text=f"Current: {self.current_theme.capitalize()} Mode",
-                  font=("Segoe UI", 9, "italic")).pack(anchor="w", pady=(8, 0))
+                  font=("Segoe UI", 9, "italic"),
+                  style="SettingsMuted.TLabel").pack(anchor="w", pady=(8, 0))
 
         # Dwell Mode
-        mf = ttk.LabelFrame(win, text="Dwell Mode", padding=12)
+        mf = ttk.LabelFrame(win, text="Dwell Mode", padding=12, style="Settings.TLabelframe")
         mf.pack(fill="x", padx=20, pady=(0, 8))
         mode_var = tk.StringVar(value=config.DWELL_MODE)
         ttk.Radiobutton(
             mf, text="Synchronous — accumulates across trial window, winner fires at end",
             variable=mode_var, value="sync",
             command=lambda: self._set_dwell_mode("sync"),
+            style="Settings.TRadiobutton",
         ).pack(anchor="w")
         ttk.Radiobutton(
             mf, text="Asynchronous — zoom-on-dwell, fires as soon as threshold is reached",
             variable=mode_var, value="async",
             command=lambda: self._set_dwell_mode("async"),
+            style="Settings.TRadiobutton",
         ).pack(anchor="w", pady=(4, 0))
         ttk.Label(
             mf,
             text="Async mode works best with Key Zoom enabled.",
-            font=("Segoe UI", 8, "italic"), foreground="gray",
+            font=("Segoe UI", 8, "italic"),
+            style="SettingsMuted.TLabel",
         ).pack(anchor="w", pady=(6, 0))
 
         # Dwell
-        df = ttk.LabelFrame(win, text="Hover Dwell Input", padding=12)
+        df = ttk.LabelFrame(win, text="Hover Dwell Input", padding=12, style="Settings.TLabelframe")
         df.pack(fill="x", padx=20, pady=8)
-        dwell_var = tk.BooleanVar(value=self.dwell_enabled)
+        dwell_var = tk.BooleanVar(value=config.DWELL_ENABLED)
         ttk.Checkbutton(df, text="Enable hover dwell input", variable=dwell_var,
-                        command=lambda: self._toggle_dwell(dwell_var.get())).pack(anchor="w")
+                        command=lambda: self._toggle_settings_dwell(dwell_var.get()),
+                        style="Settings.TCheckbutton").pack(anchor="w")
         ttk.Label(df, text="Hold duration — how long to hover before key fires:",
-                  font=("Segoe UI", 9)).pack(anchor="w", pady=(12, 2))
+                  font=("Segoe UI", 9), style="Settings.TLabel").pack(anchor="w", pady=(12, 2))
         min_ms_var = tk.IntVar(value=config.DWELL_MIN_MS)
-        min_row    = tk.Frame(df)
+        min_row    = tk.Frame(df, bg=card_bg)
         min_row.pack(fill="x")
-        min_label  = ttk.Label(min_row, text=f"{config.DWELL_MIN_MS} ms", width=7)
+        min_label  = ttk.Label(min_row, text=f"{config.DWELL_MIN_MS} ms", width=7,
+                               style="Settings.TLabel")
         min_label.pack(side="right")
 
         def on_slider(val):
@@ -1985,18 +2111,21 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             min_ms_var.set(v)
 
         ttk.Scale(min_row, from_=200, to=1500, orient="horizontal",
+                  style="Settings.Horizontal.TScale",
                   variable=min_ms_var, command=on_slider).pack(side="left", fill="x", expand=True, padx=(0, 6))
-        ttk.Button(df, text="Apply",
+        ttk.Button(df, text="Apply", style="Settings.TButton",
                    command=lambda: self._apply_min_hover(min_ms_var.get())).pack(anchor="e", pady=(8, 0))
         ttk.Label(df, text="Moving off a key resets its progress to zero.",
-                  font=("Segoe UI", 8, "italic"), foreground="gray").pack(anchor="w", pady=(6, 0))
+                  font=("Segoe UI", 8, "italic"),
+                  style="SettingsMuted.TLabel").pack(anchor="w", pady=(6, 0))
 
         ttk.Label(df, text="Post-fire cooldown — pause after a key fires:",
-                  font=("Segoe UI", 9)).pack(anchor="w", pady=(10, 2))
+                  font=("Segoe UI", 9), style="Settings.TLabel").pack(anchor="w", pady=(10, 2))
         cooldown_var   = tk.IntVar(value=config.DWELL_COOLDOWN_MS)
-        cooldown_row   = tk.Frame(df)
+        cooldown_row   = tk.Frame(df, bg=card_bg)
         cooldown_row.pack(fill="x")
-        cooldown_label = ttk.Label(cooldown_row, text=f"{config.DWELL_COOLDOWN_MS} ms", width=7)
+        cooldown_label = ttk.Label(cooldown_row, text=f"{config.DWELL_COOLDOWN_MS} ms", width=7,
+                                   style="Settings.TLabel")
         cooldown_label.pack(side="right")
 
         def on_cooldown(val):
@@ -2006,30 +2135,34 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             config.DWELL_COOLDOWN_MS = v
 
         ttk.Scale(cooldown_row, from_=0, to=2000, orient="horizontal",
+                  style="Settings.Horizontal.TScale",
                   variable=cooldown_var, command=on_cooldown).pack(
                   side="left", fill="x", expand=True, padx=(0, 6))
 
         # Zoom
-        zf = ttk.LabelFrame(win, text="Key Zoom (Gaze Stabiliser)", padding=12)
+        zf = ttk.LabelFrame(win, text="Key Zoom (Gaze Stabiliser)", padding=12, style="Settings.TLabelframe")
         zf.pack(fill="x", padx=20, pady=8)
         zoom_var = tk.BooleanVar(value=config.DWELL_ZOOM)
         ttk.Checkbutton(
             zf, text="Zoom hovered key as dwell accumulates",
             variable=zoom_var,
             command=lambda: self._toggle_zoom(zoom_var.get()),
+            style="Settings.TCheckbutton",
         ).pack(anchor="w")
         ttk.Label(
             zf,
             text="Enlarges the key you're gazing at to widen its hit area.",
-            font=("Segoe UI", 8, "italic"), foreground="gray",
+            font=("Segoe UI", 8, "italic"),
+            style="SettingsMuted.TLabel",
         ).pack(anchor="w", pady=(4, 8))
 
         ttk.Label(zf, text="Zoom start delay — how long to settle before zoom appears:",
-                  font=("Segoe UI", 9)).pack(anchor="w")
+                  font=("Segoe UI", 9), style="Settings.TLabel").pack(anchor="w")
         zoom_delay_var = tk.IntVar(value=config.DWELL_ZOOM_DELAY_MS)
-        zoom_delay_row = tk.Frame(zf)
+        zoom_delay_row = tk.Frame(zf, bg=card_bg)
         zoom_delay_row.pack(fill="x", pady=(2, 0))
-        zoom_delay_label = ttk.Label(zoom_delay_row, text=f"{config.DWELL_ZOOM_DELAY_MS} ms", width=7)
+        zoom_delay_label = ttk.Label(zoom_delay_row, text=f"{config.DWELL_ZOOM_DELAY_MS} ms", width=7,
+                                     style="Settings.TLabel")
         zoom_delay_label.pack(side="right")
 
         def on_zoom_delay(val):
@@ -2039,11 +2172,12 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             config.DWELL_ZOOM_DELAY_MS = v
 
         ttk.Scale(zoom_delay_row, from_=0, to=800, orient="horizontal",
+                  style="Settings.Horizontal.TScale",
                   variable=zoom_delay_var, command=on_zoom_delay).pack(
                   side="left", fill="x", expand=True, padx=(0, 6))
 
         # Prediction Language
-        lf = ttk.LabelFrame(win, text="Prediction Language", padding=12)
+        lf = ttk.LabelFrame(win, text="Prediction Language", padding=12, style="Settings.TLabelframe")
         lf.pack(fill="x", padx=20, pady=(0, 8))
         lang_var = tk.StringVar(value=config.PREDICTION_LANGUAGE)
 
@@ -2053,15 +2187,20 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
 
         ttk.Radiobutton(lf, text="Both (Filipino + English)",
                         variable=lang_var, value="both",
-                        command=lambda: _set_lang("both")).pack(anchor="w")
+                        command=lambda: _set_lang("both"),
+                        style="Settings.TRadiobutton").pack(anchor="w")
         ttk.Radiobutton(lf, text="Filipino only",
                         variable=lang_var, value="filipino",
-                        command=lambda: _set_lang("filipino")).pack(anchor="w", pady=(4, 0))
+                        command=lambda: _set_lang("filipino"),
+                        style="Settings.TRadiobutton").pack(anchor="w", pady=(4, 0))
         ttk.Radiobutton(lf, text="English only",
                         variable=lang_var, value="english",
-                        command=lambda: _set_lang("english")).pack(anchor="w", pady=(4, 0))
+                        command=lambda: _set_lang("english"),
+                        style="Settings.TRadiobutton").pack(anchor="w", pady=(4, 0))
         ttk.Label(lf, text="Filters autocomplete and next-word predictions.",
-                  font=("Segoe UI", 8, "italic"), foreground="gray").pack(anchor="w", pady=(6, 0))
+                  font=("Segoe UI", 8, "italic"),
+                  style="SettingsMuted.TLabel").pack(anchor="w", pady=(6, 0))
 
-        ttk.Button(win, text="Close", command=_close_settings).pack(pady=(8, 12))
+        ttk.Button(win, text="Close", command=self._close_settings_window,
+                   style="Settings.TButton").pack(pady=(8, 12))
         self._apply_arrow_cursor(settings_win)
