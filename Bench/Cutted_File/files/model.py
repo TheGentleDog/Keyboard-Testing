@@ -143,6 +143,8 @@ def _load_dataset(filepath):
 # N-GRAM LANGUAGE MODEL
 # =============================================================================
 class NgramModel:
+    MIN_COMPLETION_COUNT = 10
+
     def __init__(self):
         self.unigrams            = Counter()
         self.bigrams             = defaultdict(Counter)
@@ -644,6 +646,19 @@ class NgramModel:
             return word in self.english_vocab or word not in self.filipino_vocab
         return True
 
+    def _is_allowed_completion_word(self, word):
+        """Keep rare words out of completions unless they are user/trusted entries."""
+        word = self._clean_token(word)
+        if not word:
+            return False
+        if word in self.new_words:
+            return True
+        if word in self.user_shortcuts.values():
+            return True
+        if word in self.csv_shortcuts.values():
+            return True
+        return self.unigrams.get(word, 0) >= self.MIN_COMPLETION_COUNT
+
     def get_completion_suggestions(self, prefix, context=None, max_results=8, language="both"):
         prefix = self._clean_token(prefix)
         context = self._clean_sequence(context or [])
@@ -662,6 +677,7 @@ class NgramModel:
             if w.startswith(prefix) and len(w) >= min_word_length
             and w.isalpha() and self._has_vowels(w)
             and self._lang_filter(w, language)
+            and self._is_allowed_completion_word(w)
         ]
         char_completions = self.get_char_level_completions(prefix, max_results=10)
         candidates = [
@@ -678,6 +694,8 @@ class NgramModel:
                     continue
                 if not self._lang_filter(word, language):
                     continue
+                if not self._is_allowed_completion_word(word):
+                    continue
                 if prefix in word:
                     pos = word.index(prefix)
                     fuzzy_candidates.append((word, False, False, 0.5 / (pos + 1)))
@@ -692,6 +710,8 @@ class NgramModel:
         rule_candidates = []
         if len(prefix) >= 2:
             for w in self.generate_rule_candidates(prefix):
+                if not self._is_allowed_completion_word(w):
+                    continue
                 if w not in [c for c, *_ in candidates + fuzzy_candidates]:
                     rule_candidates.append((w, False, False, 1.5))
 
