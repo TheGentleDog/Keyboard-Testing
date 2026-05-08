@@ -1233,21 +1233,22 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     def _frame_gap(self):
         return self.GAZE_FRAME_GAP_PX if self._gaze_tracking_active else 5
 
+    def _top_control_gap(self):
+        return 0
+
     def _create_widgets(self):
         theme = self.themes[self.current_theme]
 
         # ── Top area: text displays + PANIC BUTTON ────────────────────────────
         top_frame = tk.Frame(self, bg=theme["bg"])
         self.top_frame = top_frame
-        top_frame.pack(fill="x", padx=self._frame_gap(), pady=(self._frame_gap(), 3))
+        top_frame.pack(fill="x", padx=self._top_control_gap(), pady=(0, 3))
 
         displays = tk.Frame(top_frame, bg=theme["bg"])
         self.displays_frame = displays
         displays.pack(side="left", fill="both", expand=True)
 
-        self.input_display = tk.Text(
-            displays, wrap="word", font=("Segoe UI", 18), height=2
-        )
+        self.input_display = tk.Text(displays, wrap="word", font=("Segoe UI", 18), height=2)
         self.input_display.pack(fill="both", expand=True)
         self.input_display.config(state="disabled")
 
@@ -1263,7 +1264,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
 
         # ── Prediction bar ────────────────────────────────────────────────────
         self.predictive_container = tk.Frame(self, bg=theme["bg"])
-        self.predictive_container.pack(fill="x", padx=self._frame_gap(), pady=3)
+        self.predictive_container.pack(fill="x", padx=self._top_control_gap(), pady=0)
 
         # ── Status bar (pack first with side=bottom so it anchors correctly) ───
         self.status_bar = ttk.Label(
@@ -1275,7 +1276,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
 
         # ── Shared content area — keyboard and predefined panel swap here ──────
         self.content_area = tk.Frame(self, bg=theme["bg"])
-        self.content_area.pack(fill="both", expand=True, padx=self._frame_gap(), pady=(3, self._frame_gap()))
+        self.content_area.pack(fill="both", expand=True, padx=self._frame_gap(), pady=(0, self._frame_gap()))
 
         # Main grid: row 0 = func row, rows 1-3 = letters (all equal weight)
         self.main_grid = tk.Frame(self.content_area, bg=theme["bg"])
@@ -1286,7 +1287,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
 
         # Row 0: func row (always visible)
         self.func_row_frame = tk.Frame(self.main_grid, bg=theme["bg"])
-        self.func_row_frame.grid(row=0, column=0, sticky="nsew", padx=1, pady=1)
+        self.func_row_frame.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
         self._create_func_row(self.func_row_frame)
 
         # Rows 1-3: swappable area
@@ -1365,7 +1366,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                 activebackground=func_abg, activeforeground=func_fg,
                 relief="raised", bd=1, cursor="hand2",
             )
-            btn.grid(row=0, column=col, sticky="nsew", padx=1)
+            btn.grid(row=0, column=col, sticky="nsew", padx=0, pady=0)
             self.keyboard_buttons.append(btn)
 
     def _create_letter_rows(self, parent):
@@ -1721,7 +1722,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                 relief="raised", bd=2, cursor="hand2",
                 bg=theme["button_bg"], fg=theme["button_fg"],
             )
-            btn.pack(side="left", padx=3, ipadx=26, ipady=38, expand=True, fill="both")
+            btn.pack(side="left", padx=0, ipadx=26, ipady=38, expand=True, fill="both")
 
     def apply_completion(self, word):
         """User selected a completion suggestion while typing (before space)."""
