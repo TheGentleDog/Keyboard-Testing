@@ -401,8 +401,6 @@ class GazeTrackerApp:
         self._tracking_faces = 0
         self._tracking_predictions = 0
         self._mouse_moves = 0
-        self._pipeline_latency_ms = 0.0
-        self._pipeline_latency_avg_ms = 0.0
         self._tracking_error = None
         self.pyautogui_ok = _PYAUTOGUI_OK
         self.pyautogui_screen_size = (_PYAUTOGUI_SCREEN_W, _PYAUTOGUI_SCREEN_H)
@@ -571,8 +569,6 @@ class GazeTrackerApp:
         # top HUD bar
         cv2.rectangle(cv,(0,0),(SCREEN_W,38),(16,16,16),-1)
         txt(cv, "GazeTracker  1920x1080", (14,26), scale=0.62, color=C_ACCENT, thick=1)
-        txt(cv, f"Latency {self._pipeline_latency_avg_ms:.1f} ms", (SCREEN_W-310,26),
-            scale=0.50, color=(180,220,255))
         txt(cv, f"FPS {fps:.1f}", (SCREEN_W-110,26), scale=0.60, color=(150,255,150))
         mouse_state = "ON" if self._mouse_ctrl else "OFF"
         ctrl = f"R=recalibrate   H=pip   D=debug   X=mouse({mouse_state})   Q=quit"
@@ -706,8 +702,6 @@ class GazeTrackerApp:
         self._tracking_faces = 0
         self._tracking_predictions = 0
         self._mouse_moves = 0
-        self._pipeline_latency_ms = 0.0
-        self._pipeline_latency_avg_ms = 0.0
         self._tracking_error = None
         window_ready = False
 
@@ -716,7 +710,6 @@ class GazeTrackerApp:
                 if stop_event and stop_event.is_set():
                     break
 
-                frame_start = time.perf_counter()
                 ret, cam = cap.read()
                 if not ret:
                     self._tracking_error = "Camera frame read failed"
@@ -745,15 +738,6 @@ class GazeTrackerApp:
                 elif window_ready:
                     cv2.destroyWindow(self.WIN)
                     window_ready = False
-
-                latency_ms = (time.perf_counter() - frame_start) * 1000.0
-                self._pipeline_latency_ms = latency_ms
-                if self._pipeline_latency_avg_ms <= 0:
-                    self._pipeline_latency_avg_ms = latency_ms
-                else:
-                    self._pipeline_latency_avg_ms = (
-                        0.15 * latency_ms + 0.85 * self._pipeline_latency_avg_ms
-                    )
         except Exception as e:
             self._tracking_error = str(e)
             print(f"[Error] Tracking crashed: {e}")
