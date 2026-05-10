@@ -151,6 +151,7 @@ class GazeFeatureExtractor:
     R_CORNERS = [362, 263]
     L_IRIS    = 468
     R_IRIS    = 473
+    GLABELLA  = 9    # Approximate Face Mesh point at the glabella / between eyebrows
 
     # Eye landmarks for EAR (Eye Aspect Ratio) blink detection
     # Left eye: outer corner, upper1, upper2, inner corner, lower2, lower1
@@ -195,6 +196,15 @@ class GazeFeatureExtractor:
     def iris_px(self, lms, w, h):
         def p(i): return (int(lms[i].x*w), int(lms[i].y*h))
         return p(self.L_IRIS), p(self.R_IRIS)
+
+    def glabella_px(self, lms, w, h):
+        return np.array([lms[self.GLABELLA].x * w, lms[self.GLABELLA].y * h], float)
+
+    def interocular_px(self, lms, w, h):
+        def p(i): return np.array([lms[i].x * w, lms[i].y * h], float)
+        left = (p(self.L_CORNERS[0]) + p(self.L_CORNERS[1])) / 2.0
+        right = (p(self.R_CORNERS[0]) + p(self.R_CORNERS[1])) / 2.0
+        return float(np.linalg.norm(right - left))
 
 
 # ──────────────────────────────────────────────────────────────
@@ -393,6 +403,10 @@ class GazeTrackerApp:
         self._show_distance = show_distance
         self._tutorial_enabled = tutorial_enabled
         self._last_distance = None
+        self._head_ref = None
+        self._head_ref_samples = []
+        self._head_shift = None
+        self._head_shift_threshold = 0.2
         self._mouse_ctrl   = True
         self._window_open  = True
         self._blink = False  # blink state indicator
@@ -409,6 +423,9 @@ class GazeTrackerApp:
     def _new_calib(self):
         self.calib = CalibrationManager(self.num_points, self.spp)
         self.smoother.reset(); self.hist.clear()
+        self._head_ref = None
+        self._head_ref_samples = []
+        self._head_shift = None
 
     def _fps(self):
         now = time.time(); self._fpsq.append(now)
@@ -456,9 +473,9 @@ class GazeTrackerApp:
             left, right = self.extractor.iris_px(lms, w, h)
             left_arr = np.array(left, float)
             right_arr = np.array(right, float)
-            eye_center = (left_arr + right_arr) / 2.0
-            pos_x = eye_center[0] - (w / 2.0)
-            pos_y = (h / 2.0) - eye_center[1]
+            glabella = self.extractor.glabella_px(lms, w, h)
+            pos_x = glabella[0] - (w / 2.0)
+            pos_y = (h / 2.0) - glabella[1]
             pos_x_norm = pos_x / (w / 2.0)
             pos_y_norm = pos_y / (h / 2.0)
             angle_x = math.degrees(math.atan(pos_x / focal_px_for_width(w)))
@@ -481,6 +498,43 @@ class GazeTrackerApp:
         except Exception:
             pass
         return self._last_distance
+
+    def _head_position_feature(self, lms, w, h):
+        if lms is None:
+            return None
+        try:
+            glabella = self.extractor.glabella_px(lms, w, h)
+            scale = self.extractor.interocular_px(lms, w, h)
+            if scale < 1.0:
+                return None
+            return np.array([glabella[0] / scale, glabella[1] / scale], float)
+        except Exception:
+            return None
+
+    def _record_calibration_head_position(self, lms, w, h):
+        feat = self._head_position_feature(lms, w, h)
+        if feat is not None:
+            self._head_ref_samples.append(feat)
+
+    def _finalize_calibration_head_position(self):
+        if self._head_ref_samples:
+            self._head_ref = np.mean(np.array(self._head_ref_samples), axis=0)
+            print(f"[Head] Calibrated glabella reference from {len(self._head_ref_samples)} samples.")
+
+    def _update_head_shift(self, lms, w, h):
+        feat = self._head_position_feature(lms, w, h)
+        if feat is None or self._head_ref is None:
+            self._head_shift = None
+            return None
+        delta = feat - self._head_ref
+        mag = float(np.linalg.norm(delta))
+        self._head_shift = {
+            "dx": float(delta[0]),
+            "dy": float(delta[1]),
+            "mag": mag,
+            "moved": mag >= self._head_shift_threshold,
+        }
+        return self._head_shift
 
     # ── calibration render ──────────────────────────────────────
     def _render_calib(self, cam, feat, lms=None):
@@ -524,6 +578,7 @@ class GazeTrackerApp:
             overlay_pip(cv, cam, distance_info=distance_info)
         # Only add calibration samples when not blinking
         if feat is not None and not is_blinking:
+            self._record_calibration_head_position(lms, cam.shape[1], cam.shape[0])
             self.calib.add_sample(feat)
 
     # ── tracking render ─────────────────────────────────────────
@@ -534,6 +589,10 @@ class GazeTrackerApp:
         # Check for blink - if blinking, skip gaze update and use last position
         if lms is not None:
             self._blink = self.extractor.is_blinking(lms, cam.shape[1], cam.shape[0])
+            self._update_head_shift(lms, cam.shape[1], cam.shape[0])
+        else:
+            self._blink = False
+            self._head_shift = None
 
         if feat is not None and not self._blink:
             raw = self.calib.model.predict(feat)
@@ -575,6 +634,19 @@ class GazeTrackerApp:
         cw = cv2.getTextSize(ctrl, cv2.FONT_HERSHEY_SIMPLEX, 0.48, 1)[0][0]
         txt(cv, ctrl, (SCREEN_W//2-cw//2, 26), scale=0.48, color=(110,110,110))
 
+        if self._head_shift and self._head_shift["moved"]:
+            msg = "Head moved from calibrated position"
+            detail = f"Shift: {self._head_shift['mag']:.2f}  dx {self._head_shift['dx']:+.2f}  dy {self._head_shift['dy']:+.2f}"
+            mw = cv2.getTextSize(msg, cv2.FONT_HERSHEY_SIMPLEX, 0.82, 2)[0][0]
+            dw = cv2.getTextSize(detail, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)[0][0]
+            box_w = max(mw, dw) + 48
+            x0 = SCREEN_W // 2 - box_w // 2
+            y0 = 58
+            cv2.rectangle(cv, (x0, y0), (x0 + box_w, y0 + 72), (24, 24, 24), -1)
+            cv2.rectangle(cv, (x0, y0), (x0 + box_w, y0 + 72), C_WARN, 2)
+            txt(cv, msg, (SCREEN_W//2 - mw//2, y0 + 30), scale=0.82, color=C_WARN, thick=2)
+            txt(cv, detail, (SCREEN_W//2 - dw//2, y0 + 56), scale=0.55, color=C_TEXT)
+
         if self._pip:
             distance_info = self._estimate_distance(lms, cam.shape[1], cam.shape[0]) if self._show_distance else None
             overlay_pip(cv, cam, distance_info=distance_info)
@@ -584,7 +656,14 @@ class GazeTrackerApp:
         if not self._dbg or lms is None: return
         h,w = cam.shape[:2]
         for pt in self.extractor.iris_px(lms,w,h):
-            cv2.circle(cam, pt, 4, (0,220,255), -1)
+            cv2.circle(cam, pt, 3, (0,220,255), -1)
+        g = self.extractor.glabella_px(lms, w, h)
+        gx, gy = int(g[0]), int(g[1])
+        cv2.circle(cam, (gx, gy), 10, (255, 0, 255), 2)
+        cv2.line(cam, (gx - 14, gy), (gx + 14, gy), (255, 0, 255), 2)
+        cv2.line(cam, (gx, gy - 14), (gx, gy + 14), (255, 0, 255), 2)
+        cv2.putText(cam, "GLABELLA", (gx + 14, gy - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 0, 255), 1, cv2.LINE_AA)
         for idx in GazeFeatureExtractor.L_CORNERS + GazeFeatureExtractor.R_CORNERS:
             cv2.circle(cam,(int(lms[idx].x*w),int(lms[idx].y*h)),3,(255,100,0),-1)
 
@@ -686,6 +765,7 @@ class GazeTrackerApp:
                 return False
 
         # Calibration done — destroy window, continue tracking headlessly
+        self._finalize_calibration_head_position()
         cv2.destroyWindow(self.WIN)
         cv2.waitKey(1)
         print("[Info] Calibration done — tracking active.")

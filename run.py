@@ -1782,6 +1782,8 @@ class LauncherUI(tk.Tk):
                 min_tracking_confidence=0.5,
             )
             self.after(0, lambda: self._set_preview_status(status, self.DARK["accent"]))
+            head_ref = None
+            head_shift_threshold = 0.2
 
             while self._preview_stop is not None and not self._preview_stop.is_set():
                 ret, frame = cap.read()
@@ -1793,13 +1795,25 @@ class LauncherUI(tk.Tk):
                 h, w = frame.shape[:2]
                 result = mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
                 lms = result.multi_face_landmarks[0].landmark if result.multi_face_landmarks else None
+                current_head_feature = None
 
                 if lms is not None:
                     left_eye = np.array([lms[468].x * w, lms[468].y * h])
                     right_eye = np.array([lms[473].x * w, lms[473].y * h])
-                    eye_center = (left_eye + right_eye) / 2.0
-                    pos_x = eye_center[0] - (w / 2.0)
-                    pos_y = (h / 2.0) - eye_center[1]
+                    glabella = np.array([lms[9].x * w, lms[9].y * h])
+                    left_anchor = (
+                        np.array([lms[33].x * w, lms[33].y * h]) +
+                        np.array([lms[133].x * w, lms[133].y * h])
+                    ) / 2.0
+                    right_anchor = (
+                        np.array([lms[362].x * w, lms[362].y * h]) +
+                        np.array([lms[263].x * w, lms[263].y * h])
+                    ) / 2.0
+                    face_scale = float(np.linalg.norm(right_anchor - left_anchor))
+                    if face_scale > 1.0:
+                        current_head_feature = glabella / face_scale
+                    pos_x = glabella[0] - (w / 2.0)
+                    pos_y = (h / 2.0) - glabella[1]
                     pos_x_norm = pos_x / (w / 2.0)
                     pos_y_norm = pos_y / (h / 2.0)
                     focal_x_px = w / (2.0 * math.tan(math.radians(camera_hfov_deg) / 2.0))
@@ -1807,11 +1821,35 @@ class LauncherUI(tk.Tk):
                     angle_y = math.degrees(math.atan(pos_y_norm))
 
                     cx, cy = int(w / 2), int(h / 2)
-                    ex, ey = int(eye_center[0]), int(eye_center[1])
+                    gx, gy = int(glabella[0]), int(glabella[1])
                     cv2.line(frame, (cx - 24, cy), (cx + 24, cy), (80, 80, 80), 1, cv2.LINE_AA)
                     cv2.line(frame, (cx, cy - 24), (cx, cy + 24), (80, 80, 80), 1, cv2.LINE_AA)
-                    cv2.circle(frame, (ex, ey), 7, (0, 220, 120), 2, cv2.LINE_AA)
-                    cv2.line(frame, (cx, cy), (ex, ey), (0, 160, 220), 1, cv2.LINE_AA)
+                    cv2.circle(frame, (gx, gy), 11, (255, 0, 255), 2, cv2.LINE_AA)
+                    cv2.line(frame, (gx - 15, gy), (gx + 15, gy), (255, 0, 255), 2, cv2.LINE_AA)
+                    cv2.line(frame, (gx, gy - 15), (gx, gy + 15), (255, 0, 255), 2, cv2.LINE_AA)
+                    cv2.putText(frame, "GLABELLA", (gx + 16, gy - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 0, 255), 1, cv2.LINE_AA)
+                    cv2.line(frame, (cx, cy), (gx, gy), (0, 160, 220), 1, cv2.LINE_AA)
+
+                    cv2.rectangle(frame, (10, h - 78), (470, h - 14), (18, 18, 18), -1)
+                    cv2.putText(frame, "Press L to set/restart head baseline", (22, h - 50),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.55, (220, 220, 220), 1, cv2.LINE_AA)
+                    if head_ref is not None and current_head_feature is not None:
+                        delta = current_head_feature - head_ref
+                        shift = float(np.linalg.norm(delta))
+                        moved = shift >= head_shift_threshold
+                        color = (0, 100, 255) if moved else (0, 220, 120)
+                        label = "HEAD MOVED" if moved else "Head stable"
+                        cv2.putText(frame, f"{label}: {shift:.2f}  dx {delta[0]:+.2f}  dy {delta[1]:+.2f}",
+                                    (22, h - 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2, cv2.LINE_AA)
+                        if moved:
+                            cv2.rectangle(frame, (w // 2 - 300, 26), (w // 2 + 300, 86), (18, 18, 18), -1)
+                            cv2.rectangle(frame, (w // 2 - 300, 26), (w // 2 + 300, 86), color, 2)
+                            cv2.putText(frame, "Head moved from baseline", (w // 2 - 220, 64),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2, cv2.LINE_AA)
+                    else:
+                        cv2.putText(frame, "No baseline set", (22, h - 24),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (160, 160, 160), 1, cv2.LINE_AA)
 
                     if debug_on:
                         for idx in [468, 473]:
@@ -1847,6 +1885,12 @@ class LauncherUI(tk.Tk):
                 key = cv2.waitKey(1) & 0xFF
                 if key in (ord("q"), 27):
                     break
+                if key in (ord("l"), ord("L")):
+                    if current_head_feature is not None:
+                        head_ref = current_head_feature.copy()
+                        self.after(0, lambda: self._set_preview_status("Head baseline set", self.DARK["accent"]))
+                    else:
+                        self.after(0, lambda: self._set_preview_status("No face for baseline", self.DARK["danger"]))
         except Exception as exc:
             msg = str(exc)
             self.after(0, lambda: self._set_preview_status(msg[:28], self.DARK["danger"]))
