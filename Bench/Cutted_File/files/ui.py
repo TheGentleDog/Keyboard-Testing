@@ -1276,7 +1276,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
 
         # ── Shared content area — keyboard and predefined panel swap here ──────
         self.content_area = tk.Frame(self, bg=theme["bg"])
-        self.content_area.pack(fill="both", expand=True, padx=self._frame_gap(), pady=(0, self._frame_gap()))
+        self.content_area.pack(fill="both", expand=True, padx=self._top_control_gap(), pady=(0, self._frame_gap()))
 
         # Main grid: row 0 = func row, rows 1-3 = letters (all equal weight)
         self.main_grid = tk.Frame(self.content_area, bg=theme["bg"])
@@ -1293,7 +1293,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         # Rows 1-3: swappable area
         self.letters_frame    = tk.Frame(self.main_grid, bg=theme["bg"])
         self.predefined_frame = tk.Frame(self.main_grid, bg=theme["bg"])
-        self.letters_frame.grid(row=1, column=0, rowspan=3, sticky="nsew")
+        self.letters_frame.grid(row=1, column=0, rowspan=3, sticky="nsew", padx=self._frame_gap())
         self._create_keyboard_area(self.letters_frame)
 
         self.apply_theme()
@@ -1598,14 +1598,14 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         """Toggle between letter keys and predefined sentence panel."""
         if self._in_predefined_mode:
             self.predefined_frame.grid_remove()
-            self.letters_frame.grid(row=1, column=0, rowspan=3, sticky="nsew")
+            self.letters_frame.grid(row=1, column=0, rowspan=3, sticky="nsew", padx=self._frame_gap())
             self._in_predefined_mode = False
             self._dwell_reset_all()
             self.status_bar.config(text="Keyboard mode")
         else:
             self.letters_frame.grid_remove()
             self._create_predefined_panel(self.predefined_frame)
-            self.predefined_frame.grid(row=1, column=0, rowspan=3, sticky="nsew")
+            self.predefined_frame.grid(row=1, column=0, rowspan=3, sticky="nsew", padx=self._frame_gap())
             self._in_predefined_mode = True
             self._dwell_reset_all()
             self.status_bar.config(text="Predefined sentences")

@@ -66,6 +66,23 @@ def _set_dark_title_bar(window, bg="#252628", fg="#ffffff"):
         pass
 
 
+def _show_borderless_window_in_taskbar(window):
+    """Give a borderless Tk window a normal Windows taskbar button."""
+    if sys.platform != "win32":
+        return
+    try:
+        window.update_idletasks()
+        hwnd = ctypes.windll.user32.GetParent(window.winfo_id()) or window.winfo_id()
+        exstyle = ctypes.windll.user32.GetWindowLongW(hwnd, -20)
+        exstyle &= ~0x00000080  # WS_EX_TOOLWINDOW
+        exstyle |= 0x00040000   # WS_EX_APPWINDOW
+        ctypes.windll.user32.SetWindowLongW(hwnd, -20, exstyle)
+        window.withdraw()
+        window.after(10, window.deiconify)
+    except Exception:
+        pass
+
+
 class WelcomeUI(tk.Tk):
     """
     First screen shown to the user.
@@ -121,6 +138,7 @@ class WelcomeUI(tk.Tk):
         self.focus_force()
         self.attributes("-topmost", True)
         self.after(200, lambda: self.attributes("-topmost", False))
+        self.after(250, lambda: _show_borderless_window_in_taskbar(self))
 
     def _build(self, width, height):
         c = self.canvas
@@ -147,11 +165,13 @@ class WelcomeUI(tk.Tk):
         self.canvas.bind("<ButtonRelease-1>", self._stop_window_drag)
 
         nav_y = 68
-        c.create_text(32, nav_y, text="SeenbyEveryone", fill="#d6d7d8",
+        c.create_text(112, nav_y, text="About us", fill="#d6d7d8",
                       font=("Krona One", 10), anchor="w")
-        c.create_text(width // 2, nav_y, text="About us", fill="#d6d7d8",
+        c.create_text(width // 2, nav_y, text="Home", fill="#d6d7d8",
                       font=("Krona One", 10))
         c.create_text(width - 112, nav_y, text="Help", fill="#d6d7d8",
+                      font=("Krona One", 10), anchor="e")
+        c.create_text(width - 32, height - 30, text="SeenByEveryone", fill="#d6d7d8",
                       font=("Krona One", 10), anchor="e")
 
         center_x = width // 2
@@ -502,6 +522,7 @@ class LauncherUI(tk.Tk):
         self.focus_force()
         self.attributes("-topmost", True)
         self.after(200, lambda: self.attributes("-topmost", False))
+        self.after(250, lambda: _show_borderless_window_in_taskbar(self))
 
     def _section(self, parent, title, subtitle=None):
         """Returns a card frame with a section label."""
@@ -961,6 +982,8 @@ class LauncherUI(tk.Tk):
             top = 18
             bottom = view_h - 18
             track_h = max(1, bottom - top)
+            if content_h <= view_h:
+                return top, track_h, 0, 1, top
             thumb_h = max(42, track_h * (view_h / content_h))
             max_scroll = max(1, content_h - view_h)
             travel = max(1, track_h - thumb_h)
@@ -969,8 +992,13 @@ class LauncherUI(tk.Tk):
 
         def drag_scrollbar(event):
             top, thumb_h, max_scroll, travel, _thumb_y = scrollbar_metrics()
+            if max_scroll <= 0:
+                self._settings_scroll_y = 0
+                self._draw_canvas_settings(canvas, sections, keep_scroll=True)
+                sync_active_from_scroll()
+                return "break"
             pct = (event.y - top - scrollbar_drag["offset"]) / travel
-            self._settings_scroll_y = max(0, min(max_scroll, pct * max_scroll))
+            self._settings_scroll_y = int(round(max(0, min(max_scroll, pct * max_scroll))))
             self._draw_canvas_settings(canvas, sections, keep_scroll=True)
             sync_active_from_scroll()
             return "break"
@@ -996,7 +1024,7 @@ class LauncherUI(tk.Tk):
             self.update_idletasks()
             section = sections.get(key)
             if isinstance(section, (int, float)):
-                self._settings_scroll_y = max(0, section - 12)
+                self._settings_scroll_y = int(round(max(0, section - 12)))
                 self._draw_canvas_settings(canvas, sections, keep_scroll=True)
                 set_active(key)
                 return
@@ -1013,7 +1041,7 @@ class LauncherUI(tk.Tk):
 
         def make_nav(key, text):
             index = len(nav_items)
-            item_y = nav_y + 33 + index * 50
+            item_y = nav_y + 33 + index * 46
             item_x = nav_x + 10
             if Image is not None:
                 nav_images[key] = {
@@ -1270,7 +1298,7 @@ class LauncherUI(tk.Tk):
         if not keep_scroll:
             self._settings_scroll_y = 0
         max_scroll = max(0, self._settings_content_height - max(1, canvas.winfo_height()))
-        self._settings_scroll_y = max(0, min(self._settings_scroll_y, max_scroll))
+        self._settings_scroll_y = int(round(max(0, min(self._settings_scroll_y, max_scroll))))
 
         x = 46
         width = max(360, canvas.winfo_width() - x - 70)
@@ -1493,11 +1521,18 @@ class LauncherUI(tk.Tk):
         default_button()
 
         self._settings_content_height = max(1, y_positions[0] + self._settings_scroll_y)
+        actual_max_scroll = max(0, self._settings_content_height - max(1, canvas.winfo_height()))
+        if self._settings_scroll_y > actual_max_scroll:
+            self._settings_scroll_y = int(round(actual_max_scroll))
+            self._draw_canvas_settings(canvas, sections, keep_scroll=True)
+            return
         self._draw_settings_scrollbar(canvas)
 
     def _scroll_canvas_settings(self, canvas, sections, delta):
+        if not delta:
+            return
         max_scroll = max(0, self._settings_content_height - max(1, canvas.winfo_height()))
-        self._settings_scroll_y = max(0, min(max_scroll, self._settings_scroll_y + delta))
+        self._settings_scroll_y = int(round(max(0, min(max_scroll, self._settings_scroll_y + delta))))
         self._draw_canvas_settings(canvas, sections, keep_scroll=True)
 
     def _draw_settings_scrollbar(self, canvas):
@@ -1565,6 +1600,8 @@ class LauncherUI(tk.Tk):
         return ImageTk.PhotoImage(img)
 
     def _render_alpha_panel(self, width, height, fill, opacity):
+        width = max(1, int(round(width)))
+        height = max(1, int(round(height)))
         alpha = max(0, min(255, round(255 * opacity)))
         fill_rgb = self._hex_to_rgb(fill)
         img = Image.new("RGBA", (width, height), (*fill_rgb, alpha))
