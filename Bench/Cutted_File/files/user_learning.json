@@ -1,23 +1,25 @@
 {
   "user_shortcuts": {
     "m": "man",
-    "g": "grandmother",
+    "g": "sige",
     "w": "want",
     "l": "looking",
     "el": "election",
     "n": "nurse",
     "h": "husband",
-    "y": "you"
+    "y": "you",
+    "k": "kailangan"
   },
   "user_shortcut_usage": {
     "m": 2,
-    "g": 1,
+    "g": 2,
     "w": 2,
     "l": 1,
     "el": 1,
     "n": 1,
     "h": 1,
-    "y": 1
+    "y": 1,
+    "k": 2
   },
   "new_words": [],
   "word_usage_history": [
@@ -234,6 +236,16 @@
         "i",
         "love"
       ]
+    ],
+    [
+      "sige",
+      [
+        "sige"
+      ]
+    ],
+    [
+      "ka",
+      []
     ]
   ]
 }

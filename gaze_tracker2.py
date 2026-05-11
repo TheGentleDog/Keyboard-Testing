@@ -28,6 +28,7 @@ import time
 import collections
 import math
 import argparse
+import threading
 
 try:
     import pyautogui
@@ -402,9 +403,101 @@ class GazeTrackerApp:
         self._tracking_predictions = 0
         self._mouse_moves = 0
         self._tracking_error = None
+        self._heatmap_recording = False
+        self._heatmap_points = []
+        self._heatmap_lock = threading.Lock()
+        self._heatmap_started_at = None
+        self._heatmap_last_point_at = 0.0
+        self._heatmap_interval_seconds = 0.033
         self.pyautogui_ok = _PYAUTOGUI_OK
         self.pyautogui_screen_size = (_PYAUTOGUI_SCREEN_W, _PYAUTOGUI_SCREEN_H)
         self.canvas = np.zeros((SCREEN_H, SCREEN_W, 3), np.uint8)
+
+    def start_heatmap_recording(self):
+        """Begin recording valid smoothed gaze points for the keyboard session."""
+        with self._heatmap_lock:
+            self._heatmap_points = []
+            self._heatmap_started_at = time.time()
+            self._heatmap_last_point_at = 0.0
+            self._heatmap_recording = True
+
+    def stop_heatmap_recording(self):
+        with self._heatmap_lock:
+            self._heatmap_recording = False
+
+    def heatmap_stats(self):
+        with self._heatmap_lock:
+            points = list(self._heatmap_points)
+            started_at = self._heatmap_started_at
+        if not points:
+            return {
+                "point_count": 0,
+                "duration_seconds": 0,
+            }
+        first_ts = started_at if started_at is not None else points[0][0]
+        last_ts = points[-1][0]
+        return {
+            "point_count": len(points),
+            "duration_seconds": max(0, round(last_ts - first_ts)),
+        }
+
+    def _record_heatmap_point(self, gx, gy):
+        now = time.time()
+        with self._heatmap_lock:
+            if not self._heatmap_recording:
+                return
+            if now - self._heatmap_last_point_at < self._heatmap_interval_seconds:
+                return
+            self._heatmap_last_point_at = now
+            self._heatmap_points.append((now, int(gx), int(gy)))
+
+    def save_heatmap_png(self, output_path, background_image=None, opacity=0.58):
+        """
+        Save a full-screen gaze heatmap over the provided keyboard-window image.
+        background_image may be a PIL image or RGB/RGBA numpy array.
+        """
+        with self._heatmap_lock:
+            points = list(self._heatmap_points)
+
+        if background_image is None:
+            base = np.zeros((SCREEN_H, SCREEN_W, 3), np.uint8)
+        else:
+            base = np.asarray(background_image)
+            if base.ndim == 2:
+                base = cv2.cvtColor(base, cv2.COLOR_GRAY2BGR)
+            elif base.shape[2] == 4:
+                base = cv2.cvtColor(base, cv2.COLOR_RGBA2BGR)
+            else:
+                base = cv2.cvtColor(base, cv2.COLOR_RGB2BGR)
+            base = np.ascontiguousarray(base)
+
+        out_h, out_w = base.shape[:2]
+        density = np.zeros((out_h, out_w), np.float32)
+
+        for _, gx, gy in points:
+            x = int(np.clip(gx * out_w / SCREEN_W, 0, out_w - 1))
+            y = int(np.clip(gy * out_h / SCREEN_H, 0, out_h - 1))
+            density[y, x] += 1.0
+
+        if points:
+            blur_radius = max(31, int(min(out_w, out_h) * 0.045))
+            if blur_radius % 2 == 0:
+                blur_radius += 1
+            density = cv2.GaussianBlur(density, (blur_radius, blur_radius), 0)
+            max_density = float(density.max())
+            if max_density > 0:
+                density = density / max_density
+
+            heat_u8 = np.uint8(np.clip(density * 255.0, 0, 255))
+            color = cv2.applyColorMap(heat_u8, cv2.COLORMAP_JET)
+            alpha = (density * opacity).astype(np.float32)
+            alpha = cv2.merge([alpha, alpha, alpha])
+            composed = (base.astype(np.float32) * (1.0 - alpha)) + (color.astype(np.float32) * alpha)
+            base = np.uint8(np.clip(composed, 0, 255))
+
+        if not cv2.imwrite(output_path, base):
+            raise OSError(f"Could not write heatmap PNG: {output_path}")
+        return output_path, len(points)
 
     def _new_calib(self):
         self.calib = CalibrationManager(self.num_points, self.spp)
@@ -543,6 +636,7 @@ class GazeTrackerApp:
             self._last_gaze = (gx, gy)
             self._tracking_predictions += 1
             self.hist.append((gx, gy))
+            self._record_heatmap_point(gx, gy)
             if self._mouse_ctrl and _PYAUTOGUI_OK:
                 mx = int(gx * _PYAUTOGUI_SCREEN_W / SCREEN_W)
                 my = int(gy * _PYAUTOGUI_SCREEN_H / SCREEN_H)
