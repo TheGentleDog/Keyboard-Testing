@@ -2211,6 +2211,14 @@ def main():
                 )
             app.after(3000, monitor_tracking)
 
+    def monitor_head_position():
+        shift = getattr(tracker, "_head_shift", None)
+        if shift and shift.get("moved"):
+            app.show_head_position_warning(shift)
+        else:
+            app.hide_head_position_warning()
+        app.after(250, monitor_head_position)
+
     app.protocol("WM_DELETE_WINDOW", on_close)
     app.bind_all("<KeyPress-q>", quit_session)
     app.bind_all("<KeyPress-Q>", quit_session)
@@ -2219,6 +2227,7 @@ def main():
     app.bind_all("<KeyPress-r>", recalibrate)
     app.bind_all("<KeyPress-R>", recalibrate)
     app.after(1000, monitor_tracking)
+    app.after(250, monitor_head_position)
     app.mainloop()
 
     # Cleanup

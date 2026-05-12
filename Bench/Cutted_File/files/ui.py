@@ -268,6 +268,9 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._pointer_overlay        = None
         self._pointer_canvas         = None
         self._pointer_job            = None
+        self._head_warning_overlay   = None
+        self._head_warning_title     = None
+        self._head_warning_detail    = None
         self._ui_tutorial_enabled    = ui_tutorial and self.ui_layout == "ui2"
         self._tutorial_overlay       = None
         self._tutorial_prev_dwell    = None
@@ -309,6 +312,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._hide_finish_tutorial_button()
         self._show_system_cursor()
         self._destroy_pointer_overlay()
+        self.hide_head_position_warning()
         super().destroy()
 
     def _keyboard_only_gaze_shortcut(self, event=None):
@@ -438,6 +442,98 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                 pass
         self._pointer_overlay = None
         self._pointer_canvas = None
+
+    def show_head_position_warning(self, shift):
+        try:
+            mag = float(shift.get("mag", 0.0))
+            dx = float(shift.get("dx", 0.0))
+            dy = float(shift.get("dy", 0.0))
+            distance = float(shift.get("distance", 0.0))
+        except Exception:
+            mag = dx = dy = 0.0
+            distance = 0.0
+        guide = shift.get("guide") if isinstance(shift, dict) else None
+        if not guide:
+            guide_parts = []
+            if dx > 0.03:
+                guide_parts.append("left")
+            elif dx < -0.03:
+                guide_parts.append("right")
+            if dy > 0.03:
+                guide_parts.append("up")
+            elif dy < -0.03:
+                guide_parts.append("down")
+            if distance > 0.08:
+                guide_parts.append("closer")
+            elif distance < -0.08:
+                guide_parts.append("further")
+            if len(guide_parts) > 2:
+                guide_text = ", ".join(guide_parts[:-1]) + ", and " + guide_parts[-1]
+            else:
+                guide_text = " and ".join(guide_parts)
+            guide = "Shift " + guide_text if guide_text else "Hold steady"
+
+        if self._head_warning_overlay is None:
+            overlay = tk.Toplevel(self)
+            overlay.withdraw()
+            overlay.overrideredirect(True)
+            overlay.attributes("-topmost", True)
+            overlay.configure(bg="#1b1b1b", cursor=self.pointer_cursor)
+            try:
+                overlay.wm_attributes("-disabled", True)
+            except Exception:
+                pass
+
+            frame = tk.Frame(overlay, bg="#1b1b1b", highlightthickness=2, highlightbackground="#ff6b35")
+            frame.pack(fill="both", expand=True)
+            title = tk.Label(
+                frame,
+                text=guide,
+                bg="#1b1b1b",
+                fg="#ffb199",
+                font=("Segoe UI", 18, "bold"),
+            )
+            title.pack(fill="x", padx=24, pady=(14, 2))
+            detail = tk.Label(
+                frame,
+                bg="#1b1b1b",
+                fg="#f1f1f1",
+                font=("Segoe UI", 11),
+            )
+            detail.pack(fill="x", padx=24, pady=(0, 14))
+
+            self._head_warning_overlay = overlay
+            self._head_warning_title = title
+            self._head_warning_detail = detail
+
+        self._head_warning_title.config(text=guide)
+        self._head_warning_detail.config(
+            text=(
+                f"Position x {dx:+.2f}, y {dy:+.2f} -> target x 0.00, y 0.00\n"
+                f"Distance {distance:+.0%} -> target 0%   Shift {mag:.2f}"
+            )
+        )
+        try:
+            width = 680
+            height = 116
+            x = max(0, (self.winfo_screenwidth() - width) // 2)
+            y = 76
+            self._head_warning_overlay.geometry(f"{width}x{height}+{x}+{y}")
+            self._head_warning_overlay.deiconify()
+            self._head_warning_overlay.lift()
+        except Exception:
+            pass
+
+    def hide_head_position_warning(self):
+        if self._head_warning_overlay is None:
+            return
+        try:
+            self._head_warning_overlay.destroy()
+        except Exception:
+            pass
+        self._head_warning_overlay = None
+        self._head_warning_title = None
+        self._head_warning_detail = None
 
     def _show_main_pointer(self):
         if self._use_pointer_overlay:

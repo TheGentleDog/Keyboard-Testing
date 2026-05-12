@@ -405,8 +405,11 @@ class GazeTrackerApp:
         self._last_distance = None
         self._head_ref = None
         self._head_ref_samples = []
+        self._head_scale_ref = None
+        self._head_scale_samples = []
         self._head_shift = None
         self._head_shift_threshold = 0.2
+        self._head_distance_threshold = 0.08
         self._mouse_ctrl   = True
         self._window_open  = True
         self._blink = False  # blink state indicator
@@ -425,6 +428,8 @@ class GazeTrackerApp:
         self.smoother.reset(); self.hist.clear()
         self._head_ref = None
         self._head_ref_samples = []
+        self._head_scale_ref = None
+        self._head_scale_samples = []
         self._head_shift = None
 
     def _fps(self):
@@ -511,15 +516,38 @@ class GazeTrackerApp:
         except Exception:
             return None
 
+    def _head_scale_feature(self, lms, w, h):
+        if lms is None:
+            return None
+        try:
+            scale = self.extractor.interocular_px(lms, w, h)
+            return float(scale) if scale >= 1.0 else None
+        except Exception:
+            return None
+
     def _record_calibration_head_position(self, lms, w, h):
         feat = self._head_position_feature(lms, w, h)
         if feat is not None:
             self._head_ref_samples.append(feat)
+        scale = self._head_scale_feature(lms, w, h)
+        if scale is not None:
+            self._head_scale_samples.append(scale)
+
+    def _mark_initial_head_position(self, lms, w, h):
+        if self._head_ref is not None:
+            return
+        feat = self._head_position_feature(lms, w, h)
+        if feat is not None:
+            self._head_ref = feat.copy()
+            self._head_scale_ref = self._head_scale_feature(lms, w, h)
+            print("[Head] Initial calibration head position marked.")
 
     def _finalize_calibration_head_position(self):
         if self._head_ref_samples:
             self._head_ref = np.mean(np.array(self._head_ref_samples), axis=0)
             print(f"[Head] Calibrated glabella reference from {len(self._head_ref_samples)} samples.")
+        if self._head_scale_samples:
+            self._head_scale_ref = float(np.mean(np.array(self._head_scale_samples)))
 
     def _update_head_shift(self, lms, w, h):
         feat = self._head_position_feature(lms, w, h)
@@ -528,11 +556,38 @@ class GazeTrackerApp:
             return None
         delta = feat - self._head_ref
         mag = float(np.linalg.norm(delta))
+        scale = self._head_scale_feature(lms, w, h)
+        distance_delta = 0.0
+        if scale is not None and self._head_scale_ref is not None and scale > 0:
+            distance_delta = (self._head_scale_ref / scale) - 1.0
+        guide_parts = []
+        if delta[0] > 0.03:
+            guide_parts.append("left")
+        elif delta[0] < -0.03:
+            guide_parts.append("right")
+        if delta[1] > 0.03:
+            guide_parts.append("up")
+        elif delta[1] < -0.03:
+            guide_parts.append("down")
+        if distance_delta > self._head_distance_threshold:
+            guide_parts.append("closer")
+        elif distance_delta < -self._head_distance_threshold:
+            guide_parts.append("further")
+        if len(guide_parts) > 2:
+            guide_text = ", ".join(guide_parts[:-1]) + ", and " + guide_parts[-1]
+        else:
+            guide_text = " and ".join(guide_parts)
+        guide = "Shift " + guide_text if guide_text else "Hold steady"
         self._head_shift = {
             "dx": float(delta[0]),
             "dy": float(delta[1]),
             "mag": mag,
-            "moved": mag >= self._head_shift_threshold,
+            "distance": float(distance_delta),
+            "moved": mag >= self._head_shift_threshold or abs(distance_delta) >= self._head_distance_threshold,
+            "guide": guide,
+            "position": f"x {delta[0]:+.2f}, y {delta[1]:+.2f}",
+            "distance_label": f"{distance_delta:+.0%}",
+            "target": "x 0.00, y 0.00",
         }
         return self._head_shift
 
@@ -543,8 +598,15 @@ class GazeTrackerApp:
 
         # Skip blink frames during calibration
         is_blinking = False
+        head_moved = False
         if lms is not None:
             is_blinking = self.extractor.is_blinking(lms, cam.shape[1], cam.shape[0])
+            if not is_blinking:
+                self._mark_initial_head_position(lms, cam.shape[1], cam.shape[0])
+                self._update_head_shift(lms, cam.shape[1], cam.shape[0])
+                head_moved = bool(self._head_shift and self._head_shift["moved"])
+        else:
+            self._head_shift = None
 
         for i,(fx,fy) in enumerate(self.calib.pts):
             px,py = int(fx*SCREEN_W), int(fy*SCREEN_H)
@@ -573,11 +635,27 @@ class GazeTrackerApp:
         hw = cv2.getTextSize(hint, cv2.FONT_HERSHEY_SIMPLEX, 0.48, 1)[0][0]
         txt(cv, hint, (SCREEN_W//2 - hw//2, SCREEN_H-18), scale=0.48, color=(100,100,100))
 
+        if self._head_shift and self._head_shift["moved"]:
+            msg = self._head_shift.get("guide", "Shift back to center")
+            detail = (
+                f"Position {self._head_shift['position']}  -> target {self._head_shift['target']}  |  "
+                f"Distance {self._head_shift['distance_label']} -> target 0%"
+            )
+            mw = cv2.getTextSize(msg, cv2.FONT_HERSHEY_SIMPLEX, 0.82, 2)[0][0]
+            dw = cv2.getTextSize(detail, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)[0][0]
+            box_w = max(mw, dw) + 48
+            x0 = SCREEN_W // 2 - box_w // 2
+            y0 = 88
+            cv2.rectangle(cv, (x0, y0), (x0 + box_w, y0 + 72), (24, 24, 24), -1)
+            cv2.rectangle(cv, (x0, y0), (x0 + box_w, y0 + 72), C_WARN, 2)
+            txt(cv, msg, (SCREEN_W//2 - mw//2, y0 + 30), scale=0.82, color=C_WARN, thick=2)
+            txt(cv, detail, (SCREEN_W//2 - dw//2, y0 + 56), scale=0.55, color=C_TEXT)
+
         if self._pip:
             distance_info = self._estimate_distance(lms, cam.shape[1], cam.shape[0]) if self._show_distance else None
             overlay_pip(cv, cam, distance_info=distance_info)
-        # Only add calibration samples when not blinking
-        if feat is not None and not is_blinking:
+        # Only add calibration samples when the face is usable and near the starting head position.
+        if feat is not None and not is_blinking and not head_moved:
             self._record_calibration_head_position(lms, cam.shape[1], cam.shape[0])
             self.calib.add_sample(feat)
 
@@ -635,8 +713,11 @@ class GazeTrackerApp:
         txt(cv, ctrl, (SCREEN_W//2-cw//2, 26), scale=0.48, color=(110,110,110))
 
         if self._head_shift and self._head_shift["moved"]:
-            msg = "Head moved from calibrated position"
-            detail = f"Shift: {self._head_shift['mag']:.2f}  dx {self._head_shift['dx']:+.2f}  dy {self._head_shift['dy']:+.2f}"
+            msg = self._head_shift.get("guide", "Shift back to center")
+            detail = (
+                f"Position {self._head_shift['position']}  -> target {self._head_shift['target']}  |  "
+                f"Distance {self._head_shift['distance_label']} -> target 0%"
+            )
             mw = cv2.getTextSize(msg, cv2.FONT_HERSHEY_SIMPLEX, 0.82, 2)[0][0]
             dw = cv2.getTextSize(detail, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)[0][0]
             box_w = max(mw, dw) + 48
