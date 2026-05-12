@@ -1185,7 +1185,7 @@ def save_graph(
     """
     Save a PNG chart from the current BLEU run:
       - one aggregate bar chart
-      - one BLEU distribution histogram chart
+      - one per-case BLEU line chart
     """
     if not output_path:
         return
@@ -1216,7 +1216,7 @@ def save_graph(
     }.get(lang, lang.capitalize())
 
     aggregate_path = graph_variant_path(output_path, "aggregate")
-    distribution_path = graph_variant_path(output_path, "distribution")
+    per_case_path = graph_variant_path(output_path, "per_case")
 
     fig_bar, ax_bar = plt.subplots(figsize=(12, 4.8), constrained_layout=True)
     fig_bar.suptitle(
@@ -1267,67 +1267,43 @@ def save_graph(
     fig_bar.savefig(aggregate_path, dpi=160)
     plt.close(fig_bar)
 
-    fig_dist, axes = plt.subplots(1, 2, figsize=(13.5, 5.2), constrained_layout=True)
-    fig_dist.suptitle(
-        f"BLEU Top-1 and Oracle BLEU Distributions - {lang_title} (Top-{top_k})",
-        fontsize=14,
-        fontweight="bold",
-    )
-
-    distribution_specs = [
-        ("BLEU Top-1 Distribution", "bleu_top1"),
-        ("Oracle BLEU Distribution", "bleu_oracle"),
-    ]
-    bins = [i for i in range(0, 105, 5)]
+    fig_line, ax_line = plt.subplots(figsize=(12, 4.8), constrained_layout=True)
     plotted = False
+    for label, metrics, color in groups:
+        records = metrics.get("all_records", [])
+        if max_line_cases:
+            records = records[:max_line_cases]
+        if not records:
+            continue
+        plotted = True
+        xs = list(range(1, len(records) + 1))
+        oracle = [r.get("bleu_oracle", 0.0) * 100.0 for r in records]
+        top1 = [r.get("bleu_top1", 0.0) * 100.0 for r in records]
+        ax_line.plot(xs, oracle, label=f"{label} BLEU oracle", color=color, linewidth=1.8)
+        ax_line.plot(xs, top1, label=f"{label} BLEU top-1", color=color, linewidth=1.1, linestyle="--", alpha=0.75)
 
-    for ax, (title, record_key) in zip(axes, distribution_specs):
-        local_plotted = False
-        for label, metrics, color in groups:
-            records = metrics.get("all_records", [])
-            scores = [
-                r.get(record_key, 0.0) * 100.0
-                for r in records
-                if record_key in r
-            ]
-            if not scores:
-                continue
-            local_plotted = True
-            plotted = True
-            ax.hist(
-                scores,
-                bins=bins,
-                label=label,
-                color=color,
-                alpha=0.38,
-                edgecolor=color,
-                linewidth=0.8,
-            )
+    if plotted:
+        case_label = "all test cases" if not max_line_cases else f"first {max_line_cases} cases per language"
+        ax_line.set_title(f"Per-Case BLEU Line ({case_label})")
+        ax_line.set_xlabel("Test case")
+        ax_line.set_ylabel("BLEU")
+        ax_line.set_ylim(0, 105)
+        ax_line.grid(axis="y", linestyle="--", alpha=0.25)
+        ax_line.legend()
+    else:
+        ax_line.text(
+            0.5, 0.5,
+            "No test-case records available; no BLEU line to plot.",
+            ha="center",
+            va="center",
+        )
+        ax_line.set_axis_off()
 
-        if local_plotted:
-            ax.set_title(title, fontsize=10, fontweight="bold")
-            ax.set_xlabel("BLEU score")
-            ax.set_ylabel("Test cases")
-            ax.set_xlim(0, 100)
-            ax.grid(axis="y", linestyle="--", alpha=0.25)
-            ax.legend(fontsize=8)
-        else:
-            ax.text(
-                0.5, 0.5,
-                "No test-case records available.",
-                ha="center",
-                va="center",
-            )
-            ax.set_axis_off()
-
-    if not plotted:
-        fig_dist.suptitle("No BLEU distribution data available", fontweight="bold")
-
-    fig_dist.savefig(distribution_path, dpi=160)
-    plt.close(fig_dist)
+    fig_line.savefig(per_case_path, dpi=160)
+    plt.close(fig_line)
 
     print(f"\n  Aggregate graph saved -> {aggregate_path}")
-    print(f"  Distribution graph saved -> {distribution_path}")
+    print(f"  Per-case graph saved -> {per_case_path}")
 
 
 # =============================================================================

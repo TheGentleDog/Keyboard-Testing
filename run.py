@@ -17,15 +17,21 @@ import math
 import ctypes
 import tkinter as tk
 from tkinter import ttk
+from datetime import datetime
 
 try:
-    from PIL import Image, ImageDraw, ImageFilter, ImageTk
+    from PIL import Image, ImageDraw, ImageFilter, ImageTk, ImageGrab
 except ImportError:
-    Image = ImageDraw = ImageFilter = ImageTk = None
+    Image = ImageDraw = ImageFilter = ImageTk = ImageGrab = None
 
 # ── Make keyboard modules importable ─────────────────────────────────────────
 KEYBOARD_DIR = os.path.join(os.path.dirname(__file__), "Bench", "Cutted_File", "files")
 sys.path.insert(0, KEYBOARD_DIR)
+
+try:
+    import config as app_config
+except Exception:
+    app_config = None
 
 
 # =============================================================================
@@ -818,10 +824,12 @@ class LauncherUI(tk.Tk):
         skip_btn.bind("<Leave>", lambda _: skip_btn.config(bg=d["card_alt"]))
 
     def _build(self, d):
+        heatmap_default = bool(getattr(app_config, "HEATMAP_ENABLED", False))
         self._camera_var = tk.IntVar(value=0)
         self._camera_window_var = tk.BooleanVar(value=True)
         self._camera_debug_var = tk.BooleanVar(value=True)
         self._distance_var = tk.BooleanVar(value=True)
+        self._heatmap_var = tk.BooleanVar(value=heatmap_default)
         self._ui_layout_var = tk.StringVar(value="ui2")
         self._language_english_var = tk.BooleanVar(value=True)
         self._language_tagalog_var = tk.BooleanVar(value=True)
@@ -1246,6 +1254,7 @@ class LauncherUI(tk.Tk):
         self._camera_window_var.set(True)
         self._camera_debug_var.set(True)
         self._distance_var.set(True)
+        self._heatmap_var.set(bool(getattr(app_config, "HEATMAP_ENABLED", False)))
         self._ui_layout_var.set("ui2")
         self._language_english_var.set(True)
         self._language_tagalog_var.set(True)
@@ -1457,6 +1466,7 @@ class LauncherUI(tk.Tk):
             checkbox("Show camera preview during tracking", self._camera_window_var, "camera_window"),
             checkbox("Show debug eye landmarks", self._camera_debug_var, "camera_debug"),
             checkbox("Show distance panel", self._distance_var, "distance"),
+            checkbox("Save gaze heatmap", self._heatmap_var, "heatmap"),
             preview_button(),
         ))
         section("layout", "Keyboard Layout", lambda: (
@@ -1894,6 +1904,7 @@ class LauncherUI(tk.Tk):
             "camera_window": self._camera_window_var.get(),
             "camera_debug": self._camera_debug_var.get(),
             "distance_panel": self._distance_var.get(),
+            "heatmap_enabled": self._heatmap_var.get(),
             "tutorial": tutorial,
         }
         self.quit()
@@ -1943,7 +1954,8 @@ def main():
     print(f"  Points: {cfg['points']}  |  Samples: {cfg['samples']}  |  "
           f"EMA: {cfg['ema']:.2f}  |  Camera: {cfg['camera']}  |  "
           f"Dwell: {cfg['dwell_mode']}  |  UI: {cfg['ui_layout']}  |  "
-          f"Language: {', '.join(cfg['language_preset'])}")
+          f"Language: {', '.join(cfg['language_preset'])}  |  "
+          f"Heatmap: {'on' if cfg.get('heatmap_enabled') else 'off'}")
     print("=" * 60)
 
     # ── Deferred imports (avoid slowing down launcher) ────────────────────────
@@ -1954,6 +1966,7 @@ def main():
     from config import FILIPINO_DATASET_FILE, ENGLISH_DATASET_FILE, NGRAM_CACHE_FILE
 
     config.DWELL_MODE = cfg["dwell_mode"]
+    config.HEATMAP_ENABLED = cfg.get("heatmap_enabled", False)
     if cfg["language_preset"] == ["english"]:
         config.PREDICTION_LANGUAGE = "english"
     elif cfg["language_preset"] == ["tagalog"]:
@@ -2038,6 +2051,8 @@ def main():
         sys.exit(0)
     tracker._mouse_ctrl = True
     print("\n✓ Calibration complete — launching keyboard...\n")
+    if cfg.get("heatmap_enabled"):
+        tracker.start_heatmap_recording()
 
     # ── Phase 2: Tracking in background thread (no OpenCV GUI) ───────────────
     def start_tracking():
@@ -2067,9 +2082,35 @@ def main():
         ui_tutorial=cfg["tutorial"],
     )
 
+    keyboard_snapshot = {"image": None}
+
+    def capture_keyboard_snapshot():
+        if ImageGrab is None:
+            return None
+        try:
+            app.update_idletasks()
+            x = app.winfo_rootx()
+            y = app.winfo_rooty()
+            w = app.winfo_width()
+            h = app.winfo_height()
+            if w <= 1 or h <= 1:
+                return None
+            return ImageGrab.grab(bbox=(x, y, x + w, y + h)).convert("RGB")
+        except Exception as exc:
+            print(f"[Warn] Could not capture keyboard snapshot for heatmap: {exc}")
+            return None
+
     def on_close():
+        if cfg.get("heatmap_enabled") and keyboard_snapshot["image"] is None:
+            keyboard_snapshot["image"] = capture_keyboard_snapshot()
         stop_tracking()
         app.destroy()
+
+    def capture_on_destroy(event):
+        if cfg.get("heatmap_enabled") and event.widget is app and keyboard_snapshot["image"] is None:
+            keyboard_snapshot["image"] = capture_keyboard_snapshot()
+
+    app.bind("<Destroy>", capture_on_destroy, add="+")
 
     def quit_session(_event=None):
         """Q: close keyboard and stop gaze tracking from anywhere in Tk."""
@@ -2142,6 +2183,26 @@ def main():
 
     # Cleanup
     stop_tracking()
+    if cfg.get("heatmap_enabled"):
+        tracker.stop_heatmap_recording()
+        try:
+            os.makedirs("heatmaps", exist_ok=True)
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            stats = tracker.heatmap_stats()
+            heatmap_path = os.path.join(
+                "heatmaps",
+                (
+                    f"gaze_keyboard_heatmap_{stamp}_"
+                    f"{stats['point_count']}pts_{stats['duration_seconds']}sec.png"
+                ),
+            )
+            saved_path, point_count = tracker.save_heatmap_png(
+                heatmap_path,
+                background_image=keyboard_snapshot["image"],
+            )
+            print(f"[Info] Heatmap saved: {saved_path} ({point_count} gaze points)")
+        except Exception as exc:
+            print(f"[Warn] Could not save gaze heatmap: {exc}")
     print("[Info] Application closed.")
 
 

@@ -20,8 +20,7 @@ import urllib.request
 from collections import defaultdict
 from datetime import date
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_FILE = os.path.join(_HERE, "flores_rules.json")
+OUTPUT_FILE = "flores_rules.json"
 
 # ─────────────────────────────────────────────
 # SOURCE URLS — Flores et al. (2022)
@@ -109,7 +108,6 @@ def _extract_rules(pairs):
 # MAIN GENERATION FUNCTION
 # ─────────────────────────────────────────────
 def generate(output_file: str = OUTPUT_FILE):
-    os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
     print("🌐 Fetching Flores et al. (2022) dataset from GitHub...")
     pairs = _fetch_pairs()
 

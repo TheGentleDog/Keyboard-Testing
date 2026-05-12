@@ -18,7 +18,6 @@ Or called from main.py on first startup via generate_if_missing().
 
 from collections import defaultdict, Counter
 import json
-import os
 import re
 from datetime import date
 
@@ -28,8 +27,7 @@ from datetime import date
 MODEL_NAME  = "jcblaise/roberta-tagalog-base"
 TOP_K       = 50
 MIN_SCORE   = 0.003
-_HERE       = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_FILE = os.path.join(_HERE, "filipino_dataset.json")
+OUTPUT_FILE = "filipino_dataset.json"
 
 # ─────────────────────────────────────────────
 # SEED TEMPLATES
@@ -591,7 +589,6 @@ def generate(output_file: str = OUTPUT_FILE):
     Run the full generation pipeline and save to output_file.
     Called by main.py on first startup, or run standalone.
     """
-    os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
     from transformers import pipeline as hf_pipeline
 
     print(f"🤖 Loading {MODEL_NAME} ...")
