@@ -18,6 +18,7 @@ import ctypes
 import tkinter as tk
 from tkinter import ttk
 from datetime import datetime
+from pathlib import Path
 
 try:
     from PIL import Image, ImageDraw, ImageFilter, ImageTk, ImageGrab
@@ -25,8 +26,10 @@ except ImportError:
     Image = ImageDraw = ImageFilter = ImageTk = ImageGrab = None
 
 # ── Make keyboard modules importable ─────────────────────────────────────────
-KEYBOARD_DIR = os.path.join(os.path.dirname(__file__), "Bench", "Cutted_File", "files")
-sys.path.insert(0, KEYBOARD_DIR)
+BASE_DIR = Path(__file__).resolve().parent
+KEYBOARD_DIR = BASE_DIR / "Bench" / "Cutted_File" / "files"
+if str(KEYBOARD_DIR) not in sys.path:
+    sys.path.insert(0, str(KEYBOARD_DIR))
 
 try:
     import config as app_config
@@ -2186,18 +2189,16 @@ def main():
     if cfg.get("heatmap_enabled"):
         tracker.stop_heatmap_recording()
         try:
-            os.makedirs("heatmaps", exist_ok=True)
+            heatmap_dir = BASE_DIR / "heatmaps"
+            heatmap_dir.mkdir(exist_ok=True)
             stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             stats = tracker.heatmap_stats()
-            heatmap_path = os.path.join(
-                "heatmaps",
-                (
-                    f"gaze_keyboard_heatmap_{stamp}_"
-                    f"{stats['point_count']}pts_{stats['duration_seconds']}sec.png"
-                ),
+            heatmap_path = heatmap_dir / (
+                f"gaze_keyboard_heatmap_{stamp}_"
+                f"{stats['point_count']}pts_{stats['duration_seconds']}sec.png"
             )
             saved_path, point_count = tracker.save_heatmap_png(
-                heatmap_path,
+                str(heatmap_path),
                 background_image=keyboard_snapshot["image"],
             )
             print(f"[Info] Heatmap saved: {saved_path} ({point_count} gaze points)")

@@ -8,7 +8,10 @@
     "n": "nurse",
     "h": "husband",
     "y": "you",
-    "k": "kailangan"
+    "k": "kailangan",
+    "ku": "kumain",
+    "p": "pwede",
+    "f": "feel"
   },
   "user_shortcut_usage": {
     "m": 2,
@@ -19,7 +22,10 @@
     "n": 1,
     "h": 1,
     "y": 1,
-    "k": 2
+    "k": 2,
+    "ku": 1,
+    "p": 1,
+    "f": 1
   },
   "new_words": [],
   "word_usage_history": [
@@ -246,6 +252,20 @@
     [
       "ka",
       []
+    ],
+    [
+      "i",
+      [
+        "i",
+        "don't"
+      ]
+    ],
+    [
+      "don't",
+      [
+        "i",
+        "don't"
+      ]
     ]
   ]
 }
