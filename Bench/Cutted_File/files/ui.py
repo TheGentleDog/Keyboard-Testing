@@ -271,6 +271,8 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._head_warning_overlay   = None
         self._head_warning_title     = None
         self._head_warning_detail    = None
+        self._current_word_overlay   = None
+        self._current_word_label     = None
         self._ui_tutorial_enabled    = ui_tutorial and self.ui_layout == "ui2"
         self._tutorial_overlay       = None
         self._tutorial_prev_dwell    = None
@@ -313,6 +315,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._show_system_cursor()
         self._destroy_pointer_overlay()
         self.hide_head_position_warning()
+        self._hide_current_word_overlay()
         super().destroy()
 
     def _keyboard_only_gaze_shortcut(self, event=None):
@@ -534,6 +537,66 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._head_warning_overlay = None
         self._head_warning_title = None
         self._head_warning_detail = None
+
+    def _hide_current_word_overlay(self):
+        if self._current_word_overlay is None:
+            return
+        try:
+            self._current_word_overlay.destroy()
+        except Exception:
+            pass
+        self._current_word_overlay = None
+        self._current_word_label = None
+
+    def _update_current_word_overlay(self):
+        if not hasattr(self, "letters_frame") or self._in_predefined_mode:
+            self._hide_current_word_overlay()
+            return
+        word = self.current_input.strip()
+        if not word:
+            self._hide_current_word_overlay()
+            return
+
+        try:
+            if self._current_word_overlay is None:
+                overlay = tk.Toplevel(self)
+                overlay.withdraw()
+                overlay.overrideredirect(True)
+                overlay.attributes("-topmost", True)
+                overlay.attributes("-alpha", 0.42)
+                overlay.configure(bg="#010203", cursor=self.pointer_cursor)
+                try:
+                    overlay.wm_attributes("-transparentcolor", "#010203")
+                except Exception:
+                    pass
+                try:
+                    overlay.wm_attributes("-disabled", True)
+                except Exception:
+                    pass
+
+                label = tk.Label(
+                    overlay,
+                    text=word,
+                    bg="#010203",
+                    fg="#ffffff",
+                    font=("Segoe UI", 72, "bold"),
+                    anchor="center",
+                )
+                label.pack(fill="both", expand=True)
+                self._current_word_overlay = overlay
+                self._current_word_label = label
+
+            self._current_word_label.config(text=word)
+            self.letters_frame.update_idletasks()
+            x = self.letters_frame.winfo_rootx()
+            y = self.letters_frame.winfo_rooty()
+            width = self.letters_frame.winfo_width()
+            height = self.letters_frame.winfo_height()
+            self._current_word_overlay.geometry(f"{width}x{height}+{x}+{y}")
+            self._current_word_overlay.deiconify()
+            self._current_word_overlay.lift()
+        except Exception:
+            self._hide_current_word_overlay()
 
     def _show_main_pointer(self):
         if self._use_pointer_overlay:
@@ -1354,7 +1417,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             text="PANIC\nBUTTON",
             font=("Segoe UI", 14, "bold"),
             bg=panic_bg, fg="white",
-            relief="raised", bd=2, cursor="hand2", width=10,
+            relief="raised", bd=2, cursor="hand2", width=18,
         )
         self.panic_btn.pack(side="right", fill="y", padx=(8, 0))
 
@@ -1548,17 +1611,18 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             main.grid_columnconfigure(c, weight=1, uniform="ui2col")
 
         cells = [
-            ("ABCD", lambda: self._show_ui2_letters("abcd")),
-            ("EFGH", lambda: self._show_ui2_letters("efgh")),
-            ("IJKL", lambda: self._show_ui2_letters("ijkl")),
-            ("MNOP", lambda: self._show_ui2_letters("mnop")),
-            ("QRSTU", lambda: self._show_ui2_letters("qrstu")),
-            ("VWXYZ", lambda: self._show_ui2_letters("vwxyz")),
+            ("A B C D", lambda: self._show_ui2_letters("abcd")),
+            ("E F G H", lambda: self._show_ui2_letters("efgh")),
+            ("I J K L", lambda: self._show_ui2_letters("ijkl")),
+            ("M N O P", lambda: self._show_ui2_letters("mnop")),
+            ("Q R S T U", lambda: self._show_ui2_letters("qrstu")),
+            ("V W X Y Z", lambda: self._show_ui2_letters("vwxyz")),
             ("⌫",    self.backspace),
             ("Clear all", self.clear_all),
         ]
 
         for idx, (text, cmd) in enumerate(cells):
+            group_key = text.replace(" ", "").lower()
             row, col = divmod(idx, 4)
             is_special = text in ("⌫", "Clear all")
             btn = self._make_dwell_btn(
@@ -1575,7 +1639,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             elif text == "Clear all":
                 self._clearall_btn = btn
             else:
-                self._ui2_group_buttons[text.lower()] = btn
+                self._ui2_group_buttons[group_key] = btn
 
         self._dwell_reset_all()
 
@@ -1588,18 +1652,26 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
 
         main = tk.Frame(self.letters_frame, bg=theme["bg"])
         main.pack(fill="both", expand=True)
-        main.grid_rowconfigure(0, weight=1)
-        for col in range(len(letters)):
-            main.grid_columnconfigure(col, weight=1, uniform="ui2letters")
+        use_quadrants = len(letters) == 4
+        if use_quadrants:
+            for row in range(2):
+                main.grid_rowconfigure(row, weight=1, uniform="ui2letterrow")
+            for col in range(2):
+                main.grid_columnconfigure(col, weight=1, uniform="ui2lettercol")
+        else:
+            main.grid_rowconfigure(0, weight=1)
+            for col in range(len(letters)):
+                main.grid_columnconfigure(col, weight=1, uniform="ui2letters")
 
-        for col, ch in enumerate(letters):
+        for idx, ch in enumerate(letters):
+            row, col = divmod(idx, 2) if use_quadrants else (0, idx)
             btn = self._make_dwell_btn(
                 main, lambda c=ch: self._insert_ui2_char(c),
                 text=ch.upper(), font=("Segoe UI", 28, "bold"),
                 bg=theme["button_bg"], fg=theme["button_fg"],
                 relief="raised", bd=1, cursor="hand2",
             )
-            btn.grid(row=0, column=col, sticky="nsew", padx=2, pady=2)
+            btn.grid(row=row, column=col, sticky="nsew", padx=2, pady=2)
             self.keyboard_buttons.append(btn)
             self._ui2_letter_buttons[ch] = btn
 
@@ -1696,9 +1768,11 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             self.predefined_frame.grid_remove()
             self.letters_frame.grid(row=1, column=0, rowspan=3, sticky="nsew", padx=self._frame_gap())
             self._in_predefined_mode = False
+            self._update_current_word_overlay()
             self._dwell_reset_all()
             self.status_bar.config(text="Keyboard mode")
         else:
+            self._hide_current_word_overlay()
             self.letters_frame.grid_remove()
             self._create_predefined_panel(self.predefined_frame)
             self.predefined_frame.grid(row=1, column=0, rowspan=3, sticky="nsew", padx=self._frame_gap())
@@ -1779,6 +1853,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self.input_display.tag_config("normal",       foreground=theme["text_fg"],  font=("Segoe UI", 32))
         self.input_display.config(state="disabled")
 
+        self._update_current_word_overlay()
         self.update_predictions()
 
     # =========================================================================
