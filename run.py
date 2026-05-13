@@ -2096,6 +2096,8 @@ def main():
 
     stop_gaze = threading.Event()
     gaze_thread = None
+    recalibrating = False
+    closing = False
 
     # ── Build gaze tracker ────────────────────────────────────────────────────
     tracker = GazeTrackerApp(
@@ -2123,6 +2125,8 @@ def main():
     # ── Phase 2: Tracking in background thread (no OpenCV GUI) ───────────────
     def start_tracking():
         nonlocal gaze_thread
+        if gaze_thread and gaze_thread.is_alive():
+            return
         tracker._tracking_error = None
         gaze_thread = threading.Thread(
             target=tracker.track,
@@ -2132,10 +2136,16 @@ def main():
         gaze_thread.start()
         print("[Info] Tracking thread started.")
 
-    def stop_tracking():
+    def stop_tracking(release_camera=False, timeout=3.0):
         stop_gaze.set()
         if gaze_thread and gaze_thread.is_alive():
-            gaze_thread.join(timeout=2.0)
+            if release_camera:
+                try:
+                    tracker._cap.release()
+                except Exception:
+                    pass
+            gaze_thread.join(timeout=timeout)
+        return not (gaze_thread and gaze_thread.is_alive())
 
     start_tracking()
 
@@ -2149,8 +2159,15 @@ def main():
     )
 
     def on_close():
-        stop_tracking()
-        app.destroy()
+        nonlocal closing
+        if closing:
+            return
+        closing = True
+        stop_tracking(release_camera=True, timeout=2.0)
+        try:
+            app.destroy()
+        except tk.TclError:
+            pass
 
     def quit_session(_event=None):
         """Q: close keyboard and stop gaze tracking from anywhere in Tk."""
@@ -2170,24 +2187,49 @@ def main():
         Calibration must run on the main thread on macOS, so this callback stops
         the tracking thread, opens calibration, then restarts tracking.
         """
-        nonlocal stop_gaze
-        app.status_bar.config(text="Recalibrating gaze...")
+        nonlocal stop_gaze, recalibrating
+        if recalibrating or closing:
+            return "break"
+
+        recalibrating = True
+        tracker._mouse_ctrl = False
+        app.status_bar.config(text="Recalibrating gaze... camera is restarting")
         app.update_idletasks()
 
-        stop_tracking()
-        stop_gaze = threading.Event()
+        # Hide the fullscreen Tk window before opening OpenCV's fullscreen
+        # calibration window. Keeping both mapped can make Windows look frozen.
+        app.withdraw()
+        app.update()
 
-        ok = tracker.calibrate()
-        if ok:
+        stopped = stop_tracking(release_camera=True, timeout=5.0)
+        if not stopped:
+            app.deiconify()
+            app.lift()
+            app.focus_force()
+            app.status_bar.config(text="Recalibration failed: camera is still busy")
+            recalibrating = False
+            return "break"
+
+        stop_gaze = threading.Event()
+        try:
+            ok = tracker.calibrate()
+        finally:
+            app.deiconify()
+            app.lift()
+            app.focus_force()
+            recalibrating = False
+
+        if ok and not closing:
             tracker._mouse_ctrl = True
             start_tracking()
             app.status_bar.config(text="Recalibration complete | gaze tracking active")
-        else:
-            app.status_bar.config(text="Recalibration cancelled | closing session")
-            on_close()
+        elif not closing:
+            app.status_bar.config(text="Recalibration cancelled | gaze tracking paused")
         return "break"
 
     def monitor_tracking():
+        if closing:
+            return
         current_status = app.status_bar.cget("text")
         can_update_status = current_status.startswith((
             "Gaze tracking",
@@ -2209,15 +2251,19 @@ def main():
                         f"moves {tracker._mouse_moves} | pyauto {'OK' if tracker.pyautogui_ok else 'NO'}"
                     )
                 )
-            app.after(3000, monitor_tracking)
+            if not closing:
+                app.after(3000, monitor_tracking)
 
     def monitor_head_position():
+        if closing:
+            return
         shift = getattr(tracker, "_head_shift", None)
         if shift and shift.get("moved"):
             app.show_head_position_warning(shift)
         else:
             app.hide_head_position_warning()
-        app.after(250, monitor_head_position)
+        if not closing:
+            app.after(250, monitor_head_position)
 
     app.protocol("WM_DELETE_WINDOW", on_close)
     app.bind_all("<KeyPress-q>", quit_session)

@@ -1055,15 +1055,17 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         btn = self._make_dwell_btn(
             self,
             self._finish_ui2_tutorial,
-            text="Finish Tutorial",
-            font=("Segoe UI", 14, "bold"),
+            text="Finish\nTutorial",
+            font=("Segoe UI", 24, "bold"),
             bg="#5865f2",
             fg="#ffffff",
             relief="raised",
             bd=2,
             cursor="hand2",
         )
-        btn.place(x=self._frame_gap(), y=self._frame_gap(), width=190, height=54)
+        width = max(340, min(520, int(self.winfo_screenwidth() * 0.22)))
+        height = max(180, min(260, int(self.winfo_screenheight() * 0.18)))
+        btn.place(x=self._frame_gap(), y=self._frame_gap(), width=width, height=height)
         btn.lift()
         self._finish_tutorial_btn = btn
         self._dwell_reset_all()

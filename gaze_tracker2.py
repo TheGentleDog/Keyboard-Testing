@@ -799,10 +799,22 @@ class GazeTrackerApp:
         Opens fullscreen calibration window, blocks until calibration completes,
         then destroys the window. Call track() in a background thread after this.
         """
+        old_cap = getattr(self, "_cap", None)
+        if old_cap is not None:
+            try:
+                old_cap.release()
+            except Exception:
+                pass
+
         self._cap = cv2.VideoCapture(self.cam_id)
         configure_1080p_camera(self._cap)
         if not self._cap.isOpened():
-            print(f"[Error] Cannot open camera {self.cam_id}"); return
+            print(f"[Error] Cannot open camera {self.cam_id}")
+            try:
+                self._cap.release()
+            except Exception:
+                pass
+            return False
 
         actual_w = int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         actual_h = int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -825,7 +837,11 @@ class GazeTrackerApp:
 
         while not self.calib.done:
             ret, cam = self._cap.read()
-            if not ret: break
+            if not ret:
+                print("[Error] Camera frame read failed during calibration.")
+                self._cap.release()
+                cv2.destroyAllWindows()
+                return False
             cam = cv2.flip(cam, 1)
             res = self.mesh.process(cv2.cvtColor(cam, cv2.COLOR_BGR2RGB))
 
