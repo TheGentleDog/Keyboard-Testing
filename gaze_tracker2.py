@@ -436,10 +436,11 @@ class GazeTrackerApp:
         now = time.time(); self._fpsq.append(now)
         return (len(self._fpsq)-1)/(self._fpsq[-1]-self._fpsq[0]+1e-9) if len(self._fpsq)>1 else 0
 
-    def _show_tutorial_text(self, lines, seconds=10):
+    def _show_tutorial_text(self, lines, seconds=10, window_ready_callback=None):
         if isinstance(lines, str):
             lines = [lines]
         start = time.time()
+        window_ready_notified = False
         while True:
             elapsed = time.time() - start
             if elapsed >= seconds:
@@ -466,6 +467,13 @@ class GazeTrackerApp:
                 scale=0.8, color=(150, 150, 150), thick=2)
 
             cv2.imshow(self.WIN, cv)
+            if not window_ready_notified:
+                window_ready_notified = True
+                if window_ready_callback:
+                    try:
+                        window_ready_callback()
+                    except Exception:
+                        pass
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'):
                 return False
@@ -793,7 +801,7 @@ class GazeTrackerApp:
         return None
 
     # ── main loop ───────────────────────────────────────────────
-    def calibrate(self):
+    def calibrate(self, window_ready_callback=None):
         """
         Phase 1 — MUST run on the main thread (macOS OpenCV GUI requirement).
         Opens fullscreen calibration window, blocks until calibration completes,
@@ -802,7 +810,10 @@ class GazeTrackerApp:
         self._cap = cv2.VideoCapture(self.cam_id)
         configure_1080p_camera(self._cap)
         if not self._cap.isOpened():
-            print(f"[Error] Cannot open camera {self.cam_id}"); return
+            print(f"[Error] Cannot open camera {self.cam_id}")
+            self._cap.release()
+            cv2.destroyAllWindows()
+            return False
 
         actual_w = int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         actual_h = int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -818,14 +829,21 @@ class GazeTrackerApp:
             if not self._show_tutorial_text([
                 "Please look at the green circles",
                 "Only blink when you see a check mark",
-            ], seconds=10):
+            ], seconds=10, window_ready_callback=window_ready_callback):
                 self._cap.release()
                 cv2.destroyAllWindows()
                 return False
+            window_ready_notified = True
+        else:
+            window_ready_notified = False
 
         while not self.calib.done:
             ret, cam = self._cap.read()
-            if not ret: break
+            if not ret:
+                print("[Error] Camera frame read failed during calibration.")
+                self._cap.release()
+                cv2.destroyAllWindows()
+                return False
             cam = cv2.flip(cam, 1)
             res = self.mesh.process(cv2.cvtColor(cam, cv2.COLOR_BGR2RGB))
 
@@ -837,6 +855,13 @@ class GazeTrackerApp:
             self._debug_cam(cam, lms)
             self._render_calib(cam, feat, lms)
             cv2.imshow(self.WIN, self.canvas)
+            if not window_ready_notified:
+                window_ready_notified = True
+                if window_ready_callback:
+                    try:
+                        window_ready_callback()
+                    except Exception:
+                        pass
 
             key = cv2.waitKey(1) & 0xFF
             action = self._handle_calib_key(key)

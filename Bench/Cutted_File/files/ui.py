@@ -303,6 +303,18 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         return "break"
 
     def destroy(self):
+        self.prepare_for_recalibration(preserve_tutorial=False)
+        self._show_system_cursor()
+        self._destroy_pointer_overlay()
+        self._hide_current_word_overlay()
+        super().destroy()
+
+    def prepare_for_recalibration(self, preserve_tutorial=True):
+        """Remove transient topmost UI so calibration can own the screen."""
+        if not preserve_tutorial:
+            self._ui_tutorial_enabled = False
+            self._tutorial_input_paused = False
+            self._tutorial_step = "done"
         if self._tutorial_job is not None:
             try:
                 self.after_cancel(self._tutorial_job)
@@ -312,11 +324,28 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._destroy_guide_overlay()
         self._hide_ui_tutorial_text()
         self._hide_finish_tutorial_button()
-        self._show_system_cursor()
-        self._destroy_pointer_overlay()
         self.hide_head_position_warning()
         self._hide_current_word_overlay()
-        super().destroy()
+        self._show_system_cursor()
+        self._destroy_pointer_overlay()
+        self._dwell_reset_all()
+
+    def restart_ui2_tutorial_after_recalibration(self):
+        if self.ui_layout != "ui2":
+            return
+        self._ui_tutorial_enabled = True
+        self._tutorial_input_paused = False
+        self._tutorial_step = None
+        self._tutorial_predefined_selected = False
+        self._tutorial_prev_dwell = None
+        self.dwell_enabled = True
+        self.current_input = ""
+        self.output_words = []
+        self.output_cursor = -1
+        self.current_completion = ""
+        self.alternative_suggestions = []
+        self.update_display()
+        self.after(500, self._start_ui2_tutorial)
 
     def _keyboard_only_gaze_shortcut(self, event=None):
         if hasattr(self, "status_bar"):
@@ -1056,14 +1085,14 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             self,
             self._finish_ui2_tutorial,
             text="Finish Tutorial",
-            font=("Segoe UI", 14, "bold"),
+            font=("Segoe UI", 20, "bold"),
             bg="#5865f2",
             fg="#ffffff",
             relief="raised",
             bd=2,
             cursor="hand2",
         )
-        btn.place(x=self._frame_gap(), y=self._frame_gap(), width=190, height=54)
+        btn.place(x=self._frame_gap(), y=self._frame_gap(), width=300, height=110)
         btn.lift()
         self._finish_tutorial_btn = btn
         self._dwell_reset_all()
