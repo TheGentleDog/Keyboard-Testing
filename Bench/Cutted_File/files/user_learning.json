@@ -11,7 +11,8 @@
     "v": "visiting",
     "u": "you",
     "j": "justice",
-    "e": "exercising"
+    "e": "exercising",
+    "human": "humarap"
   },
   "user_shortcut_usage": {
     "m": 2,
@@ -25,7 +26,8 @@
     "v": 1,
     "u": 1,
     "j": 1,
-    "e": 1
+    "e": 1,
+    "human": 1
   },
   "new_words": [],
   "word_usage_history": [
@@ -402,6 +404,12 @@
       [
         "water",
         "i"
+      ]
+    ],
+    [
+      "hello",
+      [
+        "hello"
       ]
     ]
   ]
