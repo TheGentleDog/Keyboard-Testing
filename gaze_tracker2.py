@@ -28,6 +28,9 @@ import time
 import collections
 import math
 import argparse
+import csv
+import json
+from pathlib import Path
 
 try:
     import pyautogui
@@ -405,6 +408,10 @@ class GazeTrackerApp:
         self.pyautogui_ok = _PYAUTOGUI_OK
         self.pyautogui_screen_size = (_PYAUTOGUI_SCREEN_W, _PYAUTOGUI_SCREEN_H)
         self.canvas = np.zeros((SCREEN_H, SCREEN_W, 3), np.uint8)
+        self._heatmap_recording = False
+        self._heatmap_points = []
+        self._heatmap_start_time = None
+        self._heatmap_end_time = None
 
     def _new_calib(self):
         self.calib = CalibrationManager(self.num_points, self.spp)
@@ -543,6 +550,8 @@ class GazeTrackerApp:
             self._last_gaze = (gx, gy)
             self._tracking_predictions += 1
             self.hist.append((gx, gy))
+            if self._heatmap_recording:
+                self._heatmap_points.append((gx, gy, time.time()))
             if self._mouse_ctrl and _PYAUTOGUI_OK:
                 mx = int(gx * _PYAUTOGUI_SCREEN_W / SCREEN_W)
                 my = int(gy * _PYAUTOGUI_SCREEN_H / SCREEN_H)
@@ -611,6 +620,228 @@ class GazeTrackerApp:
             print(f"[Info] Mouse control {'on' if self._mouse_ctrl else 'off'} after calibration.")
             return "handled"
         return None
+
+    def start_heatmap_recording(self):
+        self._heatmap_points = []
+        self._heatmap_start_time = time.time()
+        self._heatmap_end_time = None
+        self._heatmap_recording = True
+        print("[Info] Heatmap recording started.")
+
+    def stop_heatmap_recording(self):
+        self._heatmap_recording = False
+        self._heatmap_end_time = time.time()
+        print(f"[Info] Heatmap recording stopped. {len(self._heatmap_points)} gaze points captured.")
+
+    def heatmap_stats(self):
+        end_time = self._heatmap_end_time or time.time()
+        start_time = self._heatmap_start_time or end_time
+        jitter = self._heatmap_jitter_metrics()
+        return {
+            "point_count": len(self._heatmap_points),
+            "duration_seconds": int(max(0, round(end_time - start_time))),
+            "mean_step_px": jitter["mean_step_px"],
+            "mean_spread_px": jitter["mean_spread_px"],
+            "max_spread_px": jitter["max_spread_px"],
+        }
+
+    def _heatmap_jitter_metrics(self):
+        points = list(self._heatmap_points)
+        if not points:
+            return {
+                "point_count": 0,
+                "mean_gaze_x": None,
+                "mean_gaze_y": None,
+                "mean_step_px": 0.0,
+                "median_step_px": 0.0,
+                "std_step_px": 0.0,
+                "min_step_px": 0.0,
+                "max_step_px": 0.0,
+                "p95_step_px": 0.0,
+                "mean_spread_px": 0.0,
+                "median_spread_px": 0.0,
+                "std_spread_px": 0.0,
+                "max_spread_px": 0.0,
+                "p95_spread_px": 0.0,
+                "mean_sample_interval_ms": 0.0,
+            }
+
+        xy = np.array([(point[0], point[1]) for point in points], dtype=float)
+        times = np.array([point[2] for point in points], dtype=float)
+        mean_xy = xy.mean(axis=0)
+        spread = np.linalg.norm(xy - mean_xy, axis=1)
+
+        if len(xy) > 1:
+            steps = np.linalg.norm(np.diff(xy, axis=0), axis=1)
+            intervals_ms = np.diff(times) * 1000.0
+        else:
+            steps = np.array([], dtype=float)
+            intervals_ms = np.array([], dtype=float)
+
+        def metric(values, fn, default=0.0):
+            return float(fn(values)) if len(values) else default
+
+        return {
+            "point_count": len(points),
+            "mean_gaze_x": float(mean_xy[0]),
+            "mean_gaze_y": float(mean_xy[1]),
+            "mean_step_px": metric(steps, np.mean),
+            "median_step_px": metric(steps, np.median),
+            "std_step_px": metric(steps, np.std),
+            "min_step_px": metric(steps, np.min),
+            "max_step_px": metric(steps, np.max),
+            "p95_step_px": metric(steps, lambda values: np.percentile(values, 95)),
+            "mean_spread_px": metric(spread, np.mean),
+            "median_spread_px": metric(spread, np.median),
+            "std_spread_px": metric(spread, np.std),
+            "max_spread_px": metric(spread, np.max),
+            "p95_spread_px": metric(spread, lambda values: np.percentile(values, 95)),
+            "mean_sample_interval_ms": metric(intervals_ms, np.mean),
+        }
+
+    def save_heatmap_png(self, output_path, background_image=None, bins=(40, 20), sigma=1.1):
+        """
+        Save a keyboard-style gaze heatmap and matching density value files.
+
+        The PNG uses a 40 x 20 coordinate grid like the reference image. The CSV
+        and JSON beside it contain normalized density values from 0.0 to 1.0.
+        """
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        points = list(self._heatmap_points)
+        jitter = self._heatmap_jitter_metrics()
+
+        try:
+            import matplotlib
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+            from matplotlib.patches import Ellipse
+            from scipy.ndimage import gaussian_filter
+        except ImportError as exc:
+            raise RuntimeError(f"Heatmap output needs matplotlib and scipy: {exc}") from exc
+
+        cols, rows = bins
+        if points:
+            xs = np.array([point[0] for point in points], dtype=float)
+            ys = np.array([point[1] for point in points], dtype=float)
+            heatmap, _, _ = np.histogram2d(
+                ys,
+                xs,
+                bins=[rows, cols],
+                range=[[0, SCREEN_H], [0, SCREEN_W]],
+            )
+            density = gaussian_filter(heatmap, sigma=sigma)
+            max_density = float(density.max())
+            if max_density > 0:
+                density = density / max_density
+        else:
+            density = np.zeros((rows, cols), dtype=float)
+
+        fig, ax = plt.subplots(figsize=(10.8, 6.2))
+
+        if background_image is not None:
+            bg = background_image.resize((SCREEN_W, SCREEN_H))
+            ax.imshow(bg, extent=[0, cols, rows, 0], alpha=0.32)
+        else:
+            ax.imshow(
+                np.full((rows, cols), 0.93),
+                cmap="gray",
+                vmin=0,
+                vmax=1,
+                extent=[0, cols, rows, 0],
+                alpha=1.0,
+            )
+
+        heat = ax.imshow(
+            density,
+            cmap="jet",
+            interpolation="bilinear",
+            extent=[0, cols, rows, 0],
+            vmin=0,
+            vmax=1,
+            alpha=np.clip(density * 0.95, 0, 0.95),
+        )
+
+        ax.set_xlim(0, cols)
+        ax.set_ylim(rows, 0)
+        ax.set_xticks(np.arange(0, cols + 1, 5))
+        ax.set_yticks(np.arange(0, rows + 1, 5))
+        ax.grid(color="#d9dce2", linewidth=0.7, alpha=0.6)
+        ax.tick_params(labelsize=8, colors="#565b66")
+        ax.set_facecolor("#eef0f4")
+
+        if points and jitter["mean_gaze_x"] is not None:
+            mean_grid_x = jitter["mean_gaze_x"] * cols / SCREEN_W
+            mean_grid_y = jitter["mean_gaze_y"] * rows / SCREEN_H
+            spread_w = max(0.7, jitter["p95_spread_px"] * cols / SCREEN_W * 2.0)
+            spread_h = max(0.7, jitter["p95_spread_px"] * rows / SCREEN_H * 2.0)
+            ax.add_patch(Ellipse(
+                (mean_grid_x, mean_grid_y),
+                width=spread_w,
+                height=spread_h,
+                fill=False,
+                edgecolor="white",
+                linewidth=1.4,
+                alpha=0.9,
+            ))
+            ax.scatter([mean_grid_x], [mean_grid_y], s=28, c="white",
+                       edgecolors="#222222", linewidths=0.8, zorder=5)
+
+            jitter_label = (
+                f"Jitter mean step: {jitter['mean_step_px']:.1f}px   "
+                f"P95 step: {jitter['p95_step_px']:.1f}px   "
+                f"Spread mean: {jitter['mean_spread_px']:.1f}px   "
+                f"P95 spread: {jitter['p95_spread_px']:.1f}px"
+            )
+            ax.text(
+                0.01,
+                -0.11,
+                jitter_label,
+                transform=ax.transAxes,
+                ha="left",
+                va="top",
+                fontsize=8,
+                color="#30343b",
+                bbox={"facecolor": "white", "edgecolor": "#c8ccd3", "alpha": 0.88, "pad": 4},
+            )
+
+        colorbar = fig.colorbar(heat, ax=ax, fraction=0.032, pad=0.025)
+        colorbar.set_label("Density", fontsize=8)
+        colorbar.ax.tick_params(labelsize=7)
+        colorbar.ax.text(0.5, -0.08, "normalized", transform=colorbar.ax.transAxes,
+                         ha="center", va="top", fontsize=6, color="#555555")
+
+        fig.tight_layout()
+        fig.savefig(output_path, dpi=140)
+        plt.close(fig)
+
+        csv_path = output_path.with_name(f"{output_path.stem}_density.csv")
+        json_path = output_path.with_name(f"{output_path.stem}_values.json")
+
+        with csv_path.open("w", newline="", encoding="utf-8") as file:
+            writer = csv.writer(file)
+            writer.writerow(["row", "col", "x_grid", "y_grid", "density"])
+            for row in range(rows):
+                for col in range(cols):
+                    writer.writerow([row, col, col + 0.5, row + 0.5, float(density[row, col])])
+
+        metadata = {
+            "point_count": len(points),
+            "screen_width": SCREEN_W,
+            "screen_height": SCREEN_H,
+            "grid_columns": cols,
+            "grid_rows": rows,
+            "density_min": float(density.min()) if density.size else 0.0,
+            "density_max": float(density.max()) if density.size else 0.0,
+            "density_mean": float(density.mean()) if density.size else 0.0,
+            "jitter_metrics": jitter,
+            "density_csv": str(csv_path),
+            "density_values": density.tolist(),
+        }
+        with json_path.open("w", encoding="utf-8") as file:
+            json.dump(metadata, file, indent=2)
+
+        return str(output_path), len(points)
 
     def _handle_track_key(self, key):
         if key == 255:

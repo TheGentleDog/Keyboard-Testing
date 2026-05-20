@@ -19,6 +19,7 @@ import sys
 import json
 import argparse
 import warnings
+import random
 from collections import defaultdict, Counter
 from math import log, exp
 
@@ -133,6 +134,83 @@ def load_sequences(lang: str) -> list[list[str]]:
     # fallback
     corpus = data.get("communication_corpus", [])
     return [phrase.lower().split() for phrase in corpus if len(phrase.split()) >= 2]
+
+
+def split_sequences(
+    sequences: list[list[str]],
+    test_ratio: float = 0.2,
+    seed: int = 42,
+) -> tuple[list[list[str]], list[list[str]]]:
+    """Create a deterministic train/test split from corpus sequences."""
+    if not sequences:
+        return [], []
+
+    shuffled = list(sequences)
+    rng = random.Random(seed)
+    rng.shuffle(shuffled)
+
+    if len(shuffled) == 1:
+        return shuffled, []
+
+    test_count = max(1, round(len(shuffled) * test_ratio))
+    test_count = min(test_count, len(shuffled) - 1)
+    return shuffled[test_count:], shuffled[:test_count]
+
+
+def train_eval_model(train_sequences_by_lang: dict[str, list[list[str]]]) -> NgramModel:
+    """
+    Build an in-memory n-gram model from the training split only.
+    This avoids loading the full cached model, which would include test sequences.
+    """
+    model = NgramModel()
+
+    for lang, sequences in train_sequences_by_lang.items():
+        lang_vocab = model.english_vocab if lang == "english" else model.filipino_vocab
+        for seq in sequences:
+            tokens = model._clean_sequence(seq)
+            if len(tokens) < 2:
+                continue
+            lang_vocab.update(tokens)
+            for i, token in enumerate(tokens):
+                model.unigrams[token] += 1
+                model.total_words += 1
+                model.vocabulary.add(token)
+                model._build_char_ngrams(token)
+                if i > 0:
+                    model.bigrams[tokens[i - 1]][token] += 1
+                if i > 1:
+                    model.trigrams[(tokens[i - 2], tokens[i - 1])][token] += 1
+
+    model.load_flores_rules()
+    return model
+
+
+def prepare_split_data(
+    selected_langs: list[str],
+    test_ratio: float,
+    split_seed: int,
+) -> tuple[dict[str, list[list[str]]], dict[str, list[list[str]]], dict[str, dict]]:
+    """Load each selected language and split it into train/test sequences."""
+    train_by_lang = {}
+    test_by_lang = {}
+    split_meta = {}
+
+    for lang in selected_langs:
+        sequences = load_sequences(lang)
+        train_sequences, test_sequences = split_sequences(
+            sequences,
+            test_ratio=test_ratio,
+            seed=split_seed,
+        )
+        train_by_lang[lang] = train_sequences
+        test_by_lang[lang] = test_sequences
+        split_meta[lang] = {
+            "total_sequences": len(sequences),
+            "train_sequences": len(train_sequences),
+            "test_sequences": len(test_sequences),
+        }
+
+    return train_by_lang, test_by_lang, split_meta
 
 
 def build_test_cases(sequences: list[list[str]], min_len: int = 3):
@@ -318,6 +396,19 @@ def evaluate(
             sample_records.append(record)
 
     n = len(cases)
+    if n == 0:
+        return {
+            "n_cases":         0,
+            "hit@1":           0.0,
+            f"hit@{top_k}":    0.0,
+            "MRR":             0.0,
+            "avg_bleu_top1":   0.0,
+            "avg_bleu_oracle": 0.0,
+            "corpus_bleu":     0.0,
+            "prediction_language": language,
+            "samples":         sample_records,
+            "all_records":     all_records,
+        }
     corp_bleu = corpus_level_bleu(all_refs, all_hyps)
 
     return {
@@ -620,6 +711,8 @@ def save_prediction_mode_comparison(output_path: str, args, matrix: dict, top_k:
             "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
             "top_k": top_k,
             "min_seq_len": args.min_seq_len,
+            "test_ratio": args.test_ratio,
+            "split_seed": args.split_seed,
             "max_cases": args.max_cases,
             "languages": args.lang,
             "comparison": "BLEU by test language and prediction mode",
@@ -644,6 +737,8 @@ def save_prediction_mode_comparison_full(output_path: str, args, matrix: dict, r
             "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
             "top_k": top_k,
             "min_seq_len": args.min_seq_len,
+            "test_ratio": args.test_ratio,
+            "split_seed": args.split_seed,
             "max_cases": args.max_cases,
             "languages": args.lang,
             "comparison": "BLEU by test language and prediction mode",
@@ -678,7 +773,12 @@ def compact_metrics(metrics: dict) -> dict:
     }
 
 
-def run_prediction_mode_comparison(model: NgramModel, args):
+def run_prediction_mode_comparison(
+    model: NgramModel,
+    args,
+    test_by_lang: dict[str, list[list[str]]],
+    split_meta: dict[str, dict],
+):
     selected_langs = ["tagalog", "english"] if args.lang == "both" else [args.lang]
     matrix = {}
     records = {}
@@ -693,9 +793,13 @@ def run_prediction_mode_comparison(model: NgramModel, args):
     for lang in selected_langs:
         display = "Tagalog (Filipino)" if lang == "tagalog" else "English"
         print_header(f"LOADING {display.upper()} TEST CASES")
-        sequences = load_sequences(lang)
-        cases = build_test_cases(sequences, min_len=args.min_seq_len)
-        print(f"  Generated {len(cases):,} test cases")
+        stats = split_meta[lang]
+        print(
+            f"  {stats['train_sequences']:,} train / "
+            f"{stats['test_sequences']:,} held-out test sequences"
+        )
+        cases = build_test_cases(test_by_lang[lang], min_len=args.min_seq_len)
+        print(f"  Generated {len(cases):,} held-out test cases")
 
         if args.max_cases and len(cases) > args.max_cases:
             import random
@@ -1117,11 +1221,14 @@ def save_results(
             "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
             "top_k":        top_k,
             "min_seq_len":  args.min_seq_len,
+            "test_ratio":   args.test_ratio,
+            "split_seed":   args.split_seed,
             "max_cases":    args.max_cases,
             "languages":    args.lang,
             "prediction_language": resolve_prediction_language(args.prediction_language),
             "prediction_language_source": args.prediction_language,
-            "model_cache":  "ngram_model_standalone.json",
+            "model_cache":  None,
+            "model_source": "in-memory train split",
         }
     }
 
@@ -1346,6 +1453,20 @@ def parse_args():
         help="Minimum sequence length to include in test set (default: 3)",
     )
     p.add_argument(
+        "--test-ratio",
+        type=float,
+        default=0.2,
+        metavar="R",
+        help="Fraction of corpus sequences held out for testing (default: 0.2)",
+    )
+    p.add_argument(
+        "--split-seed",
+        type=int,
+        default=42,
+        metavar="N",
+        help="Random seed for the train/test sequence split (default: 42)",
+    )
+    p.add_argument(
         "--max-cases",
         "--max-words",
         type=int,
@@ -1398,21 +1519,22 @@ def resolve_prediction_language(value: str) -> str:
 def run_evaluation(
     model:      NgramModel,
     lang:       str,
+    test_sequences: list[list[str]],
     top_k:      int,
     min_len:    int,
     max_cases:  int | None,
     prediction_language: str,
     verbose:    bool,
+    split_meta: dict | None = None,
 ) -> dict:
     display = "English" if lang == "english" else "Tagalog (Filipino)"
     print_header(f"EVALUATING: {display.upper()}")
 
-    print(f"\n  Loading {display} corpus sequences…")
-    sequences = load_sequences(lang)
-    print(f"  ✓ {len(sequences):,} sequences loaded")
-
-    cases = build_test_cases(sequences, min_len=min_len)
-    print(f"  ✓ {len(cases):,} test cases generated (min_len={min_len})")
+    if split_meta:
+        print(f"  Train sequences: {split_meta['train_sequences']:,}")
+        print(f"  Test sequences : {split_meta['test_sequences']:,}")
+    cases = build_test_cases(test_sequences, min_len=min_len)
+    print(f"  Using {len(cases):,} held-out test cases (min_len={min_len})")
 
     if max_cases and len(cases) > max_cases:
         import random; random.seed(42)
@@ -1440,6 +1562,8 @@ def run_evaluation(
     )
     print_context_breakdown(breakdown)
     metrics["breakdown"] = breakdown
+    if split_meta:
+        metrics["split"] = split_meta
 
     if verbose:
         print_samples(metrics.get("samples", []), top_k)
@@ -1465,11 +1589,25 @@ def main():
 
     print(f"\n  {BOLD('Prediction language')}: {CYAN(prediction_language)}")
 
-    print_header("LOADING MODEL")
-    model = load_model()
+    selected_langs = ["english", "tagalog"] if args.lang == "both" else [args.lang]
+
+    print_header("BUILDING HELD-OUT EVALUATION MODEL")
+    train_by_lang, test_by_lang, split_meta = prepare_split_data(
+        selected_langs,
+        test_ratio=args.test_ratio,
+        split_seed=args.split_seed,
+    )
+    for lang in selected_langs:
+        stats = split_meta[lang]
+        print(
+            f"  {lang}: {stats['train_sequences']:,} train / "
+            f"{stats['test_sequences']:,} test sequences"
+        )
+    model = train_eval_model(train_by_lang)
+    print(GREEN("✓ Evaluation model trained from training split only."))
 
     if args.compare_prediction_modes:
-        run_prediction_mode_comparison(model, args)
+        run_prediction_mode_comparison(model, args, test_by_lang, split_meta)
         print(GREEN(BOLD("\n✓ BLEU prediction-mode comparison complete.\n")))
         return
 
@@ -1480,22 +1618,26 @@ def main():
         en_metrics = run_evaluation(
             model,
             lang="english",
+            test_sequences=test_by_lang["english"],
             top_k=args.top_k,
             min_len=args.min_seq_len,
             max_cases=args.max_cases,
             prediction_language=prediction_language,
             verbose=args.verbose,
+            split_meta=split_meta["english"],
         )
 
     if args.lang in ("tagalog", "both"):
         fil_metrics = run_evaluation(
             model,
             lang="tagalog",
+            test_sequences=test_by_lang["tagalog"],
             top_k=args.top_k,
             min_len=args.min_seq_len,
             max_cases=args.max_cases,
             prediction_language=prediction_language,
             verbose=args.verbose,
+            split_meta=split_meta["tagalog"],
         )
 
     if en_metrics and fil_metrics:

@@ -2201,6 +2201,15 @@ def main():
                 background_image=keyboard_snapshot["image"],
             )
             print(f"[Info] Heatmap saved: {saved_path} ({point_count} gaze points)")
+            heatmap_stem = os.path.splitext(saved_path)[0]
+            print(f"[Info] Heatmap density CSV: {heatmap_stem}_density.csv")
+            print(f"[Info] Heatmap values JSON: {heatmap_stem}_values.json")
+            print(
+                "[Info] Heatmap jitter: "
+                f"mean step {stats.get('mean_step_px', 0.0):.2f}px | "
+                f"mean spread {stats.get('mean_spread_px', 0.0):.2f}px | "
+                f"max spread {stats.get('max_spread_px', 0.0):.2f}px"
+            )
         except Exception as exc:
             print(f"[Warn] Could not save gaze heatmap: {exc}")
     print("[Info] Application closed.")
