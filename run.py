@@ -20,13 +20,15 @@ import tkinter as tk
 from tkinter import ttk
 
 try:
-    from PIL import Image, ImageDraw, ImageFilter, ImageTk
+    from PIL import Image, ImageDraw, ImageFilter, ImageTk, ImageSequence
 except ImportError:
-    Image = ImageDraw = ImageFilter = ImageTk = None
+    Image = ImageDraw = ImageFilter = ImageTk = ImageSequence = None
 
 # ── Make keyboard modules importable ─────────────────────────────────────────
 KEYBOARD_DIR = os.path.join(os.path.dirname(__file__), "Bench", "Cutted_File", "files")
 sys.path.insert(0, KEYBOARD_DIR)
+ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
+TANAW_LOGO_PATH = os.path.join(ASSETS_DIR, "tanaw_logo.gif")
 
 
 # =============================================================================
@@ -114,6 +116,10 @@ class WelcomeUI(tk.Tk):
         self._gradient_photo = None
         self._button_photo = None
         self._button_hover_photo = None
+        self._logo_frames = []
+        self._logo_frame_index = 0
+        self._logo_item = None
+        self._logo_job = None
         self._animate_job = None
         self._fade_job = None
         self._typewriter_job = None
@@ -166,6 +172,10 @@ class WelcomeUI(tk.Tk):
         self.canvas.bind("<ButtonRelease-1>", self._stop_window_drag)
 
         nav_y = 68
+        self._logo_frames = self._load_logo_frames(TANAW_LOGO_PATH, 34, 24)
+        if self._logo_frames:
+            self._logo_item = c.create_image(24, 28, image=self._logo_frames[0][0])
+            self._animate_logo()
         c.create_text(112, nav_y, text="About us", fill="#d6d7d8",
                       font=("Krona One", 10), anchor="w")
         c.create_text(width // 2, nav_y, text="Home", fill="#d6d7d8",
@@ -174,9 +184,9 @@ class WelcomeUI(tk.Tk):
                       font=("Krona One", 10), anchor="e")
         c.create_text(width - 32, height - 30, text="SeenByEveryone", fill="#d6d7d8",
                       font=("Krona One", 10), anchor="e")
-
         center_x = width // 2
         content_y = int(height * 0.43)
+
         self.welcome_item = c.create_text(center_x, content_y, text="",
                                           fill=self.TEXT, font=("Krona One", 27))
         self.subtitle_item = c.create_text(center_x, content_y + 34, text="",
@@ -208,6 +218,31 @@ class WelcomeUI(tk.Tk):
             self._animate_gradient()
         self._fade_job = self.after(1000, lambda: self._fade_intro(0))
         self._typewriter_job = self.after(2000, self._type_subtitle)
+
+    def _load_logo_frames(self, path, max_width, max_height):
+        if Image is None or ImageTk is None or ImageSequence is None or not os.path.exists(path):
+            return []
+
+        frames = []
+        try:
+            with Image.open(path) as gif:
+                for frame in ImageSequence.Iterator(gif):
+                    img = frame.convert("RGBA")
+                    img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+                    duration = frame.info.get("duration", gif.info.get("duration", 80))
+                    frames.append((ImageTk.PhotoImage(img), max(35, int(duration or 80))))
+        except Exception:
+            return []
+        return frames
+
+    def _animate_logo(self):
+        if not self._logo_frames or self._logo_item is None:
+            return
+
+        frame, delay = self._logo_frames[self._logo_frame_index]
+        self.canvas.itemconfigure(self._logo_item, image=frame)
+        self._logo_frame_index = (self._logo_frame_index + 1) % len(self._logo_frames)
+        self._logo_job = self.after(delay, self._animate_logo)
 
     def _render_pill_button(self, width, height, fill, opacity=1.0):
         scale = 4
@@ -454,13 +489,14 @@ class WelcomeUI(tk.Tk):
         self.quit()
 
     def _cancel_welcome_jobs(self):
-        for job in (self._animate_job, self._fade_job, self._typewriter_job):
+        for job in (self._animate_job, self._logo_job, self._fade_job, self._typewriter_job):
             if job is not None:
                 try:
                     self.after_cancel(job)
                 except Exception:
                     pass
         self._animate_job = None
+        self._logo_job = None
         self._fade_job = None
         self._typewriter_job = None
 
