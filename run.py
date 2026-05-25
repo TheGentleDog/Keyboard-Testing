@@ -15,17 +15,20 @@ import os
 import threading
 import math
 import ctypes
+import time
 import tkinter as tk
 from tkinter import ttk
 
 try:
-    from PIL import Image, ImageDraw, ImageFilter, ImageTk
+    from PIL import Image, ImageDraw, ImageFilter, ImageTk, ImageSequence
 except ImportError:
-    Image = ImageDraw = ImageFilter = ImageTk = None
+    Image = ImageDraw = ImageFilter = ImageTk = ImageSequence = None
 
 # ── Make keyboard modules importable ─────────────────────────────────────────
 KEYBOARD_DIR = os.path.join(os.path.dirname(__file__), "Bench", "Cutted_File", "files")
 sys.path.insert(0, KEYBOARD_DIR)
+ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
+TANAW_LOGO_PATH = os.path.join(ASSETS_DIR, "tanaw_logo.gif")
 
 
 # =============================================================================
@@ -113,6 +116,10 @@ class WelcomeUI(tk.Tk):
         self._gradient_photo = None
         self._button_photo = None
         self._button_hover_photo = None
+        self._logo_frames = []
+        self._logo_frame_index = 0
+        self._logo_item = None
+        self._logo_job = None
         self._animate_job = None
         self._fade_job = None
         self._typewriter_job = None
@@ -165,6 +172,10 @@ class WelcomeUI(tk.Tk):
         self.canvas.bind("<ButtonRelease-1>", self._stop_window_drag)
 
         nav_y = 68
+        self._logo_frames = self._load_logo_frames(TANAW_LOGO_PATH, 34, 24)
+        if self._logo_frames:
+            self._logo_item = c.create_image(24, 28, image=self._logo_frames[0][0])
+            self._animate_logo()
         c.create_text(112, nav_y, text="About us", fill="#d6d7d8",
                       font=("Krona One", 10), anchor="w")
         c.create_text(width // 2, nav_y, text="Home", fill="#d6d7d8",
@@ -173,9 +184,9 @@ class WelcomeUI(tk.Tk):
                       font=("Krona One", 10), anchor="e")
         c.create_text(width - 32, height - 30, text="SeenByEveryone", fill="#d6d7d8",
                       font=("Krona One", 10), anchor="e")
-
         center_x = width // 2
         content_y = int(height * 0.43)
+
         self.welcome_item = c.create_text(center_x, content_y, text="",
                                           fill=self.TEXT, font=("Krona One", 27))
         self.subtitle_item = c.create_text(center_x, content_y + 34, text="",
@@ -207,6 +218,31 @@ class WelcomeUI(tk.Tk):
             self._animate_gradient()
         self._fade_job = self.after(1000, lambda: self._fade_intro(0))
         self._typewriter_job = self.after(2000, self._type_subtitle)
+
+    def _load_logo_frames(self, path, max_width, max_height):
+        if Image is None or ImageTk is None or ImageSequence is None or not os.path.exists(path):
+            return []
+
+        frames = []
+        try:
+            with Image.open(path) as gif:
+                for frame in ImageSequence.Iterator(gif):
+                    img = frame.convert("RGBA")
+                    img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+                    duration = frame.info.get("duration", gif.info.get("duration", 80))
+                    frames.append((ImageTk.PhotoImage(img), max(35, int(duration or 80))))
+        except Exception:
+            return []
+        return frames
+
+    def _animate_logo(self):
+        if not self._logo_frames or self._logo_item is None:
+            return
+
+        frame, delay = self._logo_frames[self._logo_frame_index]
+        self.canvas.itemconfigure(self._logo_item, image=frame)
+        self._logo_frame_index = (self._logo_frame_index + 1) % len(self._logo_frames)
+        self._logo_job = self.after(delay, self._animate_logo)
 
     def _render_pill_button(self, width, height, fill, opacity=1.0):
         scale = 4
@@ -453,13 +489,14 @@ class WelcomeUI(tk.Tk):
         self.quit()
 
     def _cancel_welcome_jobs(self):
-        for job in (self._animate_job, self._fade_job, self._typewriter_job):
+        for job in (self._animate_job, self._logo_job, self._fade_job, self._typewriter_job):
             if job is not None:
                 try:
                     self.after_cancel(job)
                 except Exception:
                     pass
         self._animate_job = None
+        self._logo_job = None
         self._fade_job = None
         self._typewriter_job = None
 
@@ -2019,6 +2056,75 @@ def main():
     except Exception:
         pass
 
+    startup_loading = None
+    startup_loading_label = None
+    startup_loading_detail = None
+
+    def show_startup_loading(message="Preparing calibration...", detail="Loading system components."):
+        nonlocal startup_loading, startup_loading_label, startup_loading_detail
+        hide_startup_loading()
+        loading = tk.Tk()
+        loading.withdraw()
+        loading.overrideredirect(True)
+        loading.attributes("-topmost", True)
+        loading.configure(bg="#111214", cursor="watch")
+        loading.title("Starting")
+
+        width, height = 500, 180
+        x = max(0, (loading.winfo_screenwidth() - width) // 2)
+        y = max(0, (loading.winfo_screenheight() - height) // 2)
+        loading.geometry(f"{width}x{height}+{x}+{y}")
+
+        frame = tk.Frame(loading, bg="#111214", highlightthickness=1, highlightbackground="#44484f")
+        frame.pack(fill="both", expand=True)
+        startup_loading_label = tk.Label(
+            frame,
+            text=message,
+            bg="#111214",
+            fg="#ffffff",
+            font=("Segoe UI", 18, "bold"),
+        )
+        startup_loading_label.pack(pady=(42, 8))
+        startup_loading_detail = tk.Label(
+            frame,
+            text=detail,
+            bg="#111214",
+            fg="#b9bec7",
+            font=("Segoe UI", 10),
+        )
+        startup_loading_detail.pack()
+
+        startup_loading = loading
+        loading.deiconify()
+        loading.lift()
+        loading.update()
+
+    def update_startup_loading(message=None, detail=None):
+        if startup_loading is None:
+            return
+        if message is not None and startup_loading_label is not None:
+            startup_loading_label.config(text=message)
+        if detail is not None and startup_loading_detail is not None:
+            startup_loading_detail.config(text=detail)
+        try:
+            startup_loading.update()
+        except Exception:
+            pass
+
+    def hide_startup_loading():
+        nonlocal startup_loading, startup_loading_label, startup_loading_detail
+        if startup_loading is None:
+            return
+        try:
+            startup_loading.destroy()
+        except Exception:
+            pass
+        startup_loading = None
+        startup_loading_label = None
+        startup_loading_detail = None
+
+    show_startup_loading()
+
     print("=" * 60)
     print("  GAZE-BASED DIGITAL KEYBOARD")
     print(f"  Points: {cfg['points']}  |  Samples: {cfg['samples']}  |  "
@@ -2028,6 +2134,7 @@ def main():
     print("=" * 60)
 
     # ── Deferred imports (avoid slowing down launcher) ────────────────────────
+    update_startup_loading("Preparing calibration...", "Loading gaze tracker and keyboard modules.")
     from gaze_tracker2 import GazeTrackerApp
     import config
     from model import ngram_model
@@ -2079,16 +2186,22 @@ def main():
             os.remove(NGRAM_CACHE_FILE)
 
     # ── Pre-load datasets & model ─────────────────────────────────────────────
+    update_startup_loading("Preparing calibration...", "Checking datasets.")
     _ensure_datasets()
+    update_startup_loading("Preparing calibration...", "Checking language rules.")
     _ensure_flores()
 
     if not os.path.exists(NGRAM_CACHE_FILE):
+        update_startup_loading("Preparing calibration...", "Building missing model cache.")
         print("Model cache missing — forcing dataset regeneration first.")
         _rebuild_datasets()
 
+    update_startup_loading("Preparing calibration...", "Loading prediction model.")
     if not ngram_model.load_cache():
+        update_startup_loading("Preparing calibration...", "Training prediction model.")
         print("Building n-gram model from datasets...")
         if not ngram_model.train_from_builtin():
+            hide_startup_loading()
             print("Failed to build n-gram model: datasets were not available.")
             sys.exit(1)
         ngram_model.save_cache()
@@ -2097,7 +2210,6 @@ def main():
     stop_gaze = threading.Event()
     gaze_thread = None
     recalibrating = False
-    closing = False
 
     # ── Build gaze tracker ────────────────────────────────────────────────────
     tracker = GazeTrackerApp(
@@ -2115,18 +2227,19 @@ def main():
 
     # ── Phase 1: Calibration on main thread (required on macOS) ──────────────
     print("  Starting calibration...")
-    ok = tracker.calibrate()
+    update_startup_loading("Opening calibration...", "Please wait while the camera starts.")
+    ok = tracker.calibrate(window_ready_callback=hide_startup_loading)
     if not ok:
+        hide_startup_loading()
         print("[Info] Calibration cancelled.")
         sys.exit(0)
+    hide_startup_loading()
     tracker._mouse_ctrl = True
     print("\n✓ Calibration complete — launching keyboard...\n")
 
     # ── Phase 2: Tracking in background thread (no OpenCV GUI) ───────────────
     def start_tracking():
         nonlocal gaze_thread
-        if gaze_thread and gaze_thread.is_alive():
-            return
         tracker._tracking_error = None
         gaze_thread = threading.Thread(
             target=tracker.track,
@@ -2136,16 +2249,19 @@ def main():
         gaze_thread.start()
         print("[Info] Tracking thread started.")
 
-    def stop_tracking(release_camera=False, timeout=3.0):
+    def stop_tracking(timeout=6.0, pump_ui=None):
         stop_gaze.set()
-        if gaze_thread and gaze_thread.is_alive():
-            if release_camera:
+        if not gaze_thread or not gaze_thread.is_alive():
+            return True
+        deadline = time.monotonic() + timeout
+        while gaze_thread.is_alive() and time.monotonic() < deadline:
+            gaze_thread.join(timeout=0.05)
+            if pump_ui is not None:
                 try:
-                    tracker._cap.release()
+                    pump_ui()
                 except Exception:
                     pass
-            gaze_thread.join(timeout=timeout)
-        return not (gaze_thread and gaze_thread.is_alive())
+        return not gaze_thread.is_alive()
 
     start_tracking()
 
@@ -2157,17 +2273,67 @@ def main():
         gaze_tracking_active=True,
         ui_tutorial=cfg["tutorial"],
     )
+    recalibration_overlay = None
+
+    def show_recalibration_overlay(message="Preparing recalibration..."):
+        nonlocal recalibration_overlay
+        hide_recalibration_overlay()
+        overlay = tk.Toplevel()
+        overlay.withdraw()
+        overlay.overrideredirect(True)
+        overlay.attributes("-topmost", True)
+        overlay.configure(bg="#111214", cursor="watch")
+        overlay.title("Recalibrating")
+        try:
+            overlay.grab_set()
+        except Exception:
+            pass
+
+        width, height = 460, 170
+        x = max(0, (overlay.winfo_screenwidth() - width) // 2)
+        y = max(0, (overlay.winfo_screenheight() - height) // 2)
+        overlay.geometry(f"{width}x{height}+{x}+{y}")
+
+        frame = tk.Frame(overlay, bg="#111214", highlightthickness=1, highlightbackground="#44484f")
+        frame.pack(fill="both", expand=True)
+        tk.Label(
+            frame,
+            text=message,
+            bg="#111214",
+            fg="#ffffff",
+            font=("Segoe UI", 18, "bold"),
+        ).pack(pady=(40, 8))
+        tk.Label(
+            frame,
+            text="Please wait while gaze tracking pauses.",
+            bg="#111214",
+            fg="#b9bec7",
+            font=("Segoe UI", 10),
+        ).pack()
+
+        recalibration_overlay = overlay
+        overlay.deiconify()
+        overlay.lift()
+        app.update()
+
+    def hide_recalibration_overlay():
+        nonlocal recalibration_overlay
+        if recalibration_overlay is None:
+            return
+        try:
+            recalibration_overlay.grab_release()
+        except Exception:
+            pass
+        try:
+            recalibration_overlay.destroy()
+        except Exception:
+            pass
+        recalibration_overlay = None
 
     def on_close():
-        nonlocal closing
-        if closing:
-            return
-        closing = True
-        stop_tracking(release_camera=True, timeout=2.0)
-        try:
-            app.destroy()
-        except tk.TclError:
-            pass
+        stop_tracking()
+        hide_recalibration_overlay()
+        app.destroy()
 
     def quit_session(_event=None):
         """Q: close keyboard and stop gaze tracking from anywhere in Tk."""
@@ -2188,48 +2354,72 @@ def main():
         the tracking thread, opens calibration, then restarts tracking.
         """
         nonlocal stop_gaze, recalibrating
-        if recalibrating or closing:
+        if recalibrating:
             return "break"
-
         recalibrating = True
-        tracker._mouse_ctrl = False
-        app.status_bar.config(text="Recalibrating gaze... camera is restarting")
-        app.update_idletasks()
 
-        # Hide the fullscreen Tk window before opening OpenCV's fullscreen
-        # calibration window. Keeping both mapped can make Windows look frozen.
+        tutorial_step_before_recalibration = getattr(app, "_tutorial_step", None)
+        tutorial_was_active = bool(
+            getattr(app, "_ui_tutorial_enabled", False)
+            and tutorial_step_before_recalibration not in (None, "done")
+        )
+        app.prepare_for_recalibration(preserve_tutorial=True)
+        previous_dwell = True if tutorial_was_active else getattr(app, "dwell_enabled", True)
+        tracker._head_shift = None
+        app.status_bar.config(text="Recalibrating gaze...")
         app.withdraw()
         app.update()
+        show_recalibration_overlay()
+        app.update()
 
-        stopped = stop_tracking(release_camera=True, timeout=5.0)
-        if not stopped:
-            app.deiconify()
-            app.lift()
-            app.focus_force()
-            app.status_bar.config(text="Recalibration failed: camera is still busy")
-            recalibrating = False
-            return "break"
-
-        stop_gaze = threading.Event()
+        original_calib_tutorial = tracker._tutorial_enabled
         try:
-            ok = tracker.calibrate()
-        finally:
-            app.deiconify()
-            app.lift()
-            app.focus_force()
-            recalibrating = False
+            if not stop_tracking(pump_ui=app.update):
+                hide_recalibration_overlay()
+                app.deiconify()
+                app.dwell_enabled = previous_dwell
+                if getattr(app, "_use_pointer_overlay", False) and getattr(app, "_pointer_overlay", None) is None:
+                    app._init_pointer_overlay()
+                app._show_main_pointer()
+                if tutorial_was_active:
+                    app.restart_ui2_tutorial_after_recalibration()
+                else:
+                    app.update_display()
+                app.status_bar.config(text="Recalibration blocked | camera is still stopping")
+                return "break"
 
-        if ok and not closing:
-            tracker._mouse_ctrl = True
-            start_tracking()
-            app.status_bar.config(text="Recalibration complete | gaze tracking active")
-        elif not closing:
-            app.status_bar.config(text="Recalibration cancelled | gaze tracking paused")
+            stop_gaze = threading.Event()
+            tracker._tutorial_enabled = False
+            tracker._pip = False
+            app.update()
+            ok = tracker.calibrate(window_ready_callback=hide_recalibration_overlay)
+            if ok:
+                tracker._head_shift = None
+                tracker._mouse_ctrl = True
+                tracker._pip = False
+                app.deiconify()
+                app.lift()
+                app.dwell_enabled = previous_dwell
+                if getattr(app, "_use_pointer_overlay", False) and getattr(app, "_pointer_overlay", None) is None:
+                    app._init_pointer_overlay()
+                app._show_main_pointer()
+                if tutorial_was_active:
+                    app.restart_ui2_tutorial_after_recalibration()
+                else:
+                    app.update_display()
+                start_tracking()
+                app.status_bar.config(text="Recalibration complete | gaze tracking active")
+            else:
+                hide_recalibration_overlay()
+                app.status_bar.config(text="Recalibration cancelled | closing session")
+                on_close()
+        finally:
+            hide_recalibration_overlay()
+            tracker._tutorial_enabled = original_calib_tutorial
+            recalibrating = False
         return "break"
 
     def monitor_tracking():
-        if closing:
-            return
         current_status = app.status_bar.cget("text")
         can_update_status = current_status.startswith((
             "Gaze tracking",
@@ -2251,19 +2441,18 @@ def main():
                         f"moves {tracker._mouse_moves} | pyauto {'OK' if tracker.pyautogui_ok else 'NO'}"
                     )
                 )
-            if not closing:
-                app.after(3000, monitor_tracking)
+            app.after(3000, monitor_tracking)
 
     def monitor_head_position():
-        if closing:
+        if recalibrating:
+            app.after(250, monitor_head_position)
             return
         shift = getattr(tracker, "_head_shift", None)
         if shift and shift.get("moved"):
             app.show_head_position_warning(shift)
         else:
             app.hide_head_position_warning()
-        if not closing:
-            app.after(250, monitor_head_position)
+        app.after(250, monitor_head_position)
 
     app.protocol("WM_DELETE_WINDOW", on_close)
     app.bind_all("<KeyPress-q>", quit_session)

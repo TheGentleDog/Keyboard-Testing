@@ -52,6 +52,8 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             "funckey_bg":       "#171719",
             "funckey_fg":       "#ffffff",
             "funckey_active_bg":"#5865f2",
+            "tts_bg":           "#071f4a",
+            "tts_active_bg":    "#0b2d68",
             # panic button
             "panic_bg":         "#660002",
             "dwell_bar":        "#55ff88",
@@ -150,6 +152,8 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self.status_bar.config(text="Tutorial: follow the highlighted target")
 
     def _tutorial_allows_widget(self, widget):
+        if getattr(self, "_panic_active", False):
+            return False
         if not getattr(self, "_ui_tutorial_enabled", False):
             return True
         step = getattr(self, "_tutorial_step", None)
@@ -249,6 +253,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self.bind_all('<KeyPress-X>', self._keyboard_only_gaze_shortcut)
         self.bind_all('<KeyPress-r>', self._keyboard_only_gaze_shortcut)
         self.bind_all('<KeyPress-R>', self._keyboard_only_gaze_shortcut)
+        self.bind_all('<KeyPress-1>', self._stop_panic_shortcut)
 
         self.ui_layout               = ui_layout if ui_layout in ("qwerty", "ui2") else "qwerty"
         self._ui2_groups             = ("abcd", "efgh", "ijkl", "mnop", "qrstu", "vwxyz")
@@ -264,6 +269,10 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._panic_active           = False
         self._settings_open          = False
         self._settings_window        = None
+        self._panic_overlay          = None
+        self._panic_overlay_label    = None
+        self._panic_blink_job        = None
+        self._panic_blink_visible    = True
         self._pointer_overlay        = None
         self._pointer_canvas         = None
         self._pointer_job            = None
@@ -286,6 +295,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._tutorial_input_paused  = False
         self._ui2_group_buttons      = {}
         self._ui2_letter_buttons     = {}
+        self._ui2_letters_open       = False
 
         self._dwell_init()
         self._load_sentence_counts()
@@ -302,6 +312,19 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         return "break"
 
     def destroy(self):
+        self._hide_panic_stop_overlay()
+        self.prepare_for_recalibration(preserve_tutorial=False)
+        self._show_system_cursor()
+        self._destroy_pointer_overlay()
+        self._hide_current_word_overlay()
+        super().destroy()
+
+    def prepare_for_recalibration(self, preserve_tutorial=True):
+        """Remove transient topmost UI so calibration can own the screen."""
+        if not preserve_tutorial:
+            self._ui_tutorial_enabled = False
+            self._tutorial_input_paused = False
+            self._tutorial_step = "done"
         if self._tutorial_job is not None:
             try:
                 self.after_cancel(self._tutorial_job)
@@ -311,11 +334,29 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._destroy_guide_overlay()
         self._hide_ui_tutorial_text()
         self._hide_finish_tutorial_button()
-        self._show_system_cursor()
-        self._destroy_pointer_overlay()
+        self._hide_panic_stop_overlay()
         self.hide_head_position_warning()
         self._hide_current_word_overlay()
-        super().destroy()
+        self._show_system_cursor()
+        self._destroy_pointer_overlay()
+        self._dwell_reset_all()
+
+    def restart_ui2_tutorial_after_recalibration(self):
+        if self.ui_layout != "ui2":
+            return
+        self._ui_tutorial_enabled = True
+        self._tutorial_input_paused = False
+        self._tutorial_step = None
+        self._tutorial_predefined_selected = False
+        self._tutorial_prev_dwell = None
+        self.dwell_enabled = True
+        self.current_input = ""
+        self.output_words = []
+        self.output_cursor = -1
+        self.current_completion = ""
+        self.alternative_suggestions = []
+        self.update_display()
+        self.after(500, self._start_ui2_tutorial)
 
     def _keyboard_only_gaze_shortcut(self, event=None):
         if hasattr(self, "status_bar"):
@@ -1054,17 +1095,15 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         btn = self._make_dwell_btn(
             self,
             self._finish_ui2_tutorial,
-            text="Finish\nTutorial",
-            font=("Segoe UI", 24, "bold"),
+            text="Finish Tutorial",
+            font=("Segoe UI", 20, "bold"),
             bg="#5865f2",
             fg="#ffffff",
             relief="raised",
             bd=2,
             cursor="hand2",
         )
-        width = max(340, min(520, int(self.winfo_screenwidth() * 0.22)))
-        height = max(180, min(260, int(self.winfo_screenheight() * 0.18)))
-        btn.place(x=self._frame_gap(), y=self._frame_gap(), width=width, height=height)
+        btn.place(x=self._frame_gap(), y=self._frame_gap(), width=300, height=110)
         btn.lift()
         self._finish_tutorial_btn = btn
         self._dwell_reset_all()
@@ -1509,21 +1548,28 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             w.destroy()
 
         parent.grid_rowconfigure(0, weight=1)
-        for col, w in enumerate([1, 1, 5, 3, 1]):
+        for col, w in enumerate([1, 1, 4, 3, 2]):
             parent.grid_columnconfigure(col, weight=w, uniform="fcol")
+
+        middle_text = "Back" if self._ui2_letters_open else "⎵"
+        middle_cmd = (lambda: self._create_ui2_group_rows(self.letters_frame)) if self._ui2_letters_open else self.finalize_word
+        middle_size = 16 if self._ui2_letters_open else 22
+        predefined_text = "Back\nto keys" if self._in_predefined_mode else "Predefined\nSentence"
 
         for col, (text, cmd, fsize) in enumerate([
             ("◄",                    self.move_word_left,      20),
             ("►",                    self.move_word_right,     20),
-            ("⎵",                    self.finalize_word,       22),
-            ("Predefined\nSentence", self.predefined_sentence, 13),
+            (middle_text,             middle_cmd,                middle_size),
+            (predefined_text,         self.predefined_sentence, 13),
             ("🔊",                   self.enter,               22),
         ]):
             btn = self._make_dwell_btn(
                 parent, cmd,
                 text=text, font=("Segoe UI", fsize, "bold"),
-                bg=func_bg, fg=func_fg,
-                activebackground=func_abg, activeforeground=func_fg,
+                bg=theme.get("tts_bg", func_bg) if col == 4 else func_bg,
+                fg=func_fg,
+                activebackground=theme.get("tts_active_bg", func_abg) if col == 4 else func_abg,
+                activeforeground=func_fg,
                 relief="raised", bd=1, cursor="hand2",
             )
             btn.grid(row=0, column=col, sticky="nsew", padx=0, pady=0)
@@ -1594,8 +1640,10 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         theme = self.themes[self.current_theme]
         parent.configure(bg=theme["bg"])
         self._unregister_widgets(parent)
+        self._ui2_letters_open = False
         self._ui2_group_buttons = {}
         self._ui2_letter_buttons = {}
+        self._create_func_row(self.func_row_frame)
 
         def btn_kw(**extra):
             return dict(
@@ -1649,7 +1697,9 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         theme = self.themes[self.current_theme]
         self.letters_frame.configure(bg=theme["bg"])
         self._unregister_widgets(self.letters_frame)
+        self._ui2_letters_open = True
         self._ui2_letter_buttons = {}
+        self._create_func_row(self.func_row_frame)
 
         main = tk.Frame(self.letters_frame, bg=theme["bg"])
         main.pack(fill="both", expand=True)
@@ -1769,15 +1819,19 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             self.predefined_frame.grid_remove()
             self.letters_frame.grid(row=1, column=0, rowspan=3, sticky="nsew", padx=self._frame_gap())
             self._in_predefined_mode = False
+            self._create_func_row(self.func_row_frame)
             self._update_current_word_overlay()
             self._dwell_reset_all()
             self.status_bar.config(text="Keyboard mode")
         else:
             self._hide_current_word_overlay()
+            if self.ui_layout == "ui2" and self._ui2_letters_open:
+                self._create_ui2_group_rows(self.letters_frame)
             self.letters_frame.grid_remove()
             self._create_predefined_panel(self.predefined_frame)
             self.predefined_frame.grid(row=1, column=0, rowspan=3, sticky="nsew", padx=self._frame_gap())
             self._in_predefined_mode = True
+            self._create_func_row(self.func_row_frame)
             self._dwell_reset_all()
             self.status_bar.config(text="Predefined sentences")
 
@@ -2017,19 +2071,83 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
 
 
     def panic(self):
-        """Toggle emergency alarm on/off."""
+        """Start emergency alarm. Stop is intentionally keyboard-only: press 1."""
+        if self._panic_active:
+            self.status_bar.config(text="Alarm active | press 1 to stop")
+            return
+        panic_sound.start()
+        self._panic_active = True
+        self.dwell_enabled = False
+        self.dwell_hovered = None
+        self._dwell_reset_all()
+        self._show_panic_stop_overlay()
+        self.status_bar.config(text="Alarm active | press 1 to stop")
+
+    def _stop_panic_shortcut(self, _event=None):
         if self._panic_active:
             panic_sound.stop()
             self._panic_active = False
-            self.panic_btn.config(bg=self.themes[self.current_theme].get("panic_bg", "#660002"))
-            self._apply_button_chrome(self.panic_btn)
+            self._hide_panic_stop_overlay()
+            self.dwell_enabled = True
+            self.dwell_hovered = None
+            self._dwell_reset_all()
             self.status_bar.config(text="Alarm stopped")
-        else:
-            panic_sound.start()
-            self._panic_active = True
-            self.panic_btn.config(bg="#ff0000")
-            self._apply_button_chrome(self.panic_btn)
-            self.status_bar.config(text="Alarm active | press PANIC again to stop")
+            return "break"
+        return None
+
+    def _show_panic_stop_overlay(self):
+        self._hide_panic_stop_overlay()
+        overlay = tk.Toplevel(self)
+        overlay.withdraw()
+        overlay.overrideredirect(True)
+        overlay.attributes("-topmost", True)
+        overlay.configure(bg="#050000", cursor=self.pointer_cursor, highlightthickness=0, bd=0)
+        try:
+            overlay.wm_attributes("-disabled", True)
+        except Exception:
+            pass
+        self._position_overlay(overlay)
+
+        label = tk.Label(
+            overlay,
+            text="PRESS 1 TO STOP",
+            bg="#050000",
+            fg="#ff2020",
+            font=("Segoe UI", 72, "bold"),
+            bd=0,
+            highlightthickness=0,
+        )
+        label.place(relx=0.5, rely=0.52, anchor="center")
+        self._panic_overlay = overlay
+        self._panic_overlay_label = label
+        self._panic_blink_visible = True
+        overlay.deiconify()
+        overlay.lift()
+        self._blink_panic_stop_overlay()
+
+    def _blink_panic_stop_overlay(self):
+        if not self._panic_active or self._panic_overlay_label is None:
+            return
+        self._panic_blink_visible = not self._panic_blink_visible
+        self._panic_overlay_label.config(fg="#ff2020" if self._panic_blink_visible else "#050000")
+        if self._panic_overlay is not None:
+            self._position_overlay(self._panic_overlay)
+        self._panic_blink_job = self.after(450, self._blink_panic_stop_overlay)
+
+    def _hide_panic_stop_overlay(self):
+        if self._panic_blink_job is not None:
+            try:
+                self.after_cancel(self._panic_blink_job)
+            except Exception:
+                pass
+            self._panic_blink_job = None
+        if self._panic_overlay is not None:
+            try:
+                self._panic_overlay.destroy()
+            except Exception:
+                pass
+        self._panic_overlay = None
+        self._panic_overlay_label = None
 
     # =========================================================================
     # NAVIGATION
@@ -2088,7 +2206,8 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                     pass
         panic_bg = theme.get("panic_bg", "#660002")
         if hasattr(self, 'panic_btn'):
-            self.panic_btn.config(bg="#ff0000" if self._panic_active else panic_bg, fg="white")
+            self.panic_btn.config(text="PANIC\nBUTTON", bg=panic_bg, fg="white",
+                                  font=("Segoe UI", 14, "bold"))
             self._apply_button_chrome(self.panic_btn)
         # keyboard_buttons[0..4] are the function row; rest are letter keys
         func_bg    = theme.get("funckey_bg",    theme["button_bg"])
@@ -2100,8 +2219,10 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         if hasattr(self, 'keyboard_buttons'):
             for i, btn in enumerate(self.keyboard_buttons):
                 if i < 5 or id(btn) in special:
-                    btn.config(bg=func_bg, fg=func_fg,
-                               activebackground=func_abg, activeforeground=func_fg)
+                    btn_bg = theme.get("tts_bg", func_bg) if i == 4 else func_bg
+                    btn_abg = theme.get("tts_active_bg", func_abg) if i == 4 else func_abg
+                    btn.config(bg=btn_bg, fg=func_fg,
+                               activebackground=btn_abg, activeforeground=func_fg)
                 else:
                     btn.config(bg=theme["button_bg"], fg=theme["button_fg"],
                                activebackground=theme["button_active_bg"],
