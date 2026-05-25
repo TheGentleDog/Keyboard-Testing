@@ -12,7 +12,11 @@
     "u": "you",
     "j": "justice",
     "e": "exercising",
-    "human": "humarap"
+    "human": "humarap",
+    "plea": "please",
+    "ple": "please",
+    "hung": "hungry",
+    "th": "there"
   },
   "user_shortcut_usage": {
     "m": 2,
@@ -27,7 +31,11 @@
     "u": 1,
     "j": 1,
     "e": 1,
-    "human": 1
+    "human": 1,
+    "plea": 1,
+    "ple": 1,
+    "hung": 1,
+    "th": 1
   },
   "new_words": [],
   "word_usage_history": [
@@ -404,6 +412,76 @@
       [
         "water",
         "i"
+      ]
+    ],
+    [
+      "hello",
+      [
+        "hello"
+      ]
+    ],
+    [
+      "can",
+      [
+        "can",
+        "we",
+        "drink",
+        "tonight"
+      ]
+    ],
+    [
+      "we",
+      [
+        "can",
+        "we",
+        "drink",
+        "tonight"
+      ]
+    ],
+    [
+      "drink",
+      [
+        "can",
+        "we"
+      ]
+    ],
+    [
+      "tonight",
+      [
+        "we",
+        "drink"
+      ]
+    ],
+    [
+      "please",
+      [
+        "please",
+        "help",
+        "me",
+        "im"
+      ]
+    ],
+    [
+      "help",
+      [
+        "please",
+        "help",
+        "me",
+        "im"
+      ]
+    ],
+    [
+      "me",
+      [
+        "please",
+        "help"
+      ]
+    ],
+    [
+      "im",
+      [
+        "help",
+        "me"
       ]
     ],
     [

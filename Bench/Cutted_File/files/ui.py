@@ -62,7 +62,6 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     POINTER_SIZE = 72
     POINTER_OUTLINE = "#8b0018"
     POINTER_FILL = "#8f8f8f"
-
     # ── Override dwell flash to restore correct per-button colour ─────────────
     def _dwell_flash(self, btn):
         theme = self.themes[self.current_theme]
