@@ -27,8 +27,40 @@ except ImportError:
 # ── Make keyboard modules importable ─────────────────────────────────────────
 KEYBOARD_DIR = os.path.join(os.path.dirname(__file__), "Bench", "Cutted_File", "files")
 sys.path.insert(0, KEYBOARD_DIR)
-ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
+
+
+def _resource_path(*parts):
+    """Resolve bundled files both in source and in a PyInstaller build."""
+    base_dir = getattr(sys, "_MEIPASS", os.path.dirname(__file__))
+    return os.path.join(base_dir, *parts)
+
+
+ASSETS_DIR = _resource_path("assets")
+FONTS_DIR = os.path.join(ASSETS_DIR, "fonts")
 TANAW_LOGO_PATH = os.path.join(ASSETS_DIR, "tanaw_logo.gif")
+
+
+def _load_bundled_fonts():
+    """
+    Register fonts shipped in assets/fonts for this running app.
+
+    On Windows this uses a private process font install, so users do not need
+    to install the font on their computer. Tk can then use the font by its
+    internal family name, for example "Krona One" or "Actor".
+    """
+    if sys.platform != "win32" or not os.path.isdir(FONTS_DIR):
+        return
+
+    FR_PRIVATE = 0x10
+    font_extensions = (".ttf", ".otf", ".ttc")
+    for filename in os.listdir(FONTS_DIR):
+        if not filename.lower().endswith(font_extensions):
+            continue
+        font_path = os.path.join(FONTS_DIR, filename)
+        try:
+            ctypes.windll.gdi32.AddFontResourceExW(font_path, FR_PRIVATE, 0)
+        except Exception:
+            pass
 
 
 # =============================================================================
@@ -2026,6 +2058,8 @@ class LauncherUI(tk.Tk):
 # =============================================================================
 
 def main():
+    _load_bundled_fonts()
+
     welcome = WelcomeUI()
     welcome.mainloop()
     welcome_result = welcome.result
