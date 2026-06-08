@@ -6,7 +6,7 @@
     "l": "looking",
     "el": "election",
     "n": "nurse",
-    "h": "husband",
+    "h": "here",
     "y": "you",
     "k": "kailangan",
     "ku": "kumain",
@@ -20,7 +20,7 @@
     "l": 1,
     "el": 1,
     "n": 1,
-    "h": 1,
+    "h": 2,
     "y": 1,
     "k": 2,
     "ku": 1,
@@ -265,6 +265,12 @@
       [
         "i",
         "don't"
+      ]
+    ],
+    [
+      "move",
+      [
+        "move"
       ]
     ]
   ]
