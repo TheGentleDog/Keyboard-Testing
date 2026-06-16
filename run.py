@@ -385,19 +385,20 @@ class WelcomeUI(tk.Tk):
         ).pack(fill="x", padx=26, pady=(0, 12))
         developers = tk.Frame(body, bg="#15191c")
         developers.pack(fill="x", padx=20, pady=(0, 24))
-        developer_names = (
-            "Allen Alwin A. David",
-            "Johan C. Pastorfide",
-            "Raynard Angelo A. Padagas",
-            "Jewel T. Fabella",
+        developer_profiles = (
+            ("Allen Alwin A. David", "1.png"),
+            ("Johan C. Pastorfide", "2.jpg"),
+            ("Raynard Angelo A. Padagas", "3.png"),
+            ("Jewel T. Fabella", "4.jpg"),
         )
-        for column, name in enumerate(developer_names):
+        for column, (name, image_filename) in enumerate(developer_profiles):
             developers.grid_columnconfigure(column, weight=1)
             self._create_profile_card(
                 developers,
                 name,
                 0,
                 column,
+                image_filename,
             )
 
         tk.Label(
@@ -413,7 +414,7 @@ class WelcomeUI(tk.Tk):
         mentor.grid_columnconfigure(0, weight=1)
         mentor.grid_columnconfigure(1, weight=0)
         mentor.grid_columnconfigure(2, weight=1)
-        self._create_profile_card(mentor, "Justine Jude C. Pura", 0, 1)
+        self._create_profile_card(mentor, "Justine Jude C. Pura", 0, 1, "MENTOR.png")
 
         self._about_frame = frame
         self._about_window = self.canvas.create_window(
@@ -426,7 +427,7 @@ class WelcomeUI(tk.Tk):
             tags=("about_content",),
         )
 
-    def _create_profile_card(self, parent, name, row, column):
+    def _create_profile_card(self, parent, name, row, column, image_filename=None):
         card = tk.Frame(
             parent,
             width=150,
@@ -439,7 +440,9 @@ class WelcomeUI(tk.Tk):
         )
         card.pack_propagate(False)
         card.grid(row=row, column=column, padx=6, sticky="n")
-        photo = self._load_profile_photo(_resource_path("assets", "1.jpg"), 112)
+        photo = None
+        if image_filename:
+            photo = self._load_profile_photo(_resource_path("assets", image_filename), 112)
         if photo is not None:
             self._about_photos.append(photo)
             image_label = tk.Label(card, image=photo, bg="#202529", bd=0)
