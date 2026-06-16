@@ -385,11 +385,17 @@ class WelcomeUI(tk.Tk):
         ).pack(fill="x", padx=26, pady=(0, 12))
         developers = tk.Frame(body, bg="#15191c")
         developers.pack(fill="x", padx=20, pady=(0, 24))
-        for column in range(4):
+        developer_names = (
+            "Allen Alwin A. David",
+            "Johan C. Pastorfide",
+            "Raynard Angelo A. Padagas",
+            "Jewel T. Fabella",
+        )
+        for column, name in enumerate(developer_names):
             developers.grid_columnconfigure(column, weight=1)
             self._create_profile_card(
                 developers,
-                f"Developer {column + 1}",
+                name,
                 0,
                 column,
             )
@@ -407,7 +413,7 @@ class WelcomeUI(tk.Tk):
         mentor.grid_columnconfigure(0, weight=1)
         mentor.grid_columnconfigure(1, weight=0)
         mentor.grid_columnconfigure(2, weight=1)
-        self._create_profile_card(mentor, "Mentor Name", 0, 1)
+        self._create_profile_card(mentor, "Justine Jude C. Pura", 0, 1)
 
         self._about_frame = frame
         self._about_window = self.canvas.create_window(
@@ -423,12 +429,15 @@ class WelcomeUI(tk.Tk):
     def _create_profile_card(self, parent, name, row, column):
         card = tk.Frame(
             parent,
+            width=150,
+            height=190,
             bg="#202529",
             highlightbackground="#394047",
             highlightthickness=1,
             padx=12,
             pady=12,
         )
+        card.pack_propagate(False)
         card.grid(row=row, column=column, padx=6, sticky="n")
         photo = self._load_profile_photo(_resource_path("assets", "1.jpg"), 112)
         if photo is not None:
@@ -445,15 +454,19 @@ class WelcomeUI(tk.Tk):
                 font=("Segoe UI", 9, "bold"),
             )
         image_label.pack()
-        tk.Label(
+        name_label = tk.Label(
             card,
             text=name,
             bg="#202529",
             fg="#ffffff",
             font=("Actor", 11, "bold"),
             wraplength=125,
-        ).pack(pady=(10, 0))
-        for widget in (card, image_label):
+            height=3,
+            anchor="n",
+            justify="center",
+        )
+        name_label.pack(fill="x", pady=(10, 0))
+        for widget in (card, image_label, name_label):
             widget.bind("<MouseWheel>", self._scroll_about)
 
     def _load_profile_photo(self, path, size):
@@ -1230,6 +1243,10 @@ class LauncherUI(tk.Tk):
         self._settings_content_height = 1
         self._animate_job = None
         self._entry_fade_job = None
+        self._launcher_view_fade_job = None
+        self._launcher_transitioning = False
+        self._launcher_help_frame = None
+        self._launcher_help_window = None
         self._dragging_window = False
         d = self.DARK
 
@@ -2033,6 +2050,343 @@ class LauncherUI(tk.Tk):
             self._draw_canvas_settings(self._settings_canvas, self._settings_sections, keep_scroll=True)
         return "break"
 
+    def _show_launcher_help(self, _event=None):
+        if self._launcher_transitioning or self._entry_fade_job is not None:
+            return "break"
+        self._launcher_transitioning = True
+        self._fade_launcher_view(1.0, 0.0, 8, lambda: self._swap_launcher_help(True))
+        return "break"
+
+    def _hide_launcher_help(self, _event=None):
+        if self._launcher_transitioning:
+            return "break"
+        self._launcher_transitioning = True
+        self._fade_launcher_view(1.0, 0.0, 8, lambda: self._swap_launcher_help(False))
+        return "break"
+
+    def _swap_launcher_help(self, show):
+        if show:
+            self._build_launcher_help_page()
+            self._launcher_canvas.itemconfigure(self._launcher_help_window, state="normal")
+            self._launcher_canvas.tag_raise(self._launcher_help_window)
+            self._launcher_canvas.tag_raise(self.minimize_btn)
+            self._launcher_canvas.tag_raise(self.close_btn)
+            self.after_idle(self._sync_launcher_help_scrollbar)
+        else:
+            self._launcher_canvas.itemconfigure(self._launcher_help_window, state="hidden")
+        self._fade_launcher_view(0.0, 1.0, 8, self._finish_launcher_view_transition)
+
+    def _fade_launcher_view(self, start, end, steps, on_complete, step=0):
+        amount = step / steps
+        alpha = start + ((end - start) * amount)
+        try:
+            self.attributes("-alpha", max(0.0, min(1.0, alpha)))
+        except tk.TclError:
+            on_complete()
+            return
+        if step < steps:
+            self._launcher_view_fade_job = self.after(
+                24,
+                lambda: self._fade_launcher_view(
+                    start,
+                    end,
+                    steps,
+                    on_complete,
+                    step + 1,
+                ),
+            )
+        else:
+            self._launcher_view_fade_job = None
+            on_complete()
+
+    def _finish_launcher_view_transition(self):
+        self.attributes("-alpha", 1.0)
+        self._launcher_transitioning = False
+
+    def _build_launcher_help_page(self):
+        if self._launcher_help_frame is not None:
+            return
+
+        frame = tk.Frame(
+            self._launcher_canvas,
+            bg="#0b0d0f",
+            highlightbackground="#252b30",
+            highlightthickness=1,
+        )
+        header = tk.Canvas(
+            frame,
+            height=58,
+            bg="#0b0d0f",
+            highlightthickness=0,
+            bd=0,
+        )
+        header.pack(fill="x")
+        header.create_text(
+            28,
+            29,
+            text="Help",
+            fill="#ffffff",
+            font=("Krona One", 17),
+            anchor="w",
+        )
+
+        home_w, home_h = 126, 34
+        home_x, home_y = 650, 12
+        if Image is not None:
+            self._launcher_help_home_photo = self._render_setup_action_button(
+                home_w,
+                home_h,
+                WelcomeUI.BUTTON,
+            )
+            header.create_image(
+                home_x,
+                home_y,
+                anchor="nw",
+                image=self._launcher_help_home_photo,
+                tags=("launcher_help_home",),
+            )
+        else:
+            header.create_rectangle(
+                home_x,
+                home_y,
+                home_x + home_w,
+                home_y + home_h,
+                outline=WelcomeUI.BUTTON_BORDER,
+                fill=WelcomeUI.BUTTON,
+                tags=("launcher_help_home",),
+            )
+        header.create_text(
+            home_x + home_w / 2,
+            home_y + home_h / 2,
+            text="Home",
+            fill="#ffffff",
+            font=("Segoe UI", 10, "bold"),
+            tags=("launcher_help_home",),
+        )
+        header.tag_bind("launcher_help_home", "<Button-1>", self._hide_launcher_help)
+        header.tag_bind(
+            "launcher_help_home",
+            "<Enter>",
+            lambda _e: header.configure(cursor="hand2"),
+        )
+        header.tag_bind(
+            "launcher_help_home",
+            "<Leave>",
+            lambda _e: header.configure(cursor=""),
+        )
+
+        content_wrap = tk.Frame(frame, bg="#15191c")
+        content_wrap.pack(fill="both", expand=True, padx=18, pady=(0, 18))
+        scrollbar = tk.Canvas(
+            content_wrap,
+            width=12,
+            bg="#15191c",
+            highlightthickness=0,
+            bd=0,
+        )
+        content = tk.Text(
+            content_wrap,
+            wrap="word",
+            yscrollcommand=self._update_launcher_help_scrollbar,
+            bg="#15191c",
+            fg="#d9dcde",
+            selectbackground="#46535d",
+            relief="flat",
+            bd=0,
+            padx=26,
+            pady=18,
+            cursor="arrow",
+            font=("Actor", 11),
+            spacing1=2,
+            spacing3=7,
+        )
+        self._launcher_help_content = content
+        self._launcher_help_scrollbar = scrollbar
+        self._launcher_help_scroll_thumb = scrollbar.create_rectangle(
+            3,
+            0,
+            9,
+            40,
+            fill="#66727a",
+            outline="",
+        )
+        self._launcher_help_scroll_drag_offset = 0
+        scrollbar.tag_bind(
+            self._launcher_help_scroll_thumb,
+            "<Enter>",
+            lambda _e: scrollbar.itemconfigure(
+                self._launcher_help_scroll_thumb,
+                fill="#a1adb4",
+            ),
+        )
+        scrollbar.tag_bind(
+            self._launcher_help_scroll_thumb,
+            "<Leave>",
+            lambda _e: scrollbar.itemconfigure(
+                self._launcher_help_scroll_thumb,
+                fill="#66727a",
+            ),
+        )
+        scrollbar.tag_bind(
+            self._launcher_help_scroll_thumb,
+            "<ButtonPress-1>",
+            self._start_launcher_help_scroll_drag,
+        )
+        scrollbar.tag_bind(
+            self._launcher_help_scroll_thumb,
+            "<B1-Motion>",
+            self._drag_launcher_help_scrollbar,
+        )
+        scrollbar.bind("<Button-1>", self._jump_launcher_help_scrollbar)
+        scrollbar.bind(
+            "<Configure>",
+            lambda _e: self._sync_launcher_help_scrollbar(),
+        )
+        scrollbar.pack(side="right", fill="y", padx=(0, 7), pady=10)
+        content.pack(side="left", fill="both", expand=True)
+
+        content.tag_configure(
+            "intro",
+            font=("Actor", 12),
+            foreground="#c2c8cc",
+            spacing3=18,
+        )
+        content.tag_configure(
+            "section",
+            font=("Krona One", 12),
+            foreground="#ffffff",
+            spacing1=13,
+            spacing3=8,
+        )
+        content.tag_configure(
+            "module",
+            font=("Actor", 11, "bold"),
+            foreground="#ffffff",
+        )
+        content.tag_configure(
+            "shortcut",
+            font=("Consolas", 11, "bold"),
+            foreground="#dce8ee",
+            lmargin1=12,
+            lmargin2=12,
+            spacing1=2,
+            spacing3=2,
+        )
+        content.insert(
+            "end",
+            "This section provides guidance on how to use the TANAW system effectively.\n",
+            "intro",
+        )
+        content.insert("end", "1. How to Use the System\n", "section")
+        content.insert(
+            "end",
+            "A working camera (720p or 1080p resolution) is required for the system to "
+            "function properly. Ensure that the camera is enabled and properly positioned "
+            "before using the system, as it is essential for tracking and interaction. "
+            "The system will guide the user through a tutorial upon first use, which may "
+            "be skipped if the user chooses to proceed directly to the main interface.\n\n"
+            "For optimal performance, the recommended setup includes controlled lighting "
+            "conditions, a seated position, and a distance of approximately 60-70 cm "
+            "between the user and the camera.\n",
+        )
+        content.insert("end", "2. Navigation Guide\n", "section")
+        content.insert(
+            "end",
+            "The system includes the following configurable modules:\n\n",
+        )
+        modules = (
+            ("Camera Window", "Used for camera testing and real-time video preview to ensure proper setup and functionality."),
+            ("Keyboard Layout", "Allows selection between default or QWERTY keyboard layouts based on user preference."),
+            ("Language Settings", "Changes the language used for predictive text and autocompletion features."),
+            ("Dwell Mode", "Enables selection between synchronous and asynchronous interaction timing for cursor-based selection."),
+            ("Calibration", "Adjusts input accuracy by setting the number of calibration points and samples; higher values improve accuracy but require longer calibration time."),
+            ("Kalman Filter", "Refines tracking stability by adjusting process noise and measurement noise to balance responsiveness and accuracy."),
+            ("Smoother (EMA Alpha)", "Controls the level of smoothing applied to input data; higher values improve responsiveness, while lower values produce smoother but slower movement."),
+        )
+        for name, description in modules:
+            content.insert("end", f"{name} - ", "module")
+            content.insert("end", f"{description}\n\n")
+        content.insert("end", "3. Keyboard Shortcuts (Keybinds)\n", "section")
+        for shortcut in (
+            "R = Recalibration",
+            "S = Settings",
+            "X = Use Mouse Mode",
+            "H = Show Camera during Calibration",
+            "1 = Stop Panic Button",
+        ):
+            content.insert("end", f"{shortcut}\n", "shortcut")
+        content.configure(state="disabled")
+
+        self._launcher_help_frame = frame
+        self._launcher_help_window = self._launcher_canvas.create_window(
+            14,
+            40,
+            anchor="nw",
+            width=815,
+            height=501,
+            window=frame,
+            state="hidden",
+            tags=("launcher_help_page",),
+        )
+
+    def _update_launcher_help_scrollbar(self, first, last):
+        self._launcher_help_scroll_first = float(first)
+        self._launcher_help_scroll_last = float(last)
+        self._sync_launcher_help_scrollbar()
+
+    def _sync_launcher_help_scrollbar(self):
+        scrollbar = getattr(self, "_launcher_help_scrollbar", None)
+        thumb = getattr(self, "_launcher_help_scroll_thumb", None)
+        if scrollbar is None or thumb is None:
+            return
+        height = scrollbar.winfo_height()
+        if height <= 1:
+            return
+        first = getattr(self, "_launcher_help_scroll_first", 0.0)
+        last = getattr(self, "_launcher_help_scroll_last", 1.0)
+        thumb_height = max(42, height * (last - first))
+        travel = max(0, height - thumb_height)
+        top = travel * first / max(0.0001, 1.0 - (last - first))
+        scrollbar.coords(thumb, 3, top, 9, top + thumb_height)
+        content_fits = first <= 0.001 and last >= 0.999
+        scrollbar.itemconfigure(thumb, state="hidden" if content_fits else "normal")
+
+    def _start_launcher_help_scroll_drag(self, event):
+        thumb_top = self._launcher_help_scrollbar.coords(
+            self._launcher_help_scroll_thumb
+        )[1]
+        self._launcher_help_scroll_drag_offset = event.y - thumb_top
+        return "break"
+
+    def _drag_launcher_help_scrollbar(self, event):
+        height = self._launcher_help_scrollbar.winfo_height()
+        coords = self._launcher_help_scrollbar.coords(
+            self._launcher_help_scroll_thumb
+        )
+        thumb_height = coords[3] - coords[1]
+        travel = max(1, height - thumb_height)
+        top = max(
+            0,
+            min(travel, event.y - self._launcher_help_scroll_drag_offset),
+        )
+        self._launcher_help_content.yview_moveto(top / travel)
+        return "break"
+
+    def _jump_launcher_help_scrollbar(self, event):
+        current = self._launcher_help_scrollbar.find_withtag("current")
+        if self._launcher_help_scroll_thumb in current:
+            return "break"
+        height = self._launcher_help_scrollbar.winfo_height()
+        coords = self._launcher_help_scrollbar.coords(
+            self._launcher_help_scroll_thumb
+        )
+        thumb_height = coords[3] - coords[1]
+        travel = max(1, height - thumb_height)
+        self._launcher_help_content.yview_moveto(
+            max(0.0, min(1.0, (event.y - thumb_height / 2) / travel))
+        )
+        return "break"
+
     def _draw_canvas_settings(self, canvas, sections, keep_scroll=False):
         canvas.delete("settings_ui")
         sections.clear()
@@ -2183,23 +2537,46 @@ class LauncherUI(tk.Tk):
             bind_click(tag, self._toggle_setup_preview)
             y_positions[0] += 66
 
-        def default_button():
-            tag = "settings_default"
-            bw, bh = 170, 36
-            bx = x + width - bw - 6
+        def action_buttons():
+            bw, bh = 150, 36
+            gap = 14
+            default_x = x + width - bw - 6
+            help_x = default_x - bw - gap
             by = y_positions[0]
-            if Image is not None:
-                default_photo = self._render_setup_action_button(bw, bh, WelcomeUI.BUTTON)
-                self._settings_header_panels.append(default_photo)
-                canvas.create_image(bx, by, anchor="nw", image=default_photo,
-                                    tags=("settings_ui", tag))
-            else:
-                canvas.create_rectangle(bx, by, bx + bw, by + bh, outline=WelcomeUI.BUTTON_BORDER,
-                                        fill=WelcomeUI.BUTTON,
-                                        tags=("settings_ui", tag))
-            canvas.create_text(bx + bw / 2, by + bh / 2, text="Set default", fill="#ffffff",
-                               font=("Segoe UI", 10, "bold"), tags=("settings_ui", tag))
-            bind_click(tag, self._set_launcher_defaults)
+
+            for tag, label, bx, callback in (
+                ("settings_help", "Help", help_x, self._show_launcher_help),
+                ("settings_default", "Set default", default_x, self._set_launcher_defaults),
+            ):
+                if Image is not None:
+                    photo = self._render_setup_action_button(bw, bh, WelcomeUI.BUTTON)
+                    self._settings_header_panels.append(photo)
+                    canvas.create_image(
+                        bx,
+                        by,
+                        anchor="nw",
+                        image=photo,
+                        tags=("settings_ui", tag),
+                    )
+                else:
+                    canvas.create_rectangle(
+                        bx,
+                        by,
+                        bx + bw,
+                        by + bh,
+                        outline=WelcomeUI.BUTTON_BORDER,
+                        fill=WelcomeUI.BUTTON,
+                        tags=("settings_ui", tag),
+                    )
+                canvas.create_text(
+                    bx + bw / 2,
+                    by + bh / 2,
+                    text=label,
+                    fill="#ffffff",
+                    font=("Segoe UI", 10, "bold"),
+                    tags=("settings_ui", tag),
+                )
+                bind_click(tag, callback)
             y_positions[0] += 58
 
         def section(key, label, draw_fn):
@@ -2262,7 +2639,7 @@ class LauncherUI(tk.Tk):
             slider("EMA alpha", self._ema_var, 0.01, 1.0, lambda v: f"{v:.2f}", "ema"),
         ))
 
-        default_button()
+        action_buttons()
 
         self._settings_content_height = max(1, y_positions[0] + self._settings_scroll_y)
         actual_max_scroll = max(0, self._settings_content_height - max(1, canvas.winfo_height()))
@@ -2677,6 +3054,12 @@ class LauncherUI(tk.Tk):
             except Exception:
                 pass
             self._entry_fade_job = None
+        if self._launcher_view_fade_job is not None:
+            try:
+                self.after_cancel(self._launcher_view_fade_job)
+            except Exception:
+                pass
+            self._launcher_view_fade_job = None
         try:
             if self._content_canvas is not None:
                 self._content_canvas.unbind_all("<MouseWheel>")
