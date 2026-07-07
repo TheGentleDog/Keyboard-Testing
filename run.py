@@ -3251,6 +3251,7 @@ def main():
     from gaze_tracker2 import GazeTrackerApp
     import config
     from model import ngram_model
+    from cnn_phrase_model import cnn_phrase_model
     from generate_flores_rules import generate_if_missing as _ensure_flores
     from config import FILIPINO_DATASET_FILE, ENGLISH_DATASET_FILE, NGRAM_CACHE_FILE
 
@@ -3320,6 +3321,14 @@ def main():
             sys.exit(1)
         ngram_model.save_cache()
     ngram_model.load_user_learning()
+    if getattr(config, "ENABLE_CNN_PHRASE_SUGGESTIONS", True):
+        update_startup_loading("Preparing calibration...", "Loading CNN phrase suggestions.")
+        try:
+            if not cnn_phrase_model.load_or_train():
+                reason = getattr(cnn_phrase_model, "disabled_reason", "unavailable")
+                print(f"[Info] CNN phrase suggestions unavailable: {reason}")
+        except Exception as exc:
+            print(f"[Info] CNN phrase suggestions disabled: {exc}")
 
     stop_gaze = threading.Event()
     gaze_thread = None

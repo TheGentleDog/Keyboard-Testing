@@ -13,6 +13,11 @@ from model import ngram_model, get_context_words
 from tts import speak
 import panic_sound
 
+try:
+    from cnn_phrase_model import cnn_phrase_model
+except Exception:
+    cnn_phrase_model = None
+
 PREDEFINED_FILE      = "predefined_sentences.json"
 PREDEFINED_THRESHOLD = 3   # times spoken before auto-saving
 MAX_PREDEFINED_SENTENCES = 9
@@ -1925,12 +1930,21 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             ctx_words = self.output_words[:self.output_cursor] if self.output_cursor != -1 else self.output_words
             context   = ctx_words[-2:] if len(ctx_words) >= 2 else ctx_words
             words     = ngram_model.get_completion_suggestions(self.current_input, context, max_results=4, language=lang)
-            handler   = self.apply_completion
+            items     = [("word", word) for word in words]
         else:
             # Next-word mode — use the last 2 committed words directly as context
             context = self.output_words[-2:] if len(self.output_words) >= 2 else self.output_words
+            phrase_items = []
+            if cnn_phrase_model is not None and getattr(config, "ENABLE_CNN_PHRASE_SUGGESTIONS", True):
+                try:
+                    phrase_items = cnn_phrase_model.get_phrase_suggestions(
+                        context,
+                        max_results=getattr(config, "CNN_PHRASE_MAX_RESULTS", 2),
+                        language=lang,
+                    )
+                except Exception:
+                    phrase_items = []
             words   = ngram_model.get_next_word_suggestions(context, max_results=4, language=lang)
-            handler = self.apply_prediction
             if (
                 self._ui_tutorial_enabled
                 and self._tutorial_step in ("type_hello", "select_there", "tts_hello", "edit_hello", "tts_hi")
@@ -1938,18 +1952,41 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                 and "there" not in [w.lower() for w in words]
             ):
                 words = ["there"] + words[:3]
+            items = [("phrase", phrase) for phrase in phrase_items]
+            phrase_words = {
+                word
+                for phrase in phrase_items
+                for word in phrase.get("missing_words", [])
+            }
+            for word in words:
+                if word not in phrase_words:
+                    items.append(("word", word))
+                if len(items) >= 4:
+                    break
 
         theme = self.themes[self.current_theme]
-        for word in words:
+        for kind, item in items[:4]:
+            if kind == "phrase":
+                button_text = item["phrase"]
+                command = lambda phrase=item: self.apply_phrase_prediction(phrase)
+                font = ("Segoe UI", 18, "bold")
+                ipadx = 14
+            else:
+                button_text = item
+                command = lambda word=item: (
+                    self.apply_completion(word) if self.current_input else self.apply_prediction(word)
+                )
+                font = ("Segoe UI", 28, "bold")
+                ipadx = 26
             btn = self._make_dwell_btn(
                 self.predictive_container,
-                lambda w=word: handler(w),
-                text=word,
-                font=("Segoe UI", 28, "bold"),
+                command,
+                text=button_text,
+                font=font,
                 relief="raised", bd=2, cursor="hand2",
                 bg=theme["button_bg"], fg=theme["button_fg"],
             )
-            btn.pack(side="left", padx=0, ipadx=26, ipady=38, expand=True, fill="both")
+            btn.pack(side="left", padx=0, ipadx=ipadx, ipady=38, expand=True, fill="both")
 
     def apply_completion(self, word):
         """User selected a completion suggestion while typing (before space)."""
@@ -1963,6 +2000,24 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         ngram_model.track_word_usage(word, context)
         self.update_display()
         self.status_bar.config(text=f"Predicted: '{word}'")
+
+    def apply_phrase_prediction(self, phrase_result):
+        """User selected a phrase suggestion; append only words not already typed."""
+        missing_words = phrase_result.get("missing_words", [])
+        if not missing_words:
+            return
+        context = self.output_words[-2:] if len(self.output_words) >= 2 else self.output_words
+        for word in missing_words:
+            ngram_model.track_word_usage(word, context)
+            self.output_words.append(word)
+            context = (context + [word])[-2:]
+        self.output_cursor = -1
+        self.current_input = ""
+        self.current_completion = ""
+        self.alternative_suggestions = []
+        self.update_display()
+        phrase = phrase_result.get("phrase", " ".join(missing_words))
+        self.status_bar.config(text=f"Phrase: '{phrase}'")
 
     # =========================================================================
     # WORD COMMIT
