@@ -11,13 +11,20 @@
     "k": "kailangan",
     "ku": "kumain",
     "p": "pwede",
-    "f": "feel"
+    "f": "feel",
+    "h": "husband",
+    "y": "you",
+    "v": "visiting",
+    "u": "you",
+    "j": "justice",
+    "e": "exercising",
+    "human": "humarap"
   },
   "user_shortcut_usage": {
     "m": 2,
     "g": 2,
     "w": 2,
-    "l": 1,
+    "l": 2,
     "el": 1,
     "n": 1,
     "h": 2,
@@ -25,7 +32,12 @@
     "k": 2,
     "ku": 1,
     "p": 1,
-    "f": 1
+    "f": 1,
+    "v" : 1,
+    "u": 1,
+    "j": 1,
+    "e": 1,
+    "human": 1
   },
   "new_words": [],
   "word_usage_history": [
@@ -244,33 +256,170 @@
       ]
     ],
     [
-      "sige",
+      "hello",
       [
-        "sige"
+        "hi",
+        "there"
       ]
     ],
     [
-      "ka",
+      "there",
+      [
+        "hi",
+        "there"
+      ]
+    ],
+    [
+      "hi",
+      []
+    ],
+    [
+      "k",
+      [
+        "k",
+        "na",
+        "tayo",
+        "sa"
+      ]
+    ],
+    [
+      "na",
+      [
+        "k",
+        "na",
+        "tayo",
+        "sa"
+      ]
+    ],
+    [
+      "tayo",
+      [
+        "k",
+        "na"
+      ]
+    ],
+    [
+      "sa",
+      [
+        "na",
+        "tayo"
+      ]
+    ],
+    [
+      "walk",
       []
     ],
     [
       "i",
       [
-        "i",
-        "don't"
+        "i"
+      ]
+    ],
+    [
+      "visiting",
+      [
+        "visiting"
+      ]
+    ],
+    [
+      "k",
+      [
+        "k"
+      ]
+    ],
+    [
+      "a",
+      [
+        "a"
+      ]
+    ],
+    [
+      "i",
+      [
+        "i"
+      ]
+    ],
+    [
+      "you",
+      []
+    ],
+    [
+      "bk",
+      [
+        "some",
+        "water"
+      ]
+    ],
+    [
+      "looking",
+      [
+        "water",
+        "bk"
+      ]
+    ],
+    [
+      "you",
+      [
+        "you"
+      ]
+    ],
+    [
+      "i",
+      [
+        "hi",
+        "there"
+      ]
+    ],
+    [
+      "anong",
+      [
+        "anong",
+        "oras",
+        "ka",
+        "justice"
+      ]
+    ],
+    [
+      "oras",
+      [
+        "anong",
+        "oras",
+        "ka",
+        "justice"
+      ]
+    ],
+    [
+      "ka",
+      [
+        "anong",
+        "oras"
+      ]
+    ],
+    [
+      "justice",
+      [
+        "oras",
+        "ka"
+      ]
+    ],
+    [
+      "i",
+      [
+        "some",
+        "water"
       ]
     ],
     [
       "don't",
       [
-        "i",
-        "don't"
+        "water",
+        "i"
       ]
     ],
     [
-      "move",
+      "hello",
       [
-        "move"
+        "hello"
       ]
     ]
   ]
