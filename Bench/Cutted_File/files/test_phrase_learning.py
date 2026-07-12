@@ -339,8 +339,10 @@ def main():
 
     if args.compare_contexts:
         context_values = parse_csv_numbers(args.compare_contexts)
-        results = [
-            run_learning_test(
+        results = []
+        for context_words in context_values:
+            print(f"\n=== Context Words: {context_words} ===")
+            result = run_learning_test(
                 phrases,
                 thresholds,
                 context_words,
@@ -349,8 +351,12 @@ def main():
                 epochs,
                 learning_rate,
             )
-            for context_words in context_values
-        ]
+            print_live_table(result["live_memory"]["records"])
+            if result["cnn_retraining"]["error"]:
+                print(f"\nCNN retraining test skipped: {result['cnn_retraining']['error']}")
+            else:
+                print_cnn_table(result["cnn_retraining"]["records"])
+            results.append(result)
         print_context_comparison(results)
 
         payload = {
