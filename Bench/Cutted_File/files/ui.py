@@ -1862,6 +1862,69 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     def _get_predefined_sentences(self):
         return [s for s, c in self.sentence_counts.items() if c >= PREDEFINED_THRESHOLD]
 
+    def _phrase_tokens(self, phrase):
+        return [
+            token.strip().lower()
+            for token in str(phrase).split()
+            if token.strip()
+        ]
+
+    def _get_live_phrase_suggestions(self, context, max_results=2):
+        if not getattr(config, "ENABLE_LIVE_PHRASE_MEMORY", True):
+            return []
+        context_tokens = self._phrase_tokens(" ".join(context or []))
+        if not context_tokens:
+            return []
+
+        min_count = getattr(config, "LIVE_PHRASE_MEMORY_MIN_COUNT", 1)
+        scored = []
+        for phrase, count in self.sentence_counts.items():
+            try:
+                count = int(count)
+            except Exception:
+                continue
+            if count < min_count:
+                continue
+
+            phrase_tokens = self._phrase_tokens(phrase)
+            if len(phrase_tokens) <= len(context_tokens):
+                continue
+            if phrase_tokens[:len(context_tokens)] != context_tokens:
+                continue
+
+            missing_words = phrase_tokens[len(context_tokens):]
+            score = (count * 10) + len(context_tokens)
+            scored.append((score, phrase, missing_words))
+
+        scored.sort(key=lambda item: (-item[0], item[1].lower()))
+        results = []
+        seen = set()
+        for _, phrase, missing_words in scored:
+            key = phrase.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            results.append({
+                "phrase": phrase,
+                "missing_words": missing_words,
+                "source": "live",
+            })
+            if len(results) >= max_results:
+                break
+        return results
+
+    def _merge_phrase_suggestions(self, *groups):
+        merged = []
+        seen = set()
+        for group in groups:
+            for phrase in group:
+                key = phrase.get("phrase", "").lower()
+                if not key or key in seen:
+                    continue
+                seen.add(key)
+                merged.append(phrase)
+        return merged
+
     # =========================================================================
     # DISPLAY
     # =========================================================================
@@ -1934,6 +1997,10 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         else:
             # Next-word mode — use the last 2 committed words directly as context
             context = self.output_words[-2:] if len(self.output_words) >= 2 else self.output_words
+            live_phrase_items = self._get_live_phrase_suggestions(
+                context,
+                max_results=getattr(config, "LIVE_PHRASE_MEMORY_MAX_RESULTS", 2),
+            )
             phrase_items = []
             if cnn_phrase_model is not None and getattr(config, "ENABLE_CNN_PHRASE_SUGGESTIONS", True):
                 try:
@@ -1952,6 +2019,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                 and "there" not in [w.lower() for w in words]
             ):
                 words = ["there"] + words[:3]
+            phrase_items = self._merge_phrase_suggestions(live_phrase_items, phrase_items)
             items = [("phrase", phrase) for phrase in phrase_items]
             phrase_words = {
                 word

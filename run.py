@@ -3478,6 +3478,14 @@ def main():
             keyboard_snapshot["image"] = capture_keyboard_snapshot()
         stop_tracking()
         hide_recalibration_overlay()
+        if getattr(config, "CNN_PHRASE_RETRAIN_ON_CLOSE", True):
+            try:
+                if cnn_phrase_model.history_changed():
+                    app.status_bar.config(text="Updating phrase suggestions...")
+                    app.update()
+                    cnn_phrase_model.retrain_if_history_changed()
+            except Exception as exc:
+                print(f"[Warn] Could not update CNN phrase model on close: {exc}")
         app.destroy()
 
     def capture_on_destroy(event):

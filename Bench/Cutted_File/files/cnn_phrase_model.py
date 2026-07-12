@@ -5,6 +5,7 @@
 import json
 import os
 import re
+import hashlib
 from collections import Counter
 
 import config
@@ -118,6 +119,7 @@ class CnnPhraseSuggester:
         self.phrase_tokens = []
         self.phrase_lang = []
         self.phrase_counts = Counter()
+        self.history_signature = ""
         self.max_context = getattr(config, "CNN_PHRASE_MAX_CONTEXT", 5)
 
     def load_or_train(self):
@@ -129,6 +131,44 @@ class CnnPhraseSuggester:
             return False
         if self.load_cache():
             return True
+        return self.train_from_builtin()
+
+    def _saved_phrase_counts(self):
+        saved = _load_json(_PREDEFINED_FILE) or {}
+        if not isinstance(saved, dict):
+            return {}
+        cleaned = {}
+        for phrase, count in saved.items():
+            tokens = _clean_sequence(str(phrase).split())
+            if len(tokens) < 2:
+                continue
+            try:
+                cleaned[" ".join(tokens)] = max(1, int(count))
+            except Exception:
+                cleaned[" ".join(tokens)] = 1
+        return cleaned
+
+    def _compute_history_signature(self):
+        payload = json.dumps(
+            self._saved_phrase_counts(),
+            sort_keys=True,
+            ensure_ascii=True,
+        )
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def history_changed(self):
+        return self._compute_history_signature() != self.history_signature
+
+    def retrain_if_history_changed(self):
+        if not getattr(config, "ENABLE_CNN_PHRASE_SUGGESTIONS", True):
+            self.disabled_reason = "disabled in config"
+            return False
+        if torch is None:
+            self.disabled_reason = "torch is not installed"
+            return False
+        if not self.history_changed():
+            return False
+        print("[Info] Saved phrases changed - rebuilding CNN phrase model...")
         return self.train_from_builtin()
 
     def _load_phrase_sources(self):
@@ -158,14 +198,8 @@ class CnnPhraseSuggester:
         for phrase in AAC_SEED_PHRASES:
             add_phrase(phrase.split(), "both", weight=8)
 
-        saved = _load_json(_PREDEFINED_FILE) or {}
-        if isinstance(saved, dict):
-            for phrase, count in saved.items():
-                try:
-                    weight = max(1, int(count))
-                except Exception:
-                    weight = 1
-                add_phrase(str(phrase).split(), "both", weight=weight + 4)
+        for phrase, count in self._saved_phrase_counts().items():
+            add_phrase(phrase.split(), "both", weight=count + 4)
 
         rows = sorted(
             phrase_map.values(),
@@ -217,10 +251,18 @@ class CnnPhraseSuggester:
             torch.tensor(labels, dtype=torch.long),
         )
 
-    def train_from_builtin(self):
+    def train_from_builtin(self, learning_rate=None, epochs=None, save_cache=True):
         if torch is None:
             self.disabled_reason = "torch is not installed"
             return False
+        self.available = False
+        self.disabled_reason = ""
+        self.model = None
+        self.word_to_id = {"<PAD>": 0, "<UNK>": 1}
+        self.phrases = []
+        self.phrase_tokens = []
+        self.phrase_lang = []
+        self.phrase_counts = Counter()
         if not self._load_phrase_sources():
             self.disabled_reason = "not enough phrases"
             return False
@@ -237,8 +279,12 @@ class CnnPhraseSuggester:
             num_phrases=len(self.phrases),
         )
         self.model.train()
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=0.003)
-        epochs = max(1, int(getattr(config, "CNN_PHRASE_EPOCHS", 12)))
+        if learning_rate is None:
+            learning_rate = getattr(config, "CNN_PHRASE_LEARNING_RATE", 0.003)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=float(learning_rate))
+        if epochs is None:
+            epochs = getattr(config, "CNN_PHRASE_EPOCHS", 12)
+        epochs = max(1, int(epochs))
         batch_size = 64
         for _ in range(epochs):
             order = torch.randperm(x.size(0))
@@ -252,8 +298,14 @@ class CnnPhraseSuggester:
 
         self.model.eval()
         self.available = True
-        self.save_cache()
-        print(f"[OK] CNN phrase model trained - phrases: {len(self.phrases)}, examples: {len(examples)}")
+        self.history_signature = self._compute_history_signature()
+        if save_cache:
+            self.save_cache()
+        print(
+            "[OK] CNN phrase model trained - "
+            f"phrases: {len(self.phrases)}, examples: {len(examples)}, "
+            f"lr: {float(learning_rate):g}, epochs: {epochs}"
+        )
         return True
 
     def save_cache(self):
@@ -265,6 +317,7 @@ class CnnPhraseSuggester:
             "phrase_tokens": self.phrase_tokens,
             "phrase_lang": self.phrase_lang,
             "phrase_counts": dict(self.phrase_counts),
+            "history_signature": self.history_signature,
             "max_context": self.max_context,
             "state_dict": self.model.state_dict(),
         }
@@ -283,6 +336,7 @@ class CnnPhraseSuggester:
             self.phrase_tokens = payload["phrase_tokens"]
             self.phrase_lang = payload.get("phrase_lang", ["both"] * len(self.phrases))
             self.phrase_counts = Counter(payload.get("phrase_counts", {}))
+            self.history_signature = payload.get("history_signature", "")
             self.max_context = payload.get("max_context", self.max_context)
             self.model = TextCnnPhraseRanker(
                 vocab_size=len(self.word_to_id),
