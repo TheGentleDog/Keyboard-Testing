@@ -738,12 +738,14 @@ class GazeTrackerApp:
             mw = cv2.getTextSize(msg, cv2.FONT_HERSHEY_SIMPLEX, 0.82, 2)[0][0]
             dw = cv2.getTextSize(detail, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)[0][0]
             box_w = max(mw, dw) + 48
-            x0 = SCREEN_W // 2 - box_w // 2
-            y0 = 58
-            cv2.rectangle(cv, (x0, y0), (x0 + box_w, y0 + 72), (24, 24, 24), -1)
-            cv2.rectangle(cv, (x0, y0), (x0 + box_w, y0 + 72), C_WARN, 2)
-            txt(cv, msg, (SCREEN_W//2 - mw//2, y0 + 30), scale=0.82, color=C_WARN, thick=2)
-            txt(cv, detail, (SCREEN_W//2 - dw//2, y0 + 56), scale=0.55, color=C_TEXT)
+            box_h = 72
+            margin = 24
+            x0 = margin
+            y0 = SCREEN_H - box_h - margin
+            cv2.rectangle(cv, (x0, y0), (x0 + box_w, y0 + box_h), (24, 24, 24), -1)
+            cv2.rectangle(cv, (x0, y0), (x0 + box_w, y0 + box_h), C_WARN, 2)
+            txt(cv, msg, (x0 + box_w//2 - mw//2, y0 + 30), scale=0.82, color=C_WARN, thick=2)
+            txt(cv, detail, (x0 + box_w//2 - dw//2, y0 + 56), scale=0.55, color=C_TEXT)
 
         if self._pip:
             distance_info = self._estimate_distance(lms, cam.shape[1], cam.shape[0]) if self._show_distance else None
