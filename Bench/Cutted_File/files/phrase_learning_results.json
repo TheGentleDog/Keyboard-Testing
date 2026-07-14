@@ -205,8 +205,8 @@
             "rank": null,
             "predictions_after_retrain": [
               "please give me medicine",
-              "please help me",
-              "please call my family"
+              "please call my family",
+              "please help me"
             ]
           },
           {
@@ -215,9 +215,9 @@
             "appeared_after_cnn_retrain": false,
             "rank": null,
             "predictions_after_retrain": [
-              "i need water",
-              "i am tired",
-              "i am hungry"
+              "i want to sleep",
+              "i am hungry",
+              "i need water"
             ]
           },
           {
@@ -236,9 +236,9 @@
             "appeared_after_cnn_retrain": false,
             "rank": null,
             "predictions_after_retrain": [
-              "i need water",
-              "i am tired",
-              "i am hungry"
+              "i want to sleep",
+              "i am hungry",
+              "i need water"
             ]
           },
           {
@@ -248,8 +248,8 @@
             "rank": null,
             "predictions_after_retrain": [
               "please give me medicine",
-              "please help me",
-              "please call my family"
+              "please call my family",
+              "please help me"
             ]
           }
         ]
@@ -466,9 +466,9 @@
             "appeared_after_cnn_retrain": false,
             "rank": null,
             "predictions_after_retrain": [
+              "i need water",
               "i need food",
-              "i need help",
-              "i need water"
+              "i need help"
             ]
           },
           {

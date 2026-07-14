@@ -162,6 +162,17 @@ def summarize(records):
     }
 
 
+def summarize_by_context_length(records):
+    grouped = defaultdict(list)
+    for record in records:
+        context_len = len(str(record["context"]).split())
+        grouped[context_len].append(record)
+    return {
+        context_len: summarize(context_records)
+        for context_len, context_records in sorted(grouped.items())
+    }
+
+
 def print_summary(title, stats):
     print(f"\n{title}")
     print("-" * len(title))
@@ -189,6 +200,28 @@ def print_metrics_table(overall, by_language):
             f"{stats['mrr']:>12.4f}"
         )
     print("-" * 66)
+
+
+def print_context_table(by_context_length):
+    print("\nCNN Phrase Metrics by Context Length")
+    print("-" * 76)
+    print(
+        f"{'Context Words':<16} "
+        f"{'Cases':>8} "
+        f"{'Hit@1':>12} "
+        f"{'Hit@3':>12} "
+        f"{'MRR':>12}"
+    )
+    print("-" * 76)
+    for context_len, stats in by_context_length.items():
+        print(
+            f"{context_len:<16} "
+            f"{stats['cases']:>8} "
+            f"{stats['hit_at_1'] * 100:>11.2f}% "
+            f"{stats['hit_at_3'] * 100:>11.2f}% "
+            f"{stats['mrr'] * 100:>11.2f}%"
+        )
+    print("-" * 76)
 
 
 def save_metrics_graph(overall, by_language, output_path):
@@ -244,6 +277,64 @@ def save_metrics_graph(overall, by_language, output_path):
     print(f"Saved graph to {output_path}")
 
 
+def save_context_table_image(by_context_length, output_path):
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except Exception as exc:
+        print(f"\nCould not save context table image: matplotlib unavailable ({exc})")
+        return
+
+    columns = ["Context Words", "Cases", "Hit@1", "Hit@3", "MRR"]
+    rows = []
+    for context_len, stats in by_context_length.items():
+        rows.append([
+            str(context_len),
+            f"{stats['cases']:,}",
+            f"{stats['hit_at_1'] * 100:.1f}%",
+            f"{stats['hit_at_3'] * 100:.1f}%",
+            f"{stats['mrr'] * 100:.1f}%",
+        ])
+
+    fig_height = max(2.4, 0.48 * (len(rows) + 2))
+    fig, ax = plt.subplots(figsize=(8.5, fig_height), dpi=180)
+    ax.axis("off")
+    ax.set_title(
+        "CNN Phrase Metrics by Context Length",
+        fontsize=14,
+        fontweight="bold",
+        pad=14,
+    )
+
+    table = ax.table(
+        cellText=rows,
+        colLabels=columns,
+        cellLoc="center",
+        colLoc="center",
+        loc="center",
+        colWidths=[0.24, 0.16, 0.2, 0.2, 0.2],
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1, 1.5)
+
+    for (row, _), cell in table.get_celld().items():
+        cell.set_edgecolor("#d1d5db")
+        if row == 0:
+            cell.set_facecolor("#1f2937")
+            cell.set_text_props(color="white", weight="bold")
+        elif row % 2 == 0:
+            cell.set_facecolor("#f3f4f6")
+        else:
+            cell.set_facecolor("white")
+
+    fig.tight_layout()
+    fig.savefig(output_path, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    print(f"Saved context table image to {output_path}")
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Evaluate CNN phrase suggestions with Hit@1, Hit@3, and MRR."
@@ -295,9 +386,14 @@ def parse_args():
         help="PNG graph output path.",
     )
     parser.add_argument(
+        "--context-table-output",
+        default="cnn_phrase_metrics_context_table.png",
+        help="PNG table output path for metrics grouped by context length.",
+    )
+    parser.add_argument(
         "--no-graph",
         action="store_true",
-        help="Skip PNG graph generation.",
+        help="Skip PNG graph and table image generation.",
     )
     parser.add_argument(
         "--show-samples",
@@ -337,6 +433,7 @@ def main():
     )
 
     overall = summarize(records)
+    by_context_length = summarize_by_context_length(records)
     by_language = {}
     grouped = defaultdict(list)
     for record in records:
@@ -345,6 +442,7 @@ def main():
         by_language[language] = summarize(language_records)
 
     print_metrics_table(overall, by_language)
+    print_context_table(by_context_length)
 
     if args.show_samples:
         print("\nSample cases")
@@ -366,6 +464,7 @@ def main():
         },
         "overall": overall,
         "by_language": by_language,
+        "by_context_length": by_context_length,
         "records": records,
     }
     with open(args.output, "w", encoding="utf-8") as f:
@@ -373,6 +472,7 @@ def main():
     print(f"\nSaved results to {args.output}")
     if not args.no_graph:
         save_metrics_graph(overall, by_language, args.graph_output)
+        save_context_table_image(by_context_length, args.context_table_output)
 
 
 if __name__ == "__main__":
