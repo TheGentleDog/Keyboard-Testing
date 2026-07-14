@@ -1,0 +1,291 @@
+{
+  "settings": {
+    "lang": "tagalog",
+    "prediction_language": "both",
+    "top_k": 3,
+    "prefix_mode": "all",
+    "max_cases": 20,
+    "seed": 42
+  },
+  "overall": {
+    "cases": 20,
+    "hit_at_1": 0.4,
+    "hit_at_3": 0.45,
+    "mrr": 0.41666666666666663
+  },
+  "by_language": {
+    "filipino": {
+      "cases": 20,
+      "hit_at_1": 0.4,
+      "hit_at_3": 0.45,
+      "mrr": 0.41666666666666663
+    }
+  },
+  "records": [
+    {
+      "language": "filipino",
+      "context": "puwede ka nang",
+      "target": "puwede ka nang matulog ngayon",
+      "predictions": [
+        "puwede ka nang bumoto ngayon",
+        "puwede ka nang sumakay ngayon",
+        "puwede ka nang tumigil ngayon"
+      ],
+      "rank": null,
+      "hit_at_1": false,
+      "hit_at_3": false,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "language": "filipino",
+      "context": "kailangan niya ngayon ng",
+      "target": "kailangan niya ngayon ng tubig",
+      "predictions": [
+        "kailangan niya ngayon ng tubig"
+      ],
+      "rank": 1,
+      "hit_at_1": true,
+      "hit_at_3": true,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "language": "filipino",
+      "context": "tayo",
+      "target": "tayo ay masaya ngayon",
+      "predictions": [
+        "tayo ay natutulog",
+        "tayo ay gutom na",
+        "tayo ay masaya ngayon"
+      ],
+      "rank": 3,
+      "hit_at_1": false,
+      "hit_at_3": true,
+      "reciprocal_rank": 0.3333333333333333
+    },
+    {
+      "language": "filipino",
+      "context": "huwag",
+      "target": "huwag nang isipin pa",
+      "predictions": [
+        "huwag nang lumaki pa",
+        "huwag nang lumala pa",
+        "huwag nang ulitin pa"
+      ],
+      "rank": null,
+      "hit_at_1": false,
+      "hit_at_3": false,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "language": "filipino",
+      "context": "pwede ka",
+      "target": "pwede ka bang makipagkita mamaya",
+      "predictions": [
+        "pwede ka bang maligo mamaya",
+        "pwede ka bang maglaro mamaya",
+        "pwede ka bang sumama mamaya"
+      ],
+      "rank": null,
+      "hit_at_1": false,
+      "hit_at_3": false,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "language": "filipino",
+      "context": "pwede ka bang",
+      "target": "pwede ka bang tumawag mamaya",
+      "predictions": [
+        "pwede ka bang maligo mamaya",
+        "pwede ka bang lumangoy mamaya",
+        "pwede ka bang sumama mamaya"
+      ],
+      "rank": null,
+      "hit_at_1": false,
+      "hit_at_3": false,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "language": "filipino",
+      "context": "maaari ba",
+      "target": "maaari ba akong sumulat dito",
+      "predictions": [
+        "maaari ba akong tumawag dito",
+        "maaari ba akong maging dito",
+        "maaari ba akong maglaro dito"
+      ],
+      "rank": null,
+      "hit_at_1": false,
+      "hit_at_3": false,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "language": "filipino",
+      "context": "kailangan niya muli",
+      "target": "kailangan niya muli ng tubig",
+      "predictions": [
+        "kailangan niya muli ng tubig"
+      ],
+      "rank": 1,
+      "hit_at_1": true,
+      "hit_at_3": true,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "language": "filipino",
+      "context": "huwag",
+      "target": "huwag nang magalit pa",
+      "predictions": [
+        "huwag nang lumaki pa",
+        "huwag nang lumala pa",
+        "huwag nang ulitin pa"
+      ],
+      "rank": null,
+      "hit_at_1": false,
+      "hit_at_3": false,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "language": "filipino",
+      "context": "gusto kong magbenta",
+      "target": "gusto kong magbenta ng pagkain",
+      "predictions": [
+        "gusto kong magbenta ng pagkain"
+      ],
+      "rank": 1,
+      "hit_at_1": true,
+      "hit_at_3": true,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "language": "filipino",
+      "context": "subukan nating",
+      "target": "subukan nating bumalik bukas",
+      "predictions": [
+        "subukan nating mamatay bukas",
+        "subukan nating mangarap bukas",
+        "subukan nating tumakbo bukas"
+      ],
+      "rank": null,
+      "hit_at_1": false,
+      "hit_at_3": false,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "language": "filipino",
+      "context": "huwag nang pahirapan",
+      "target": "huwag nang pahirapan pa",
+      "predictions": [
+        "huwag nang pahirapan pa"
+      ],
+      "rank": 1,
+      "hit_at_1": true,
+      "hit_at_3": true,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "language": "filipino",
+      "context": "pwede mo ba",
+      "target": "pwede mo ba akong tulungan",
+      "predictions": [
+        "pwede mo ba akong tulungan",
+        "pwede mo ba akong ilipat"
+      ],
+      "rank": 1,
+      "hit_at_1": true,
+      "hit_at_3": true,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "language": "filipino",
+      "context": "sana ay magkaisa",
+      "target": "sana ay magkaisa na tayo",
+      "predictions": [
+        "sana ay magkaisa na tayo"
+      ],
+      "rank": 1,
+      "hit_at_1": true,
+      "hit_at_3": true,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "language": "filipino",
+      "context": "gusto kong magbawas ng",
+      "target": "gusto kong magbawas ng pagkain",
+      "predictions": [
+        "gusto kong magbawas ng pagkain"
+      ],
+      "rank": 1,
+      "hit_at_1": true,
+      "hit_at_3": true,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "language": "filipino",
+      "context": "oras na",
+      "target": "oras na para magtrabaho",
+      "predictions": [
+        "oras na para kumain",
+        "oras na para magsisi",
+        "oras na para matulog"
+      ],
+      "rank": null,
+      "hit_at_1": false,
+      "hit_at_3": false,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "language": "filipino",
+      "context": "kailangan",
+      "target": "kailangan nating tumakbo ng mabilis",
+      "predictions": [
+        "kailangan ko ng tubig",
+        "kailangan ko ng tulong",
+        "kailangan ko ng pagkain"
+      ],
+      "rank": null,
+      "hit_at_1": false,
+      "hit_at_3": false,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "language": "filipino",
+      "context": "punta",
+      "target": "punta na siya sa bahay",
+      "predictions": [
+        "punta na ka sa bahay",
+        "punta na kami sa bahay",
+        "punta na lang sa bahay"
+      ],
+      "rank": null,
+      "hit_at_1": false,
+      "hit_at_3": false,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "language": "filipino",
+      "context": "punta",
+      "target": "punta na ako sa bahay",
+      "predictions": [
+        "punta na ka sa bahay",
+        "punta na kami sa bahay",
+        "punta na lang sa bahay"
+      ],
+      "rank": null,
+      "hit_at_1": false,
+      "hit_at_3": false,
+      "reciprocal_rank": 0.0
+    },
+    {
+      "language": "filipino",
+      "context": "gusto kong magdagdag",
+      "target": "gusto kong magdagdag ng pagkain",
+      "predictions": [
+        "gusto kong magdagdag ng pagkain"
+      ],
+      "rank": 1,
+      "hit_at_1": true,
+      "hit_at_3": true,
+      "reciprocal_rank": 1.0
+    }
+  ]
+}

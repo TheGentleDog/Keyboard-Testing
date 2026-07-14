@@ -262,6 +262,53 @@ def print_context_comparison(results):
     print("-" * 78)
 
 
+def save_learning_graph(results, output_path):
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except Exception as exc:
+        print(f"\nCould not save graph: matplotlib unavailable ({exc})")
+        return
+
+    labels = [f"{result['context_words']} word" if result["context_words"] == 1
+              else f"{result['context_words']} words"
+              for result in results]
+    live = [result["live_memory"]["success_rate"] * 100 for result in results]
+    cnn = [result["cnn_retraining"]["success_rate"] * 100 for result in results]
+
+    x = list(range(len(labels)))
+    width = 0.32
+    fig, ax = plt.subplots(figsize=(8.5, 5), dpi=160)
+    live_bars = ax.bar([i - width / 2 for i in x], live, width, label="Live Memory", color="#10b981")
+    cnn_bars = ax.bar([i + width / 2 for i in x], cnn, width, label="CNN Retrain", color="#3b82f6")
+
+    ax.set_title("Learned Phrase Adaptation Performance")
+    ax.set_ylabel("Success Rate (%)")
+    ax.set_ylim(0, 100)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.legend()
+    ax.grid(axis="y", linestyle="--", alpha=0.35)
+
+    for group in (live_bars, cnn_bars):
+        for bar in group:
+            height = bar.get_height()
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                height + 1,
+                f"{height:.1f}",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+            )
+
+    fig.tight_layout()
+    fig.savefig(output_path, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    print(f"Saved graph to {output_path}")
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Test live phrase memory and CNN retraining for newly learned phrases."
@@ -321,6 +368,16 @@ def parse_args():
         default="phrase_learning_results.json",
         help="JSON output path.",
     )
+    parser.add_argument(
+        "--graph-output",
+        default="phrase_learning_graph.png",
+        help="PNG graph output path.",
+    )
+    parser.add_argument(
+        "--no-graph",
+        action="store_true",
+        help="Skip PNG graph generation.",
+    )
     return parser.parse_args()
 
 
@@ -374,6 +431,8 @@ def main():
         with open(args.output, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2, ensure_ascii=False)
         print(f"\nSaved context comparison to {args.output}")
+        if not args.no_graph:
+            save_learning_graph(results, args.graph_output)
         return
 
     result = run_learning_test(
@@ -418,6 +477,8 @@ def main():
     with open(args.output, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, ensure_ascii=False)
     print(f"\nSaved results to {args.output}")
+    if not args.no_graph:
+        save_learning_graph([result], args.graph_output)
 
 
 if __name__ == "__main__":

@@ -1988,38 +1988,61 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             w.destroy()
 
         lang = config.PREDICTION_LANGUAGE
+        total_suggestion_slots = getattr(config, "MAX_SUGGESTIONS", 5)
+        phrase_suggestion_slots = min(
+            getattr(config, "PHRASE_SUGGESTION_MAX_RESULTS", 3),
+            total_suggestion_slots,
+        )
         if self.current_input:
             # Completion mode — suggest completions for the partial word being typed
             ctx_words = self.output_words[:self.output_cursor] if self.output_cursor != -1 else self.output_words
             context   = ctx_words[-2:] if len(ctx_words) >= 2 else ctx_words
-            words     = ngram_model.get_completion_suggestions(self.current_input, context, max_results=4, language=lang)
+            words     = ngram_model.get_completion_suggestions(
+                self.current_input,
+                context,
+                max_results=total_suggestion_slots,
+                language=lang,
+            )
             items     = [("word", word) for word in words]
         else:
             # Next-word mode — use the last 2 committed words directly as context
             context = self.output_words[-2:] if len(self.output_words) >= 2 else self.output_words
             live_phrase_items = self._get_live_phrase_suggestions(
                 context,
-                max_results=getattr(config, "LIVE_PHRASE_MEMORY_MAX_RESULTS", 2),
+                max_results=min(
+                    getattr(config, "LIVE_PHRASE_MEMORY_MAX_RESULTS", 2),
+                    phrase_suggestion_slots,
+                ),
             )
             phrase_items = []
             if cnn_phrase_model is not None and getattr(config, "ENABLE_CNN_PHRASE_SUGGESTIONS", True):
                 try:
                     phrase_items = cnn_phrase_model.get_phrase_suggestions(
                         context,
-                        max_results=getattr(config, "CNN_PHRASE_MAX_RESULTS", 2),
+                        max_results=min(
+                            getattr(config, "CNN_PHRASE_MAX_RESULTS", 2),
+                            phrase_suggestion_slots,
+                        ),
                         language=lang,
                     )
                 except Exception:
                     phrase_items = []
-            words   = ngram_model.get_next_word_suggestions(context, max_results=4, language=lang)
+            words   = ngram_model.get_next_word_suggestions(
+                context,
+                max_results=total_suggestion_slots,
+                language=lang,
+            )
             if (
                 self._ui_tutorial_enabled
                 and self._tutorial_step in ("type_hello", "select_there", "tts_hello", "edit_hello", "tts_hi")
                 and [w.lower() for w in self.output_words] == ["hello"]
                 and "there" not in [w.lower() for w in words]
             ):
-                words = ["there"] + words[:3]
-            phrase_items = self._merge_phrase_suggestions(live_phrase_items, phrase_items)
+                words = ["there"] + words[:total_suggestion_slots - 1]
+            phrase_items = self._merge_phrase_suggestions(
+                live_phrase_items,
+                phrase_items,
+            )[:phrase_suggestion_slots]
             items = [("phrase", phrase) for phrase in phrase_items]
             phrase_words = {
                 word
@@ -2029,11 +2052,11 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             for word in words:
                 if word not in phrase_words:
                     items.append(("word", word))
-                if len(items) >= 4:
+                if len(items) >= total_suggestion_slots:
                     break
 
         theme = self.themes[self.current_theme]
-        for kind, item in items[:4]:
+        for kind, item in items[:total_suggestion_slots]:
             if kind == "phrase":
                 button_text = item["phrase"]
                 command = lambda phrase=item: self.apply_phrase_prediction(phrase)

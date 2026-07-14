@@ -191,6 +191,59 @@ def print_metrics_table(overall, by_language):
     print("-" * 66)
 
 
+def save_metrics_graph(overall, by_language, output_path):
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except Exception as exc:
+        print(f"\nCould not save graph: matplotlib unavailable ({exc})")
+        return
+
+    rows = [("Overall", overall)]
+    for language in sorted(by_language):
+        rows.append((language.title(), by_language[language]))
+
+    labels = [label for label, _ in rows]
+    hit1 = [stats["hit_at_1"] * 100 for _, stats in rows]
+    hit3 = [stats["hit_at_3"] * 100 for _, stats in rows]
+    mrr = [stats["mrr"] * 100 for _, stats in rows]
+
+    x = list(range(len(labels)))
+    width = 0.24
+    fig, ax = plt.subplots(figsize=(9, 5), dpi=160)
+    bars = [
+        ax.bar([i - width for i in x], hit1, width, label="Hit@1", color="#3b82f6"),
+        ax.bar(x, hit3, width, label="Hit@3", color="#10b981"),
+        ax.bar([i + width for i in x], mrr, width, label="MRR", color="#f59e0b"),
+    ]
+
+    ax.set_title("CNN Phrase Suggestion Performance")
+    ax.set_ylabel("Score (%)")
+    ax.set_ylim(0, 100)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.legend()
+    ax.grid(axis="y", linestyle="--", alpha=0.35)
+
+    for group in bars:
+        for bar in group:
+            height = bar.get_height()
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                height + 1,
+                f"{height:.1f}",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+            )
+
+    fig.tight_layout()
+    fig.savefig(output_path, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    print(f"Saved graph to {output_path}")
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Evaluate CNN phrase suggestions with Hit@1, Hit@3, and MRR."
@@ -235,6 +288,16 @@ def parse_args():
         "--output",
         default="cnn_phrase_metrics.json",
         help="JSON output path.",
+    )
+    parser.add_argument(
+        "--graph-output",
+        default="cnn_phrase_metrics_graph.png",
+        help="PNG graph output path.",
+    )
+    parser.add_argument(
+        "--no-graph",
+        action="store_true",
+        help="Skip PNG graph generation.",
     )
     parser.add_argument(
         "--show-samples",
@@ -308,6 +371,8 @@ def main():
     with open(args.output, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, ensure_ascii=False)
     print(f"\nSaved results to {args.output}")
+    if not args.no_graph:
+        save_metrics_graph(overall, by_language, args.graph_output)
 
 
 if __name__ == "__main__":
