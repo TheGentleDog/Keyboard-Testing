@@ -14,7 +14,8 @@
     ],
     "compare_contexts": [
       1,
-      2
+      2,
+      3
     ],
     "top_k": 3,
     "cnn_count": 3,
@@ -24,6 +25,13 @@
   "context_comparison": [
     {
       "context_words": 1,
+      "learning_metrics": {
+        "learning_success_rate": 1.0,
+        "retention_success_rate": 0.2,
+        "average_uses_to_learn": 2.0,
+        "minimum_uses_to_learn": 1,
+        "maximum_uses_to_learn": 3
+      },
       "live_memory": {
         "success_rate": 1.0,
         "records": [
@@ -204,9 +212,9 @@
             "appeared_after_cnn_retrain": false,
             "rank": null,
             "predictions_after_retrain": [
+              "please help me",
               "please give me medicine",
-              "please call my family",
-              "please help me"
+              "please call my family"
             ]
           },
           {
@@ -216,8 +224,8 @@
             "rank": null,
             "predictions_after_retrain": [
               "i want to sleep",
-              "i am hungry",
-              "i need water"
+              "i am tired",
+              "i need help"
             ]
           },
           {
@@ -237,8 +245,8 @@
             "rank": null,
             "predictions_after_retrain": [
               "i want to sleep",
-              "i am hungry",
-              "i need water"
+              "i am tired",
+              "i need help"
             ]
           },
           {
@@ -247,9 +255,9 @@
             "appeared_after_cnn_retrain": false,
             "rank": null,
             "predictions_after_retrain": [
+              "please help me",
               "please give me medicine",
-              "please call my family",
-              "please help me"
+              "please call my family"
             ]
           }
         ]
@@ -257,6 +265,13 @@
     },
     {
       "context_words": 2,
+      "learning_metrics": {
+        "learning_success_rate": 1.0,
+        "retention_success_rate": 0.8,
+        "average_uses_to_learn": 2.0,
+        "minimum_uses_to_learn": 1,
+        "maximum_uses_to_learn": 3
+      },
       "live_memory": {
         "success_rate": 1.0,
         "records": [
@@ -448,7 +463,7 @@
             "predictions_after_retrain": [
               "i feel pain",
               "i feel dizzy today",
-              "i feel cold"
+              "i feel hot"
             ]
           },
           {
@@ -474,6 +489,237 @@
           {
             "phrase": "please open the window",
             "context": "please open",
+            "appeared_after_cnn_retrain": true,
+            "rank": 1,
+            "predictions_after_retrain": [
+              "please open the window"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "context_words": 3,
+      "learning_metrics": {
+        "learning_success_rate": 1.0,
+        "retention_success_rate": 1.0,
+        "average_uses_to_learn": 2.0,
+        "minimum_uses_to_learn": 1,
+        "maximum_uses_to_learn": 3
+      },
+      "live_memory": {
+        "success_rate": 1.0,
+        "records": [
+          {
+            "phrase": "please adjust my pillow",
+            "context": "please adjust my",
+            "threshold": 1,
+            "count_before_threshold": 0,
+            "appeared_before_threshold": false,
+            "appeared_at_threshold": true,
+            "predictions_at_threshold": [
+              "please adjust my pillow"
+            ]
+          },
+          {
+            "phrase": "i feel dizzy today",
+            "context": "i feel dizzy",
+            "threshold": 1,
+            "count_before_threshold": 0,
+            "appeared_before_threshold": false,
+            "appeared_at_threshold": true,
+            "predictions_at_threshold": [
+              "i feel dizzy today"
+            ]
+          },
+          {
+            "phrase": "call my brother please",
+            "context": "call my brother",
+            "threshold": 1,
+            "count_before_threshold": 0,
+            "appeared_before_threshold": false,
+            "appeared_at_threshold": true,
+            "predictions_at_threshold": [
+              "call my brother please"
+            ]
+          },
+          {
+            "phrase": "i need my glasses",
+            "context": "i need my",
+            "threshold": 1,
+            "count_before_threshold": 0,
+            "appeared_before_threshold": false,
+            "appeared_at_threshold": true,
+            "predictions_at_threshold": [
+              "i need my glasses"
+            ]
+          },
+          {
+            "phrase": "please open the window",
+            "context": "please open the",
+            "threshold": 1,
+            "count_before_threshold": 0,
+            "appeared_before_threshold": false,
+            "appeared_at_threshold": true,
+            "predictions_at_threshold": [
+              "please open the window"
+            ]
+          },
+          {
+            "phrase": "please adjust my pillow",
+            "context": "please adjust my",
+            "threshold": 2,
+            "count_before_threshold": 1,
+            "appeared_before_threshold": false,
+            "appeared_at_threshold": true,
+            "predictions_at_threshold": [
+              "please adjust my pillow"
+            ]
+          },
+          {
+            "phrase": "i feel dizzy today",
+            "context": "i feel dizzy",
+            "threshold": 2,
+            "count_before_threshold": 1,
+            "appeared_before_threshold": false,
+            "appeared_at_threshold": true,
+            "predictions_at_threshold": [
+              "i feel dizzy today"
+            ]
+          },
+          {
+            "phrase": "call my brother please",
+            "context": "call my brother",
+            "threshold": 2,
+            "count_before_threshold": 1,
+            "appeared_before_threshold": false,
+            "appeared_at_threshold": true,
+            "predictions_at_threshold": [
+              "call my brother please"
+            ]
+          },
+          {
+            "phrase": "i need my glasses",
+            "context": "i need my",
+            "threshold": 2,
+            "count_before_threshold": 1,
+            "appeared_before_threshold": false,
+            "appeared_at_threshold": true,
+            "predictions_at_threshold": [
+              "i need my glasses"
+            ]
+          },
+          {
+            "phrase": "please open the window",
+            "context": "please open the",
+            "threshold": 2,
+            "count_before_threshold": 1,
+            "appeared_before_threshold": false,
+            "appeared_at_threshold": true,
+            "predictions_at_threshold": [
+              "please open the window"
+            ]
+          },
+          {
+            "phrase": "please adjust my pillow",
+            "context": "please adjust my",
+            "threshold": 3,
+            "count_before_threshold": 2,
+            "appeared_before_threshold": false,
+            "appeared_at_threshold": true,
+            "predictions_at_threshold": [
+              "please adjust my pillow"
+            ]
+          },
+          {
+            "phrase": "i feel dizzy today",
+            "context": "i feel dizzy",
+            "threshold": 3,
+            "count_before_threshold": 2,
+            "appeared_before_threshold": false,
+            "appeared_at_threshold": true,
+            "predictions_at_threshold": [
+              "i feel dizzy today"
+            ]
+          },
+          {
+            "phrase": "call my brother please",
+            "context": "call my brother",
+            "threshold": 3,
+            "count_before_threshold": 2,
+            "appeared_before_threshold": false,
+            "appeared_at_threshold": true,
+            "predictions_at_threshold": [
+              "call my brother please"
+            ]
+          },
+          {
+            "phrase": "i need my glasses",
+            "context": "i need my",
+            "threshold": 3,
+            "count_before_threshold": 2,
+            "appeared_before_threshold": false,
+            "appeared_at_threshold": true,
+            "predictions_at_threshold": [
+              "i need my glasses"
+            ]
+          },
+          {
+            "phrase": "please open the window",
+            "context": "please open the",
+            "threshold": 3,
+            "count_before_threshold": 2,
+            "appeared_before_threshold": false,
+            "appeared_at_threshold": true,
+            "predictions_at_threshold": [
+              "please open the window"
+            ]
+          }
+        ]
+      },
+      "cnn_retraining": {
+        "success_rate": 1.0,
+        "error": "",
+        "records": [
+          {
+            "phrase": "please adjust my pillow",
+            "context": "please adjust my",
+            "appeared_after_cnn_retrain": true,
+            "rank": 1,
+            "predictions_after_retrain": [
+              "please adjust my pillow"
+            ]
+          },
+          {
+            "phrase": "i feel dizzy today",
+            "context": "i feel dizzy",
+            "appeared_after_cnn_retrain": true,
+            "rank": 1,
+            "predictions_after_retrain": [
+              "i feel dizzy today"
+            ]
+          },
+          {
+            "phrase": "call my brother please",
+            "context": "call my brother",
+            "appeared_after_cnn_retrain": true,
+            "rank": 1,
+            "predictions_after_retrain": [
+              "call my brother please"
+            ]
+          },
+          {
+            "phrase": "i need my glasses",
+            "context": "i need my",
+            "appeared_after_cnn_retrain": true,
+            "rank": 1,
+            "predictions_after_retrain": [
+              "i need my glasses"
+            ]
+          },
+          {
+            "phrase": "please open the window",
+            "context": "please open the",
             "appeared_after_cnn_retrain": true,
             "rank": 1,
             "predictions_after_retrain": [

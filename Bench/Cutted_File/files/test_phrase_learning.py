@@ -173,6 +173,45 @@ def summarize(records, key):
     return sum(1 for record in records if record.get(key)) / len(records)
 
 
+def summarize_learning_metrics(live_records, cnn_records):
+    successful_live_records = [
+        record for record in live_records
+        if record.get("appeared_at_threshold")
+    ]
+    uses_to_learn = [
+        record["threshold"]
+        for record in successful_live_records
+    ]
+    return {
+        "learning_success_rate": summarize(live_records, "appeared_at_threshold"),
+        "retention_success_rate": summarize(cnn_records, "appeared_after_cnn_retrain"),
+        "average_uses_to_learn": (
+            sum(uses_to_learn) / len(uses_to_learn)
+            if uses_to_learn else 0.0
+        ),
+        "minimum_uses_to_learn": min(uses_to_learn) if uses_to_learn else None,
+        "maximum_uses_to_learn": max(uses_to_learn) if uses_to_learn else None,
+    }
+
+
+def print_learning_metrics(title, metrics):
+    min_uses = metrics["minimum_uses_to_learn"]
+    max_uses = metrics["maximum_uses_to_learn"]
+    if min_uses is None:
+        uses_text = "-"
+    elif min_uses == max_uses:
+        uses_text = str(min_uses)
+    else:
+        uses_text = f"{min_uses}-{max_uses}"
+
+    print(f"\n{title}")
+    print("-" * len(title))
+    print(f"Learning Success Rate  : {metrics['learning_success_rate'] * 100:.2f}%")
+    print(f"Retention Success Rate : {metrics['retention_success_rate'] * 100:.2f}%")
+    print(f"Average Uses-to-Learn  : {metrics['average_uses_to_learn']:.2f}")
+    print(f"Uses-to-Learn Range    : {uses_text}")
+
+
 def print_live_table(records):
     print("\nLive Phrase Memory Threshold Test")
     print("-" * 106)
@@ -229,8 +268,10 @@ def run_learning_test(phrases, thresholds, context_words, top_k, cnn_count, epoc
         epochs=epochs,
         learning_rate=learning_rate,
     )
+    metrics = summarize_learning_metrics(live_records, cnn_records)
     return {
         "context_words": context_words,
+        "learning_metrics": metrics,
         "live_memory": {
             "success_rate": summarize(live_records, "appeared_at_threshold"),
             "records": live_records,
@@ -244,22 +285,33 @@ def run_learning_test(phrases, thresholds, context_words, top_k, cnn_count, epoc
 
 
 def print_context_comparison(results):
-    print("\nContext Length Comparison")
-    print("-" * 78)
+    print("\nPhrase Learning Metrics by Context Length")
+    print("-" * 105)
     print(
-        f"{'Context Words':>13} {'Live Success':>16} "
-        f"{'CNN Retrain Success':>22} {'CNN Error':<18}"
+        f"{'Context Words':>13} {'Learning Success':>18} "
+        f"{'Retention Success':>19} {'Avg Uses':>10} {'Uses Range':>12} {'CNN Error':<18}"
     )
-    print("-" * 78)
+    print("-" * 105)
     for result in results:
         error = result["cnn_retraining"].get("error") or "-"
+        metrics = result["learning_metrics"]
+        min_uses = metrics["minimum_uses_to_learn"]
+        max_uses = metrics["maximum_uses_to_learn"]
+        if min_uses is None:
+            uses_range = "-"
+        elif min_uses == max_uses:
+            uses_range = str(min_uses)
+        else:
+            uses_range = f"{min_uses}-{max_uses}"
         print(
             f"{result['context_words']:>13} "
-            f"{result['live_memory']['success_rate'] * 100:>15.2f}% "
-            f"{result['cnn_retraining']['success_rate'] * 100:>21.2f}% "
+            f"{metrics['learning_success_rate'] * 100:>17.2f}% "
+            f"{metrics['retention_success_rate'] * 100:>18.2f}% "
+            f"{metrics['average_uses_to_learn']:>10.2f} "
+            f"{uses_range:>12} "
             f"{error[:18]:<18}"
         )
-    print("-" * 78)
+    print("-" * 105)
 
 
 def save_learning_graph(results, output_path):
@@ -271,8 +323,8 @@ def save_learning_graph(results, output_path):
         print(f"\nCould not save graph: matplotlib unavailable ({exc})")
         return
 
-    labels = [f"{result['context_words']} word" if result["context_words"] == 1
-              else f"{result['context_words']} words"
+    labels = [f"{result['context_words']} context word" if result["context_words"] == 1
+              else f"{result['context_words']} context words"
               for result in results]
     live = [result["live_memory"]["success_rate"] * 100 for result in results]
     cnn = [result["cnn_retraining"]["success_rate"] * 100 for result in results]
@@ -285,7 +337,7 @@ def save_learning_graph(results, output_path):
 
     ax.set_title("Learned Phrase Adaptation Performance")
     ax.set_ylabel("Success Rate (%)")
-    ax.set_ylim(0, 100)
+    ax.set_ylim(0, 110)
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
     ax.legend()
@@ -307,6 +359,68 @@ def save_learning_graph(results, output_path):
     fig.savefig(output_path, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     print(f"Saved graph to {output_path}")
+
+
+def save_learning_metrics_table(results, output_path):
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except Exception as exc:
+        print(f"\nCould not save metrics table image: matplotlib unavailable ({exc})")
+        return
+
+    columns = [
+        "Context Words",
+        "Learning Success Rate",
+        "Retention Success Rate",
+        "Average Uses-to-Learn",
+    ]
+    rows = []
+    for result in results:
+        metrics = result["learning_metrics"]
+        rows.append([
+            str(result["context_words"]),
+            f"{metrics['learning_success_rate'] * 100:.1f}%",
+            f"{metrics['retention_success_rate'] * 100:.1f}%",
+            f"{metrics['average_uses_to_learn']:.2f}",
+        ])
+
+    fig, ax = plt.subplots(figsize=(9.5, 2.8), dpi=180)
+    ax.axis("off")
+    ax.set_title(
+        "Phrase Learning Metrics Summary",
+        fontsize=14,
+        fontweight="bold",
+        pad=14,
+    )
+
+    table = ax.table(
+        cellText=rows,
+        colLabels=columns,
+        cellLoc="center",
+        colLoc="center",
+        loc="center",
+        colWidths=[0.18, 0.28, 0.28, 0.26],
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1, 1.6)
+
+    for (row, _), cell in table.get_celld().items():
+        cell.set_edgecolor("#d1d5db")
+        if row == 0:
+            cell.set_facecolor("#1f2937")
+            cell.set_text_props(color="white", weight="bold")
+        elif row % 2 == 0:
+            cell.set_facecolor("#f3f4f6")
+        else:
+            cell.set_facecolor("white")
+
+    fig.tight_layout()
+    fig.savefig(output_path, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    print(f"Saved metrics table to {output_path}")
 
 
 def parse_args():
@@ -374,6 +488,11 @@ def parse_args():
         help="PNG graph output path.",
     )
     parser.add_argument(
+        "--metrics-table-output",
+        default="phrase_learning_metrics_table.png",
+        help="PNG table output path for the three phrase-learning metrics.",
+    )
+    parser.add_argument(
         "--no-graph",
         action="store_true",
         help="Skip PNG graph generation.",
@@ -413,6 +532,10 @@ def main():
                 print(f"\nCNN retraining test skipped: {result['cnn_retraining']['error']}")
             else:
                 print_cnn_table(result["cnn_retraining"]["records"])
+            print_learning_metrics(
+                f"Learning Metrics ({context_words} Context Words)",
+                result["learning_metrics"],
+            )
             results.append(result)
         print_context_comparison(results)
 
@@ -433,6 +556,7 @@ def main():
         print(f"\nSaved context comparison to {args.output}")
         if not args.no_graph:
             save_learning_graph(results, args.graph_output)
+            save_learning_metrics_table(results, args.metrics_table_output)
         return
 
     result = run_learning_test(
@@ -453,6 +577,10 @@ def main():
         print(f"\nCNN retraining test skipped: {cnn_error}")
     else:
         print_cnn_table(cnn_records)
+    print_learning_metrics(
+        f"Learning Metrics ({args.context_words} Context Words)",
+        result["learning_metrics"],
+    )
 
     payload = {
         "settings": {
@@ -464,6 +592,7 @@ def main():
             "epochs": epochs,
             "learning_rate": learning_rate,
         },
+        "learning_metrics": result["learning_metrics"],
         "live_memory": {
             "success_rate": summarize(live_records, "appeared_at_threshold"),
             "records": live_records,
@@ -479,6 +608,7 @@ def main():
     print(f"\nSaved results to {args.output}")
     if not args.no_graph:
         save_learning_graph([result], args.graph_output)
+        save_learning_metrics_table([result], args.metrics_table_output)
 
 
 if __name__ == "__main__":
