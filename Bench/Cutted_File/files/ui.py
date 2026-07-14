@@ -77,11 +77,15 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         special = []
         if hasattr(self, '_backspace_btn'): special.append(self._backspace_btn)
         if hasattr(self, '_clearall_btn'):  special.append(self._clearall_btn)
+        tts_btn = kb[4] if len(kb) >= 5 else None
         func_keys = kb[:5] + special + \
                     (self.predefined_func_buttons if hasattr(self, 'predefined_func_buttons') else [])
         if hasattr(self, 'panic_btn') and btn is self.panic_btn:
             restore_bg = theme.get("panic_bg", "#8b0000")
             restore_fg = "white"
+        elif tts_btn is not None and btn is tts_btn:
+            restore_bg = theme.get("tts_bg", theme.get("funckey_bg", theme["button_bg"]))
+            restore_fg = theme.get("funckey_fg", theme["button_fg"])
         elif btn in func_keys:
             restore_bg = theme.get("funckey_bg", theme["button_bg"])
             restore_fg = theme.get("funckey_fg", theme["button_fg"])
@@ -565,8 +569,9 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         try:
             width = 680
             height = 116
-            x = max(0, (self.winfo_screenwidth() - width) // 2)
-            y = 76
+            margin = 24
+            x = margin
+            y = max(margin, self.winfo_screenheight() - height - margin)
             self._head_warning_overlay.geometry(f"{width}x{height}+{x}+{y}")
             self._head_warning_overlay.deiconify()
             self._head_warning_overlay.lift()
