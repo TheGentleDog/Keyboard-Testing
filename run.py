@@ -219,9 +219,12 @@ class WelcomeUI(tk.Tk):
         self.canvas.bind("<ButtonRelease-1>", self._stop_window_drag)
 
         nav_y = 68
-        self._logo_frames = self._load_logo_frames(TANAW_LOGO_PATH, 34, 24)
+        # Keep the brand mark prominent at the lower-left edge of the landing page.
+        self._logo_frames = self._load_logo_frames(TANAW_LOGO_PATH, 68, 48)
         if self._logo_frames:
-            self._logo_item = c.create_image(24, 28, image=self._logo_frames[0][0])
+            self._logo_item = c.create_image(
+                24, height - 24, anchor="sw", image=self._logo_frames[0][0]
+            )
             self._animate_logo()
         self.about_nav = c.create_text(112, nav_y, text="About us", fill="#d6d7d8",
                                        font=("Krona One", 10), anchor="w")
