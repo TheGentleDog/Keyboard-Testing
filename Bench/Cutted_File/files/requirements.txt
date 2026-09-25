@@ -1,9 +1,10 @@
 opencv-python
 mediapipe==0.10.14
-numpy
+numpy==1.26.4
 scipy
 pyautogui
 pygame
+Pillow
 edge-tts
 pyttsx3
 transformers
