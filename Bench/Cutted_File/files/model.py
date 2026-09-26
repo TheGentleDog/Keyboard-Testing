@@ -26,9 +26,14 @@ from config import (
 )
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.abspath(os.path.join(_HERE, "..", "..", ".."))
 
 # Flores et al. (2022) derived substitution rules
 FLORES_RULES_FILE = os.path.join(_HERE, "flores_rules.json")
+EXTRA_SHORTCUT_FILES = [
+    os.path.join(_ROOT, "shortcut_library.json"),
+    os.path.join(_HERE, "shortcut_library.json"),
+]
 
 AAC_SEED_SEQUENCES = [
     ["i", "need", "help"],
@@ -299,10 +304,38 @@ class NgramModel:
         print(f"✓ Trigram contexts: {len(self.trigrams)}")
 
         # Load Flores et al. substitution rules
+        self.load_extra_shortcuts()
         self.load_flores_rules()
         return True
 
     # ── Flores et al. (2022) Rule-Based Candidate Generation ─────────────────
+    def load_extra_shortcuts(self):
+        """Load optional project shortcut libraries outside generated datasets."""
+        loaded = 0
+        for path in EXTRA_SHORTCUT_FILES:
+            if not os.path.exists(path):
+                continue
+            data = _load_dataset(path)
+            if not isinstance(data, dict):
+                continue
+            for abbrev, full_text in data.items():
+                abbrev = str(abbrev).lower().strip()
+                tokens = self._clean_sequence(str(full_text).split())
+                if not abbrev or not tokens:
+                    continue
+                cleaned_full_text = " ".join(tokens)
+                if self.csv_shortcuts.get(abbrev) == cleaned_full_text:
+                    continue
+                self.csv_shortcuts[abbrev] = cleaned_full_text
+                loaded += 1
+                for token in tokens:
+                    self.vocabulary.add(token)
+                    if self.unigrams.get(token, 0) < self.MIN_COMPLETION_COUNT:
+                        self.unigrams[token] = self.MIN_COMPLETION_COUNT
+                    self._build_char_ngrams(token)
+        if loaded:
+            print(f"✓ Extra shortcuts loaded: {loaded}")
+
     def load_flores_rules(self):
         """Load the derived substitution rules from flores_rules.json."""
         if not os.path.exists(FLORES_RULES_FILE):
@@ -593,6 +626,7 @@ class NgramModel:
                   f"Bigrams: {len(self.bigrams)}, "
                   f"Trigrams: {len(self.trigrams)}, "
                   f"Shortcuts: {len(self.csv_shortcuts)}")
+            self.load_extra_shortcuts()
             self.load_flores_rules()
             return True
         except Exception as e:
@@ -710,6 +744,8 @@ class NgramModel:
         rule_candidates = []
         if len(prefix) >= 2:
             for w in self.generate_rule_candidates(prefix):
+                if not self._lang_filter(w, language):
+                    continue
                 if not self._is_allowed_completion_word(w):
                     continue
                 if w not in [c for c, *_ in candidates + fuzzy_candidates]:
@@ -725,7 +761,11 @@ class NgramModel:
                 if prefix in self.user_shortcut_usage:
                     score *= (1.0 + min(self.user_shortcut_usage[prefix] / 10.0, 2.0))
             elif is_exact:
-                score = prob * mult * 10
+                # Prefix matches are the clearest signal in completion mode.
+                # Keep them above high-frequency fuzzy/rule matches such as
+                # "ay" or "ang" when the user has already typed "go" / "goo".
+                typed_ratio = min(len(prefix) / max(len(word), 1), 1.0)
+                score = prob * mult * 100 * (1.0 + typed_ratio)
             else:
                 score = prob * mult
             scored.append((word, score))
@@ -744,7 +784,59 @@ class NgramModel:
         'being','had','has','have','did','does','do','will','would',
         'could','should','may','might','must','shall','na','ng','sa',
         'nang','ang','mga','ay','din','rin','lang','lamang','pa',
+        'ka','mo','ko','akong','kang','kong','siyang','nating','bang',
+        'ba','po','opo','ho','daw','raw','yata','naman','already',
     }
+
+    _CURATED_STARTERS = {
+        "english": [
+            "i", "please", "can", "you", "help", "need", "want", "yes",
+            "no", "thank", "today", "now", "here",
+        ],
+        "filipino": [
+            "ako", "kailangan", "gusto", "tulong", "pwede", "masakit",
+            "gutom", "uhaw", "salamat", "oo", "hindi", "ngayon", "dito",
+        ],
+    }
+
+    def _starter_suggestions(self, max_results=6, language="both"):
+        if language == "english":
+            preferred = self._CURATED_STARTERS["english"]
+        elif language == "filipino":
+            preferred = self._CURATED_STARTERS["filipino"]
+        else:
+            preferred = [
+                "i", "ako", "please", "kailangan", "can", "gusto",
+                "you", "tulong", "help", "masakit", "need", "gutom",
+                "want", "uhaw", "yes", "oo", "no", "hindi",
+            ]
+
+        result = []
+        seen = set()
+
+        def add(word):
+            word = self._clean_token(word)
+            if not word or word in seen:
+                return
+            if word in self._BAD_STARTERS:
+                return
+            if not self._lang_filter(word, language):
+                return
+            if word not in self.vocabulary and self.unigrams.get(word, 0) == 0:
+                return
+            seen.add(word)
+            result.append(word)
+
+        for word in preferred:
+            add(word)
+            if len(result) >= max_results:
+                return result
+
+        for word, _ in self.unigrams.most_common(max_results * 10):
+            add(word)
+            if len(result) >= max_results:
+                break
+        return result
 
     def get_next_word_suggestions(self, context=None, max_results=6, language="both"):
         MIN_BIGRAM_COUNT = 3
@@ -767,14 +859,17 @@ class NgramModel:
 
         context = self._clean_sequence(context or [])
         if not context:
-            return _filter(self.unigrams.most_common(max_results * 5), no_starters=True)
+            return self._starter_suggestions(max_results=max_results, language=language)
         elif len(context) == 1:
             prev   = self.resolve_shortcut(context[0])
             source = (
                 Counter({w: c for w, c in self.bigrams[prev].items() if c >= MIN_BIGRAM_COUNT})
                 if prev in self.bigrams else self.unigrams
             )
-            return _filter(source.most_common(max_results * 3))
+            result = _filter(source.most_common(max_results * 3))
+            if result:
+                return result
+            return _filter(self.unigrams.most_common(max_results * 5), no_starters=True)
         else:
             prev2 = self.resolve_shortcut(context[-2])
             prev1 = self.resolve_shortcut(context[-1])

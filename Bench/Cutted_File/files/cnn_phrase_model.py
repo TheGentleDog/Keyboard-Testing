@@ -386,10 +386,9 @@ class CnnPhraseSuggester:
             tokens = self.phrase_tokens[phrase_id]
             if len(tokens) <= len(context_tokens):
                 continue
-            if tokens[:len(context_tokens)] == context_tokens:
-                missing = tokens[len(context_tokens):]
-            else:
-                missing = tokens
+            if tokens[:len(context_tokens)] != context_tokens:
+                continue
+            missing = tokens[len(context_tokens):]
             if not missing:
                 continue
             count_bonus = min(self.phrase_counts.get(phrase, 0), 20) / 20.0
