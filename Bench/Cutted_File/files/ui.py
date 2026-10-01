@@ -544,16 +544,16 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                 text=guide,
                 bg="#1b1b1b",
                 fg="#ffb199",
-                font=("Segoe UI", 18, "bold"),
+                font=("Segoe UI", 14, "bold"),
             )
-            title.pack(fill="x", padx=24, pady=(14, 2))
+            title.pack(fill="x", padx=16, pady=(9, 1))
             detail = tk.Label(
                 frame,
                 bg="#1b1b1b",
                 fg="#f1f1f1",
-                font=("Segoe UI", 11),
+                font=("Segoe UI", 9),
             )
-            detail.pack(fill="x", padx=24, pady=(0, 14))
+            detail.pack(fill="x", padx=16, pady=(0, 9))
 
             self._head_warning_overlay = overlay
             self._head_warning_title = title
@@ -567,10 +567,10 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             )
         )
         try:
-            width = 680
-            height = 116
+            width = 480
+            height = 86
             margin = 24
-            x = margin
+            x = max(margin, (self.winfo_screenwidth() - width) // 2)
             y = max(margin, self.winfo_screenheight() - height - margin)
             self._head_warning_overlay.geometry(f"{width}x{height}+{x}+{y}")
             self._head_warning_overlay.deiconify()
