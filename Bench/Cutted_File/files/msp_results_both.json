@@ -1,0 +1,583 @@
+{
+  "meta": {
+    "generated_at": "2026-10-01T20:27:15",
+    "top_k": 5,
+    "languages": "both",
+    "prediction_language": "both",
+    "model_cache": "ngram_model_standalone.json",
+    "description": "MSP evaluation of word completion suggestions"
+  },
+  "word_results": [
+    {
+      "word": "hello",
+      "baseline": 5,
+      "selection_point": null,
+      "msp": null,
+      "appeared": false,
+      "hit_at_1": false,
+      "lang": "both"
+    },
+    {
+      "word": "help",
+      "baseline": 4,
+      "selection_point": 1,
+      "msp": 0.25,
+      "appeared": true,
+      "hit_at_1": true,
+      "lang": "both"
+    },
+    {
+      "word": "good",
+      "baseline": 4,
+      "selection_point": 2,
+      "msp": 0.5,
+      "appeared": true,
+      "hit_at_1": false,
+      "lang": "both"
+    },
+    {
+      "word": "salamat",
+      "baseline": 7,
+      "selection_point": 2,
+      "msp": 0.2857,
+      "appeared": true,
+      "hit_at_1": false,
+      "lang": "both"
+    },
+    {
+      "word": "kailangan",
+      "baseline": 9,
+      "selection_point": 1,
+      "msp": 0.1111,
+      "appeared": true,
+      "hit_at_1": false,
+      "lang": "both"
+    },
+    {
+      "word": "dito",
+      "baseline": 4,
+      "selection_point": 1,
+      "msp": 0.25,
+      "appeared": true,
+      "hit_at_1": true,
+      "lang": "both"
+    },
+    {
+      "word": "bahay",
+      "baseline": 5,
+      "selection_point": 1,
+      "msp": 0.2,
+      "appeared": true,
+      "hit_at_1": false,
+      "lang": "both"
+    }
+  ],
+  "word_results_full": [
+    {
+      "word": "hello",
+      "baseline": 5,
+      "selection_point": null,
+      "msp": null,
+      "appeared": false,
+      "hit_at_1": false,
+      "prefix_details": [
+        {
+          "prefix": "h",
+          "prefix_len": 1,
+          "suggestions": [
+            "help",
+            "here",
+            "huwag",
+            "he",
+            "hindi"
+          ],
+          "hit": false
+        },
+        {
+          "prefix": "he",
+          "prefix_len": 2,
+          "suggestions": [
+            "here",
+            "help",
+            "he",
+            "her",
+            "hear"
+          ],
+          "hit": false
+        },
+        {
+          "prefix": "hel",
+          "prefix_len": 3,
+          "suggestions": [
+            "help",
+            "i",
+            "hell",
+            "ba",
+            "here"
+          ],
+          "hit": false
+        },
+        {
+          "prefix": "hell",
+          "prefix_len": 4,
+          "suggestions": [
+            "i",
+            "ay",
+            "hell",
+            "help",
+            "all"
+          ],
+          "hit": false
+        },
+        {
+          "prefix": "hello",
+          "prefix_len": 5,
+          "suggestions": [
+            "him",
+            "heal",
+            "hell"
+          ],
+          "hit": false
+        }
+      ],
+      "lang": "both"
+    },
+    {
+      "word": "help",
+      "baseline": 4,
+      "selection_point": 1,
+      "msp": 0.25,
+      "appeared": true,
+      "hit_at_1": true,
+      "prefix_details": [
+        {
+          "prefix": "h",
+          "prefix_len": 1,
+          "suggestions": [
+            "help",
+            "here",
+            "huwag",
+            "he",
+            "hindi"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "he",
+          "prefix_len": 2,
+          "suggestions": [
+            "here",
+            "help",
+            "he",
+            "her",
+            "hear"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "hel",
+          "prefix_len": 3,
+          "suggestions": [
+            "help",
+            "i",
+            "hell",
+            "ba",
+            "here"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "help",
+          "prefix_len": 4,
+          "suggestions": [
+            "help",
+            "i",
+            "ay",
+            "heal",
+            "ah"
+          ],
+          "hit": true
+        }
+      ],
+      "lang": "both"
+    },
+    {
+      "word": "good",
+      "baseline": 4,
+      "selection_point": 2,
+      "msp": 0.5,
+      "appeared": true,
+      "hit_at_1": false,
+      "prefix_details": [
+        {
+          "prefix": "g",
+          "prefix_len": 1,
+          "suggestions": [
+            "sige",
+            "gustong",
+            "gusto",
+            "go",
+            "going"
+          ],
+          "hit": false
+        },
+        {
+          "prefix": "go",
+          "prefix_len": 2,
+          "suggestions": [
+            "go",
+            "going",
+            "good",
+            "gone",
+            "gorgeous"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "goo",
+          "prefix_len": 3,
+          "suggestions": [
+            "good",
+            "google",
+            "ay",
+            "doon",
+            "go"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "good",
+          "prefix_len": 4,
+          "suggestions": [
+            "good",
+            "ay",
+            "ang",
+            "and",
+            "ako"
+          ],
+          "hit": true
+        }
+      ],
+      "lang": "both"
+    },
+    {
+      "word": "salamat",
+      "baseline": 7,
+      "selection_point": 2,
+      "msp": 0.2857,
+      "appeared": true,
+      "hit_at_1": false,
+      "prefix_details": [
+        {
+          "prefix": "s",
+          "prefix_len": 1,
+          "suggestions": [
+            "sa",
+            "siyang",
+            "subukan",
+            "she",
+            "siya"
+          ],
+          "hit": false
+        },
+        {
+          "prefix": "sa",
+          "prefix_len": 2,
+          "suggestions": [
+            "sa",
+            "sana",
+            "said",
+            "salamat",
+            "sabihin"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "sal",
+          "prefix_len": 3,
+          "suggestions": [
+            "salamat",
+            "sale",
+            "salad",
+            "salmon",
+            "sa"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "sala",
+          "prefix_len": 4,
+          "suggestions": [
+            "salamat",
+            "salad",
+            "sana",
+            "sila",
+            "wala"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "salam",
+          "prefix_len": 5,
+          "suggestions": [
+            "salamat",
+            "magpasalamat",
+            "alam",
+            "malamig",
+            "salad"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "salama",
+          "prefix_len": 6,
+          "suggestions": [
+            "salamat",
+            "magpasalamat"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "salamat",
+          "prefix_len": 7,
+          "suggestions": [
+            "salamat",
+            "magpasalamat"
+          ],
+          "hit": true
+        }
+      ],
+      "lang": "both"
+    },
+    {
+      "word": "kailangan",
+      "baseline": 9,
+      "selection_point": 1,
+      "msp": 0.1111,
+      "appeared": true,
+      "hit_at_1": false,
+      "prefix_details": [
+        {
+          "prefix": "k",
+          "prefix_len": 1,
+          "suggestions": [
+            "ka",
+            "kailangan",
+            "ko",
+            "kaya",
+            "kwarto"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "ka",
+          "prefix_len": 2,
+          "suggestions": [
+            "ka",
+            "kailangan",
+            "kaya",
+            "kay",
+            "kami"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "kai",
+          "prefix_len": 3,
+          "suggestions": [
+            "kailangan",
+            "kailan",
+            "kaibigan",
+            "ka",
+            "kaya"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "kail",
+          "prefix_len": 4,
+          "suggestions": [
+            "kailangan",
+            "ka",
+            "kailan"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "kaila",
+          "prefix_len": 5,
+          "suggestions": [
+            "kailangan",
+            "kailan",
+            "kala"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "kailan",
+          "prefix_len": 6,
+          "suggestions": [
+            "kailangan",
+            "kailan"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "kailang",
+          "prefix_len": 7,
+          "suggestions": [
+            "kailangan",
+            "kailan"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "kailanga",
+          "prefix_len": 8,
+          "suggestions": [
+            "kailangan"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "kailangan",
+          "prefix_len": 9,
+          "suggestions": [
+            "kailangan"
+          ],
+          "hit": true
+        }
+      ],
+      "lang": "both"
+    },
+    {
+      "word": "dito",
+      "baseline": 4,
+      "selection_point": 1,
+      "msp": 0.25,
+      "appeared": true,
+      "hit_at_1": true,
+      "prefix_details": [
+        {
+          "prefix": "d",
+          "prefix_len": 1,
+          "suggestions": [
+            "dito",
+            "doon",
+            "day",
+            "di",
+            "dumating"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "di",
+          "prefix_len": 2,
+          "suggestions": [
+            "hindi",
+            "dito",
+            "die",
+            "different",
+            "i"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "dit",
+          "prefix_len": 3,
+          "suggestions": [
+            "dito",
+            "i",
+            "are",
+            "ito",
+            "eat"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "dito",
+          "prefix_len": 4,
+          "suggestions": [
+            "dito",
+            "go",
+            "in",
+            "it",
+            "eat"
+          ],
+          "hit": true
+        }
+      ],
+      "lang": "both"
+    },
+    {
+      "word": "bahay",
+      "baseline": 5,
+      "selection_point": 1,
+      "msp": 0.2,
+      "appeared": true,
+      "hit_at_1": false,
+      "prefix_details": [
+        {
+          "prefix": "b",
+          "prefix_len": 1,
+          "suggestions": [
+            "ba",
+            "bahay",
+            "bang",
+            "bukas",
+            "bakit"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "ba",
+          "prefix_len": 2,
+          "suggestions": [
+            "bang",
+            "ba",
+            "bakit",
+            "bahay",
+            "back"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "bah",
+          "prefix_len": 3,
+          "suggestions": [
+            "bahay",
+            "bahala",
+            "am",
+            "bang",
+            "ba"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "baha",
+          "prefix_len": 4,
+          "suggestions": [
+            "bahay",
+            "bahala",
+            "lahat",
+            "babae",
+            "buhay"
+          ],
+          "hit": true
+        },
+        {
+          "prefix": "bahay",
+          "prefix_len": 5,
+          "suggestions": [
+            "bahay",
+            "buhay",
+            "bahala",
+            "bagay"
+          ],
+          "hit": true
+        }
+      ],
+      "lang": "both"
+    }
+  ]
+}

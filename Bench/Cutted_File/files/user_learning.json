@@ -5,13 +5,13 @@
     "w": "want",
     "l": "looking",
     "el": "election",
-    "n": "nurse",
+    "n": "need",
     "h": "help",
     "y": "you",
     "k": "kailangan",
     "ku": "kumain",
     "p": "pwede",
-    "f": "feel",
+    "f": "find",
     "v": "visiting",
     "u": "you",
     "j": "justice",
@@ -19,7 +19,9 @@
     "human": "humarap",
     "lol": "laughing out loud",
     "pog": "pagod",
-    "b": "bahay"
+    "b": "bahay",
+    "jo": "join",
+    "pl": "please"
   },
   "user_shortcut_usage": {
     "m": 2,
@@ -27,13 +29,13 @@
     "w": 3,
     "l": 2,
     "el": 1,
-    "n": 1,
+    "n": 2,
     "h": 3,
     "y": 1,
     "k": 2,
     "ku": 1,
     "p": 1,
-    "f": 1,
+    "f": 2,
     "v": 1,
     "u": 1,
     "j": 1,
@@ -41,38 +43,14 @@
     "human": 1,
     "lol": 1,
     "pog": 1,
-    "b": 1
+    "b": 1,
+    "jo": 1,
+    "pl": 1
   },
-  "new_words": [],
+  "new_words": [
+    "hello"
+  ],
   "word_usage_history": [
-    [
-      "water",
-      [
-        "get",
-        "some"
-      ]
-    ],
-    [
-      "i",
-      [
-        "some",
-        "water"
-      ]
-    ],
-    [
-      "don't",
-      [
-        "water",
-        "i"
-      ]
-    ],
-    [
-      "water",
-      [
-        "get",
-        "some"
-      ]
-    ],
     [
       "ngayon",
       [
@@ -792,6 +770,35 @@
       "you",
       [
         "you"
+      ]
+    ],
+    [
+      "find",
+      [
+        "find"
+      ]
+    ],
+    [
+      "i",
+      [
+        "i",
+        "need",
+        "water"
+      ]
+    ],
+    [
+      "need",
+      [
+        "i",
+        "need",
+        "water"
+      ]
+    ],
+    [
+      "water",
+      [
+        "i",
+        "need"
       ]
     ]
   ]

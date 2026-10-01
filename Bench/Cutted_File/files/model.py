@@ -493,28 +493,45 @@ class NgramModel:
             self.save_user_learning()
 
     def add_new_word(self, word):
-        word_lower = word.lower()
+        word_lower = self._clean_token(word)
+        if not word_lower:
+            return
         if word_lower not in self.vocabulary:
             self.vocabulary.add(word_lower)
             self.new_words.add(word_lower)
-            self.unigrams[word_lower] = 1
+            self.unigrams[word_lower] = max(
+                self.unigrams.get(word_lower, 0),
+                self.MIN_COMPLETION_COUNT,
+            )
+            self._build_char_ngrams(word_lower)
             print(f"📝 New word: '{word}'")
             self.save_user_learning()
 
     def track_word_usage(self, word, context=None):
-        word_lower = word.lower()
+        word_lower = self._clean_token(word)
+        if not word_lower:
+            return
+        learned_new_word = word_lower not in self.vocabulary
+        if learned_new_word:
+            self.vocabulary.add(word_lower)
+            self.new_words.add(word_lower)
+            self._build_char_ngrams(word_lower)
         self.unigrams[word_lower] += 1
+        if learned_new_word and self.unigrams[word_lower] < self.MIN_COMPLETION_COUNT:
+            self.unigrams[word_lower] = self.MIN_COMPLETION_COUNT
         self.total_words += 1
         if context and len(context) >= 1:
-            prev = self.resolve_shortcut(context[-1].lower())
+            prev = self._clean_token(context[-1])
             self.bigrams[prev][word_lower] += 1
         if context and len(context) >= 2:
-            prev2 = self.resolve_shortcut(context[-2].lower())
-            prev1 = self.resolve_shortcut(context[-1].lower())
+            prev2 = self._clean_token(context[-2])
+            prev1 = self._clean_token(context[-1])
             self.trigrams[(prev2, prev1)][word_lower] += 1
         self.word_usage_history.append((word_lower, context))
         if len(self.word_usage_history) > 1000:
             self.word_usage_history.pop(0)
+        if learned_new_word:
+            self.save_user_learning()
 
     # ── Persistence (JSON — no pickle) ────────────────────────────────────────
     def save_user_learning(self):
@@ -541,6 +558,10 @@ class NgramModel:
             self.new_words           = set(user_data.get('new_words', []))
             self.word_usage_history  = user_data.get('word_usage_history', [])
             self.vocabulary.update(self.new_words)
+            for word in self.new_words:
+                if self.unigrams.get(word, 0) < self.MIN_COMPLETION_COUNT:
+                    self.unigrams[word] = self.MIN_COMPLETION_COUNT
+                self._build_char_ngrams(word)
             print(f"✓ User shortcuts: {len(self.user_shortcuts)}")
             print(f"✓ New words: {len(self.new_words)}")
         except Exception as e:
@@ -644,15 +665,15 @@ class NgramModel:
             count = self.unigrams.get(word, 0)
             return (count + alpha) / (self.total_words + alpha * vocab_size)
         elif len(context) == 1:
-            prev      = self.resolve_shortcut(self._clean_token(context[0]))
+            prev      = self._clean_token(context[0])
             count     = self.bigrams[prev].get(word, 0)
             prev_count= self.unigrams.get(prev, 0)
             if prev_count == 0:
                 return self.get_word_probability(word)
             return (count + alpha) / (prev_count + alpha * vocab_size)
         else:
-            prev2     = self.resolve_shortcut(self._clean_token(context[-2]))
-            prev1     = self.resolve_shortcut(self._clean_token(context[-1]))
+            prev2     = self._clean_token(context[-2])
+            prev1     = self._clean_token(context[-1])
             ctx       = (prev2, prev1)
             count     = self.trigrams[ctx].get(word, 0)
             ctx_count = sum(self.trigrams[ctx].values())
@@ -742,8 +763,15 @@ class NgramModel:
 
         # Flores et al. rule-based candidates
         rule_candidates = []
-        if len(prefix) >= 2:
+        allow_rule_candidates = (
+            len(prefix) >= 2
+            and not shortcut_candidates
+            and not exact_matches
+        )
+        if allow_rule_candidates:
             for w in self.generate_rule_candidates(prefix):
+                if not w.startswith(prefix[0]):
+                    continue
                 if not self._lang_filter(w, language):
                     continue
                 if not self._is_allowed_completion_word(w):
@@ -861,18 +889,17 @@ class NgramModel:
         if not context:
             return self._starter_suggestions(max_results=max_results, language=language)
         elif len(context) == 1:
-            prev   = self.resolve_shortcut(context[0])
-            source = (
-                Counter({w: c for w, c in self.bigrams[prev].items() if c >= MIN_BIGRAM_COUNT})
-                if prev in self.bigrams else self.unigrams
-            )
+            prev   = context[0]
+            if prev not in self.bigrams:
+                return []
+            source = Counter({w: c for w, c in self.bigrams[prev].items() if c >= MIN_BIGRAM_COUNT})
             result = _filter(source.most_common(max_results * 3))
             if result:
                 return result
-            return _filter(self.unigrams.most_common(max_results * 5), no_starters=True)
+            return []
         else:
-            prev2 = self.resolve_shortcut(context[-2])
-            prev1 = self.resolve_shortcut(context[-1])
+            prev2 = context[-2]
+            prev1 = context[-1]
             ctx   = (prev2, prev1)
             if ctx in self.trigrams:
                 source = Counter({w: c for w, c in self.trigrams[ctx].items() if c >= MIN_TRIGRAM_COUNT})
@@ -884,7 +911,7 @@ class NgramModel:
                 result = _filter(source.most_common(max_results * 3))
                 if result:
                     return result
-            return _filter(self.unigrams.most_common(max_results * 5), no_starters=True)
+            return []
 
 
 # =============================================================================
