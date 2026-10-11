@@ -39,6 +39,8 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             "funckey_bg":       "#dedede",
             "funckey_fg":       "black",
             "funckey_active_bg":"#d2d2d2",
+            "tts_bg":           "#9dceff",
+            "tts_active_bg":    "#69b4ff",
             "button_border":    "#a8a8a8",
             "dwell_bar":        "#00cc44",
             "dwell_bg":         "#c8f0d8",
@@ -69,6 +71,18 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     POINTER_SIZE = 72
     POINTER_OUTLINE = "#8b0018"
     POINTER_FILL = "#8f8f8f"
+
+    @staticmethod
+    def _composite_hex(background, foreground, opacity):
+        """Return foreground composited over background at the given opacity."""
+        try:
+            bg = tuple(int(background.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
+            fg = tuple(int(foreground.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
+            alpha = max(0.0, min(1.0, float(opacity)))
+            mixed = tuple(round((1.0 - alpha) * b + alpha * f) for b, f in zip(bg, fg))
+            return "#{:02x}{:02x}{:02x}".format(*mixed)
+        except (TypeError, ValueError):
+            return foreground
 
     # ── Override dwell flash to restore correct per-button colour ─────────────
     def _dwell_flash(self, btn):
@@ -183,7 +197,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         if step == "type_hello":
             return [self._expected_hello_target()[1]]
         if step == "select_there":
-            return [self._tutorial_select_there_target()]
+            return self._tutorial_select_there_targets()
         if step in ("tts_hello", "tts_hi"):
             return [self.keyboard_buttons[4] if len(self.keyboard_buttons) >= 5 else None]
         if step == "edit_hello":
@@ -208,24 +222,33 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             return []
         return None
 
-    def _tutorial_select_there_target(self):
+    def _tutorial_select_there_targets(self):
         words = [w.lower() for w in self.output_words]
         if words == ["hello"]:
             if self.current_input:
-                return getattr(self, "_backspace_btn", None)
-            return self._prediction_button("there")
+                return [getattr(self, "_backspace_btn", None)]
+            # Phrase learning can surface the full learned phrase instead of
+            # the next word. Both choices produce "hello there" here, so the
+            # tutorial must permit either one while keeping every other
+            # prediction locked.
+            return self._prediction_buttons("there", "hello there")
         if words and words[0] != "hello":
-            return getattr(self, "_clearall_btn", None)
+            return [getattr(self, "_clearall_btn", None)]
         if len(words) >= 2:
             bad_index = len(words) - 1
             if self.output_cursor == -1:
-                return self.keyboard_buttons[0] if len(self.keyboard_buttons) >= 1 else None
+                return [self.keyboard_buttons[0] if len(self.keyboard_buttons) >= 1 else None]
             if self.output_cursor < bad_index:
-                return self.keyboard_buttons[1] if len(self.keyboard_buttons) >= 2 else None
+                return [self.keyboard_buttons[1] if len(self.keyboard_buttons) >= 2 else None]
             if self.output_cursor > bad_index:
-                return self.keyboard_buttons[0] if len(self.keyboard_buttons) >= 1 else None
-            return getattr(self, "_backspace_btn", None)
-        return self._prediction_button("there")
+                return [self.keyboard_buttons[0] if len(self.keyboard_buttons) >= 1 else None]
+            return [getattr(self, "_backspace_btn", None)]
+        return self._prediction_buttons("there", "hello there")
+
+    def _tutorial_select_there_target(self):
+        """Return the preferred target used by the visual tutorial guide."""
+        targets = self._tutorial_select_there_targets()
+        return targets[0] if targets else self.predictive_container
 
     def _tutorial_edit_hello_target(self):
         words = [w.lower() for w in self.output_words]
@@ -298,6 +321,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         self._tutorial_job           = None
         self._tutorial_overlay_canvas = None
         self._guide_overlay          = None
+        self._guide_label_panel      = None
         self._guide_canvas           = None
         self._guide_job              = None
         self._finish_tutorial_btn    = None
@@ -809,7 +833,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         if self.output_words and self.output_words[0].lower() == "hello":
             self._tutorial_step = "select_there"
             self._show_ui_tutorial_text(
-                "Gaze at 'there' if it appears in the predictions",
+                "Gaze at 'there' or 'hello there' in the predictions",
                 5000,
                 self._update_prediction_guide,
                 target="predictions",
@@ -855,7 +879,15 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             self._draw_guide("Gaze at backspace, then gaze at 'there'", getattr(self, "_backspace_btn", None))
             self._guide_job = self.after(150, self._update_prediction_guide)
             return
-        self._draw_guide("Gaze at 'there'", self._prediction_button("there"))
+        targets = self._tutorial_select_there_targets()
+        target = targets[0] if targets else self.predictive_container
+        target_text = ""
+        try:
+            target_text = target.cget("text").strip().casefold()
+        except Exception:
+            pass
+        guide_text = "Gaze at 'hello there'" if target_text == "hello there" else "Gaze at 'there'"
+        self._draw_guide(guide_text, target)
         self._guide_job = self.after(150, self._update_prediction_guide)
 
     def _update_edit_hello_guide(self):
@@ -1149,15 +1181,51 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             return self.keyboard_buttons[4]
         return None
 
-    def _prediction_button(self, word):
-        wanted = word.lower()
+    def _prediction_buttons(self, *words):
+        wanted = {word.strip().casefold() for word in words}
+        matches = []
         for child in self.predictive_container.winfo_children():
             try:
-                if child.cget("text").lower() == wanted:
-                    return child
+                if child.cget("text").strip().casefold() in wanted:
+                    matches.append(child)
             except Exception:
                 pass
+        # Preserve the requested order so the single-word prediction remains
+        # the visual guide's preferred target when both choices are present.
+        return sorted(
+            matches,
+            key=lambda child: next(
+                (index for index, word in enumerate(words)
+                 if child.cget("text").strip().casefold() == word.strip().casefold()),
+                len(words),
+            ),
+        )
+
+    def _prediction_button(self, word):
+        matches = self._prediction_buttons(word)
+        if matches:
+            return matches[0]
         return self.predictive_container
+
+    def _draw_guide_label(self, canvas, x, y, text, font, **kwargs):
+        """Draw guide text with a separate 40%-opaque black panel behind it."""
+        text_id = canvas.create_text(x, y, text=text, font=font, **kwargs)
+        bounds = canvas.bbox(text_id)
+        panel = self._guide_label_panel
+        if bounds and panel is not None:
+            pad_x, pad_y = 28, 16
+            width = max(1, bounds[2] - bounds[0] + (pad_x * 2))
+            height = max(1, bounds[3] - bounds[1] + (pad_y * 2))
+            panel_x = self.winfo_rootx() + bounds[0] - pad_x
+            panel_y = self.winfo_rooty() + bounds[1] - pad_y
+            try:
+                panel.geometry(f"{width}x{height}+{panel_x}+{panel_y}")
+                panel.deiconify()
+                panel.lift()
+                self._guide_overlay.lift()
+            except Exception:
+                pass
+        return text_id
 
     def _hide_tutorial_target_outline(self, widget):
         if config.DWELL_MODE != "async" or widget is None:
@@ -1175,6 +1243,17 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
     def _ensure_guide_overlay(self):
         if self._guide_overlay is not None:
             return
+        panel = tk.Toplevel(self)
+        panel.withdraw()
+        panel.overrideredirect(True)
+        panel.attributes("-topmost", True)
+        panel.attributes("-alpha", 0.4)
+        panel.configure(bg="#000000", cursor=self.pointer_cursor)
+        try:
+            panel.wm_attributes("-disabled", True)
+        except Exception:
+            pass
+
         overlay = tk.Toplevel(self)
         overlay.withdraw()
         overlay.overrideredirect(True)
@@ -1197,6 +1276,7 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
             cursor=self.pointer_cursor,
         )
         canvas.pack(fill="both", expand=True)
+        self._guide_label_panel = panel
         self._guide_overlay = overlay
         self._guide_canvas = canvas
         overlay.deiconify()
@@ -1214,6 +1294,12 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                 self._guide_overlay.destroy()
             except Exception:
                 pass
+        if self._guide_label_panel is not None:
+            try:
+                self._guide_label_panel.destroy()
+            except Exception:
+                pass
+        self._guide_label_panel = None
         self._guide_overlay = None
         self._guide_canvas = None
 
@@ -1226,7 +1312,8 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
         canvas.delete("all")
         w = max(1, canvas.winfo_width())
         h = max(1, canvas.winfo_height())
-        canvas.create_text(
+        self._draw_guide_label(
+            canvas,
             w // 2,
             90,
             text=text,
@@ -1976,8 +2063,9 @@ class FilipinoKeyboard(tk.Tk, DwellMixin):
                 self.input_display.insert("end", "|", "cursor")
             else:
                 self.input_display.insert("end", "|", "cursor")
+        selected_word_bg = self._composite_hex(theme["input_bg"], "#000000", 0.4)
         self.input_display.tag_config("cursor",      foreground="red",             font=("Segoe UI", 32, "bold"))
-        self.input_display.tag_config("highlighted",  foreground=theme["text_fg"],  background="yellow", font=("Segoe UI", 32))
+        self.input_display.tag_config("highlighted",  foreground=theme["text_fg"],  background=selected_word_bg, font=("Segoe UI", 32))
         self.input_display.tag_config("editing",      foreground=theme["text_fg"],  font=("Segoe UI", 32))
         self.input_display.tag_config("normal",       foreground=theme["text_fg"],  font=("Segoe UI", 32))
         self.input_display.config(state="disabled")

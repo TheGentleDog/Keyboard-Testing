@@ -212,13 +212,6 @@ class WelcomeUI(tk.Tk):
         self.canvas.bind("<ButtonRelease-1>", self._stop_window_drag)
 
         nav_y = 68
-        # Keep the brand mark prominent at the lower-left edge of the landing page.
-        self._logo_frames = self._load_logo_frames(TANAW_LOGO_PATH, 68, 48)
-        if self._logo_frames:
-            self._logo_item = c.create_image(
-                24, height - 24, anchor="sw", image=self._logo_frames[0][0]
-            )
-            self._animate_logo()
         self.about_nav = c.create_text(112, nav_y, text="About us", fill="#d6d7d8",
                                        font=("Krona One", 10), anchor="w")
         self.home_nav = c.create_text(width // 2, nav_y, text="Home", fill="#ffffff",
@@ -233,8 +226,22 @@ class WelcomeUI(tk.Tk):
             c.tag_bind(item, "<Button-1>", command)
             c.tag_bind(item, "<Enter>", lambda _e, nav=item: self._on_nav_enter(nav))
             c.tag_bind(item, "<Leave>", lambda _e, nav=item: self._on_nav_leave(nav))
-        c.create_text(width - 32, height - 30, text="SeenByEveryone", fill="#d6d7d8",
-                      font=("Krona One", 10), anchor="e")
+        brand_text = c.create_text(
+            24, height - 30,
+            text="SeenByEveryone", fill="#d6d7d8",
+            font=("Krona One", 10), anchor="w",
+        )
+        # Keep the footer branding together at the lower-left, with the
+        # animated TANAW mark immediately to the left of the text.
+        self._logo_frames = self._load_logo_frames(TANAW_LOGO_PATH, 44, 32)
+        if self._logo_frames:
+            logo_image = self._logo_frames[0][0]
+            logo_x = 24
+            c.coords(brand_text, logo_x + logo_image.width() + 2, height - 30)
+            self._logo_item = c.create_image(
+                logo_x, height - 30, anchor="w", image=logo_image
+            )
+            self._animate_logo()
         center_x = width // 2
         content_y = int(height * 0.43)
 
@@ -1909,24 +1916,29 @@ class LauncherUI(tk.Tk):
         ]:
             make_nav(key, title)
 
-        def footer_button(key, label, y, fill, hover, callback):
+        def footer_button(
+            key, label, y, fill, hover, callback,
+            text_fill="#ffffff", border_fill=None,
+        ):
             x1 = nav_x + 18
             w = nav_w - 36
             h = 34
             tag = f"footer_{key}"
             if Image is not None:
-                normal_img = self._render_setup_action_button(w, h, fill)
-                hover_img = self._render_setup_action_button(w, h, hover)
+                normal_img = self._render_setup_action_button(w, h, fill, border=border_fill)
+                hover_img = self._render_setup_action_button(w, h, hover, border=border_fill)
                 nav_images[tag] = {"idle": normal_img, "hover": hover_img}
                 rect = self._launcher_canvas.create_image(
                     x1, y, anchor="nw", image=normal_img, tags=(tag, "footer_button"),
                 )
             else:
                 rect = self._launcher_canvas.create_rectangle(
-                    x1, y, x1 + w, y + h, outline="", fill=fill, tags=(tag, "footer_button"),
+                    x1, y, x1 + w, y + h,
+                    outline=border_fill or "", fill=fill,
+                    tags=(tag, "footer_button"),
                 )
             self._launcher_canvas.create_text(
-                x1 + w / 2, y + h / 2, text=label, fill="#ffffff",
+                x1 + w / 2, y + h / 2, text=label, fill=text_fill,
                 font=("Segoe UI", 8, "bold"), anchor="center", tags=(tag, "footer_button"),
             )
             self._launcher_canvas.tag_bind(tag, "<Button-1>", callback)
@@ -1962,8 +1974,11 @@ class LauncherUI(tk.Tk):
                 )
 
         footer_y = nav_y + nav_h - 92
-        footer_button("tutorial", "Start with tutorial", footer_y, WelcomeUI.BUTTON, WelcomeUI.BUTTON_HOVER,
-                      lambda e: self._on_start(e, tutorial=True))
+        footer_button(
+            "tutorial", "Start with tutorial", footer_y, "#ffffff", "#e5e5e5",
+            lambda e: self._on_start(e, tutorial=True),
+            text_fill="#000000", border_fill="#000000",
+        )
         footer_button("skip", "Start without tutorial", footer_y + 42, WelcomeUI.BUTTON, WelcomeUI.BUTTON_HOVER,
                       lambda e: self._on_start(e, tutorial=False))
 
@@ -2708,18 +2723,18 @@ class LauncherUI(tk.Tk):
         img = img.resize((width, height), Image.Resampling.LANCZOS)
         return ImageTk.PhotoImage(img)
 
-    def _render_setup_action_button(self, width, height, fill):
+    def _render_setup_action_button(self, width, height, fill, border=None):
         scale = 4
         img = Image.new("RGBA", (width * scale, height * scale), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img, "RGBA")
-        border = self._hex_to_rgb(WelcomeUI.BUTTON_BORDER)
+        border_rgb = self._hex_to_rgb(border or WelcomeUI.BUTTON_BORDER)
         fill_rgb = self._hex_to_rgb(fill)
         rect = (2 * scale, 2 * scale, (width - 2) * scale, (height - 2) * scale)
         draw.rounded_rectangle(
             rect,
             radius=(height // 2 - 1) * scale,
             fill=(*fill_rgb, 255),
-            outline=(*border, 255),
+            outline=(*border_rgb, 255),
             width=scale,
         )
         img = img.resize((width, height), Image.Resampling.LANCZOS)
